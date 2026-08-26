@@ -14,6 +14,34 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-26 — momentti-level applicability is not modelled
+
+- **What:** 3 § scopes which clauses bind non-residential properties *by sub-clause* — `17 §
+  Kompostointi, momentit 1–3, 5, 7–9`, `23 § Jäteastiatyypit, momentit 1–3, 6`. Chunks are whole
+  clauses, so no chunk can express "only momentit 1–3, 5, 7–9 apply to you". Deferred deliberately:
+  it matters for business properties, and the users in `DESIGN.md:22-26` are the advisor and the
+  resident.
+- **Where:** decided in `docs/adr/0004-clause-chunking-carve-outs-and-stable-addressing.md`; will
+  land in the chunker once it exists.
+- **What green tests do NOT prove here:** nothing in the golden set will fail because of this unless
+  business-property questions are added *as a known-fail class*. Without that, the gap is invisible:
+  the system answers a business-property question using clauses that do not bind it, confidently and
+  with a correct-looking citation.
+- **Disposition:** open — accepted for the MVP. Revisit if the advisor persona turns out to field
+  business-property questions in practice.
+
+## 2026-08-26 — slice 1 does not exercise the hard filter
+
+- **What:** Slice 1 ingests one authority, so there is no second jurisdiction to leak from. The
+  authority filter and the chunk address are built, but the adversarial cross-authority case — ask a
+  Kuopio-only question with `authority=lounais-suomi` and require a refusal — cannot run until the
+  second authority lands in slice 2.
+- **Where:** `specs/SPEC-slice-1-measurement-spine.md` (non-goals, and slice 2).
+- **What green tests do NOT prove here:** a green slice-1 eval says nothing about `DESIGN.md:15`'s
+  worst failure mode. "Cross-municipality answers are structurally impossible" stays an unverified
+  claim for the whole of slice 1, and the filter is untested code.
+- **Disposition:** open — closes at slice 2, which exists primarily to close it.
+
 ## 2026-08-26 — `make eval` is a stub that exits non-zero
 
 - **What:** The project's headline command, and its definition of done, does not exist. `make eval`

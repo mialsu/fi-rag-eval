@@ -1,18 +1,22 @@
 # Product design document — fi-rag-eval
 
 **Author:** Miska Sulander · **Written:** 26 Aug 2026 · **Status:** approved for build
+**Revised:** 26 Aug 2026 after `/grill-with-docs` — the jurisdiction model, the metric set and one
+golden-set category changed once the design was checked against the real sources. See ADR-0002,
+ADR-0003, ADR-0004; vocabulary in `CONTEXT.md`.
 
 ---
 
 ## 1. Problem
 
-Residents and municipal advisors need answers from waste regulations that differ per municipality and
-sit on top of national law. The documents are public but fragmented, written in dense administrative
+Residents and municipal advisors need answers from waste regulations that are issued per *regional
+waste authority* — each acting for many municipalities at once — and sit on top of national law. The documents are public but fragmented, written in dense administrative
 Finnish, and published as PDFs of varying quality.
 
 Two failure modes matter more than average accuracy:
 
-1. **Confident wrong answers** — quoting one municipality's rule for another's resident.
+1. **Confident wrong answers** — quoting one authority's rule for a resident it does not cover, or
+   flattening a conditional obligation into a single number it never had.
 2. **Silent degradation** — a prompt or model change quietly making retrieval worse, with nobody noticing.
 
 The second is the one this project is really about.
@@ -29,7 +33,8 @@ The second is the one this project is really about.
 
 **In scope**
 
-- Ingestion and chunking of Finnish PDF/HTML regulations, with municipality as a first-class filter.
+- Ingestion and chunking of Finnish PDF/HTML regulations, with the **authority** as a first-class
+  filter and the municipality as user-facing input resolved to it (ADR-0002).
 - Hybrid retrieval: PostgreSQL full-text search (BM25-ish) plus pgvector similarity, then a reranker.
 - Answer generation with inline citations and an explicit refusal path.
 - An evaluation harness with a hand-built golden set, run locally and in CI.
@@ -64,8 +69,14 @@ query ──► retrieve (BM25 ∪ vector, municipality filter) ──► rerank
 - *LiteLLM as the LLM boundary* — so the same eval harness can compare models without touching call sites.
 - *Clause-level chunking, not fixed windows* — regulations are structured; a chunk that straddles two
   clauses produces citations that don't defend the claim.
-- *Municipality as a hard filter, not a soft signal* — cross-municipality answers are the worst failure
-  mode, so they are made structurally impossible rather than discouraged by prompt.
+- *Authority as a hard filter, not a soft signal* — cross-jurisdiction answers are the worst failure
+  mode, so they are made structurally impossible rather than discouraged by prompt. The filter keys on
+  the authority because that, not the municipality, is what publishes a document (ADR-0002).
+- *Conditional answers with a citation per branch* — most obligations are conditioned on area,
+  dwelling count, bin type or property type, and determining variables are sometimes outside the
+  corpus by the document's own design. Flattening a conditional is a confident wrong answer (ADR-0003).
+- *Chunks are addressed by the document's own numbering*, not by the chunker's output, so hand-written
+  golden labels survive re-extraction and re-chunking (ADR-0004).
 - *Refusal is a first-class output*, evaluated like any other answer.
 
 ## 5. Data
@@ -79,8 +90,10 @@ municipalities, chosen for format variety. No personal data. Raw documents stay 
 The core of the project.
 
 **Golden set** — ~50 questions, hand-written and hand-answered from the sources, deliberately including:
-- questions answerable only from one municipality's rules,
-- questions whose answer differs between municipalities,
+- questions answerable only from one authority's rules,
+- questions whose answer differs **between authorities** — within one authority the text is uniform,
+  so same-authority municipalities differ in nothing,
+- questions whose answer varies by sub-municipal zone (a taajama threshold) or by property type,
 - questions the corpus genuinely cannot answer (the refusal cases),
 - questions where the obvious keyword match is the wrong clause.
 
@@ -88,10 +101,14 @@ The core of the project.
 
 | Layer | Metric | Why |
 | --- | --- | --- |
-| Retrieval | recall@k, MRR | Retrieval failure caps everything downstream |
-| Answer | groundedness | Every claim traceable to cited context |
+| Retrieval | **complete-set recall@k** (headline) | An answer needs every clause it depends on; partial retrieval yields a confident wrong answer, not a partial one |
+| Retrieval | per-chunk recall@k, MRR (diagnostics) | Shows *how far* off a miss was — one clause of three, or all three |
+| Answer | groundedness | Every claim traceable to cited context, where a claim is one conditional branch |
+| Answer | branch coverage | Share of the required branches the answer actually states; localises which one was dropped |
+| Answer | over-claim rate | Catches flattening a conditional or resolving a variable the corpus cannot resolve |
 | Answer | citation accuracy | A citation that doesn't contain the claim is worse than none |
 | Behaviour | refusal precision / recall | Measures the thing that keeps it trustworthy |
+| Judge | judge–human agreement | An unvalidated judge is a second opinion with extra steps |
 | Ops | p95 latency, cost per query | Production viability |
 
 **Judging** — retrieval metrics are computed against labelled chunk ids, no model involved. Answer

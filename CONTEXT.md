@@ -15,13 +15,28 @@ refusal, and measure that answer quality well enough to catch a regression befor
 | Jätehuoltomääräykset | A municipality's own waste-management regulations, sitting on top of `jätelaki`. | The per-municipality layer. This is what differs and what makes the municipality filter load-bearing. |
 | Source | One original public document (a PDF or HTML page) as published by its authority. | The unit of ingestion, listed in the manifest. |
 | Manifest | The checked-in list of source URLs that makes ingestion reproducible. | Raw documents stay out of git; the manifest is what is versioned. |
+| Property type | Whether a property is residential or non-residential (business, parish, wellbeing services county, state). Selects which clauses and momentit bind it. | A determining variable. The MVP models residential only. |
+| Clause (§) | One numbered section of a regulation. The unit the document cites itself by, and the default chunk boundary. | 72 in the Southwest Finland regulations; median ~175 tokens, largest ~2,076. |
+| Chunk address | A chunk's stable identifier, in the document's own terms rather than the chunker's: authority, effective date, clause, optional sub-key — `lounais-suomi@2024-08-01#15`, `…#2.biojate`. | What golden labels reference. Survives re-extraction and chunker changes. A content hash is stored alongside (never as the key) to catch text drift; an unresolvable address is a **hard error**, never a skipped question. |
+| Document version | A dated edition of an authority's regulations, identified by its effective date. | Southwest Finland: in force 1.7.2023, amended 1.8.2024, further amended 22.10.2025. A new version requires labels to be re-pointed **explicitly** — they never migrate silently. |
+| Momentti | A numbered paragraph within a clause. The granularity at which the regulations scope applicability ("17 §, momentit 1–3, 5, 7–9"). | **Not modelled in the MVP.** Business-property questions are therefore a known-fail class, not a silent defect. |
 | Chunk | One clause-level passage of a source, the unit that is embedded, retrieved and cited. | Clause-level by decision, not fixed-window — a chunk straddling two clauses produces a citation that does not defend the claim. |
-| Municipality | The jurisdiction whose regulations apply to a question. Applied as a hard pre-filter. | See **Flagged ambiguities** — whether this is the *kunta* or the regional waste authority is not yet settled. |
+| Authority | The municipal waste-management authority (*jätehuoltoviranomainen*), often a joint regional board (*jätelautakunta*), that approves and publishes one uniform set of regulations for every municipality in its area. | **The unit of publication, and the hard filter's key.** Turku is one of 18 municipalities under Lounais-Suomen jätehuoltolautakunta. Carries its own identity, effective dates and supersession. |
+| Municipality | A Finnish *kunta*. The resident's user-facing input, resolved to exactly one Authority through a checked-in map. | **Never appears on a chunk.** Two municipalities under one Authority have identical regulations, and answering them identically is correct, not a bug. |
 | Hybrid retrieval | Lexical (Postgres full-text, BM25-ish) union vector (pgvector) candidate generation. | Neither alone; the union is then reranked. |
 | Rerank | The second-stage scoring that orders the union of candidates before they reach the model. | |
 | Refusal | A first-class output: declining to answer because the retrieved context does not support one. | Evaluated like any other answer. A refusal is a correct answer to an unanswerable question. |
+| Conditional answer | The product's normal output shape: the regulation's own branch structure, one citation per branch, with unresolved conditions surfaced rather than silently picked. | Most obligations are conditioned on area, dwelling count or bin type, so a single-value answer is usually a wrong answer. |
+| Determining variable | A fact that selects which branch of a conditional answer applies — dwelling count, taajama membership, bin type, composting, **property type**. | May be outside the corpus (taajama boundaries) or personal to the asker (composting). Never guessed. |
+| Taajama | A Finnish built-up area. The geographic scope many obligations key on, including the ">10,000 inhabitants" threshold for the bio-waste duty. | **Its boundaries are not in the corpus** — they live in the authority's external map service, and the authority deviates from the national delineation per property. Structurally unanswerable from documents alone. |
+| Huoneisto | A dwelling unit on a property. The unit obligations are counted in ("1 or more", "5 or more"). | Not a household and not a person count. Confusing the two silently changes which rule applies. |
 | Citation | A pointer from a claim in the answer to the chunk that supports it. | |
 | Golden set | The hand-written, hand-answered question set the harness scores against. | ~50 questions. Written before any tuning, deliberately adversarial. |
+| Required chunk set | The set of chunk ids a question cannot be answered correctly without. Recall is computed over the whole set. | Set-valued, not a single id — the bio-waste question needs the obligation clause, the interval table and the composting exemption. |
+| Required branch | One conditional branch a correct answer must state, paired with the chunk that supports it. **This is the unit a "claim" means here.** | Hand-enumerated per question. Makes the groundedness denominator explicit instead of inferred, and turns judging into narrow yes/no calls. |
+| Branch coverage | The share of a question's required branches that the answer actually states. | Localises failure: you learn *which* branch was dropped, not merely that a metric fell. |
+| Forbidden claim | A branch or assertion a correct answer must NOT make — flattening a conditional into one value, or resolving a determining variable the corpus cannot resolve. | |
+| Over-claim rate | The share of answers that assert a forbidden claim. | The metric that catches confident wrongness, this project's failure mode #1. |
 | Groundedness | The share of claims in an answer that are supported by the cited context. | Judged by model, validated against hand labels. |
 | Citation accuracy | Whether a cited chunk actually contains the claim it is attached to. | A citation that does not contain the claim is worse than no citation. |
 | recall@k / MRR | Retrieval metrics computed against labelled chunk ids. | No model involved — these are arithmetic, and therefore the metrics to trust most. |
@@ -38,22 +53,27 @@ refusal, and measure that answer quality well enough to catch a regression befor
 | Chatbot | Answering service / QA over sources | A chat product is an explicit non-goal; the word invites scope creep toward one. |
 | Document | `source` (the original) or `chunk` (the retrieved passage) | The ambiguity between the two is exactly where citation bugs hide. |
 | City | Municipality | The Finnish unit is the *kunta*, which is not always a city. |
+| "Turku's regulations" / "the municipality's regulations" | "the Authority's regulations" | No municipality publishes its own. Attributing a document to a municipality is the mistake the whole filter design exists to prevent. |
 | I don't know | Refusal | A refusal is a designed, evaluated output, not a failure to respond. |
 | Passed / green | The metric value, with the N it was computed over | A green run over a silently reduced question set is the harness's worst lie. |
+| Household / "two-person household" | Huoneisto count | Obligations key on dwelling units, never on the number of residents. The README's own example question uses the wrong variable. |
+| "The answer" (a single value) | Conditional answer | Implies obligations are unconditional. Most are not, and flattening a branch is how a confident wrong answer gets produced. |
 
 ## Flagged ambiguities
 
 Words we haven't fully pinned down yet — resolve before they cause a bug.
 
-- **"Municipality" — the *kunta*, or the regional waste authority?** Many Finnish municipalities
-  delegate waste management to a regional company or joint authority (a *jätehuoltoyhtiö* or
-  *jätelautakunta*), which is often the body that actually publishes the regulations for several
-  municipalities at once. A resident asks about their *kunta*; the applicable document may be
-  regional. Since the municipality filter is a hard filter and cross-jurisdiction answers are the
-  #1 failure mode, this needs deciding before ingestion, not after. Likely resolution: model both,
-  with a *kunta* → authority mapping, and filter on the authority while accepting the *kunta* as
-  the user-facing input.
-- **What counts as one "claim"** for groundedness — a sentence, or a proposition? Two graders will
-  disagree on the denominator, which makes the metric unstable run-to-run.
-- **Whether a partially-supported answer is a refusal case.** If the corpus answers half the
-  question, the correct behaviour (answer the half, or refuse) is not yet decided.
+- ~~**"Municipality" — the *kunta*, or the regional waste authority?**~~ **RESOLVED 26 Aug 2026.**
+  The Authority. Verified against sources rather than assumed: regulations are uniform across every
+  municipality in an authority's area (*"Määräykset ovat yhtenäiset kaikissa jätelautakunnan
+  toimialueen kunnissa"*), and Turku is 1 of 18 municipalities under one board. The filter keys on
+  the Authority; the *kunta* is input only. Note this contradicts `README.md:18-19`, which claims
+  municipalities each publish their own — that line needs correcting.
+- ~~**What counts as one "claim"** for groundedness?~~ **RESOLVED 26 Aug 2026.** A claim is one
+  **required branch**, hand-enumerated in the golden-set entry. The denominator is therefore set by
+  hand per question rather than inferred from the answer text, which is what makes it stable
+  run-to-run and what lets the judge answer narrow yes/no questions instead of grading prose.
+- ~~**Whether a partially-supported answer is a refusal case.**~~ **PARTLY RESOLVED 26 Aug 2026.**
+  A missing *determining variable* is **not** a refusal — it is a conditional answer with the
+  condition surfaced. Still open: whether a question whose *subject matter* is genuinely absent
+  from the corpus, as opposed to merely under-determined, is the only true refusal case.

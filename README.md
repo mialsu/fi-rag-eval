@@ -17,17 +17,24 @@ pipeline as the thing being measured.
 
 ## The problem it solves
 
-Finnish municipalities each publish their own waste regulations (`jätehuoltomääräykset`) on top of
-national waste law. Answering a resident's question — *"how often does a two-person household in
-Turku need the bio-waste bin emptied?"* — means knowing which municipality's rules apply, finding the
-clause, and refusing to guess when the answer isn't in the source. Keyword search does not do this,
-and an unmeasured chatbot cannot be trusted with it.
+Finnish waste regulations (`jätehuoltomääräykset`) are issued by regional waste authorities, each
+acting for many municipalities at once, on top of national waste law — Turku is one of eighteen
+municipalities under a single board. Answering a resident's question — *"how often must the bio-waste
+bin be emptied at a property in Turku?"* — means finding the right authority's document and then
+reporting what the regulation actually says, which is conditional: it depends on whether the property
+lies in a built-up area of over 10,000 inhabitants, how many dwellings it has, whether the household
+composts, and what kind of bin it is. One of those facts is not even in the regulations — the area
+boundaries live in a separate map service.
+
+So the honest answer has branches and a citation on each, and the system has to know which facts it
+cannot resolve. Keyword search does not do this, and an unmeasured chatbot cannot be trusted with it.
 
 ## What it will do
 
 - Ingest and chunk public Finnish waste regulations and national waste law.
 - Retrieve with a hybrid of BM25 and vector search, then rerank.
-- Answer with inline citations, and **refuse** when the retrieved context doesn't support an answer.
+- Answer with inline citations — conditionally, one citation per branch — and **refuse** when the
+  retrieved context doesn't support an answer.
 - Score itself against a golden set on every pull request, and fail CI on regression.
 
 ## Measured quality
@@ -36,11 +43,14 @@ Filled in from the first real evaluation run. Until then it stays empty rather t
 
 | Metric | Value | Notes |
 | --- | --- | --- |
-| Retrieval recall@5 | — | |
-| Retrieval MRR | — | |
+| **Complete-set recall@5** | — | headline: did retrieval find *every* clause the answer depends on |
+| Per-chunk recall@5 / MRR | — | diagnostics only |
 | Answer groundedness | — | share of claims supported by cited context |
+| Branch coverage | — | share of the required conditional branches the answer states |
+| Over-claim rate | — | answers that flatten a conditional or resolve what the sources can't |
 | Citation accuracy | — | cited chunk actually contains the claim |
 | Refusal precision / recall | — | correctly declining unanswerable questions |
+| Judge–human agreement | — | the judge is validated, not trusted |
 | p95 latency | — | |
 | Cost per query | — | |
 
