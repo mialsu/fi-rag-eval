@@ -81,7 +81,14 @@ class Baseline:
 
 
 def git_commit() -> str:
-    """Identify the run. Every published number is traceable to a commit."""
+    """Identify the run. Every published number is traceable to a commit.
+
+    Called *before* a baseline is written, deliberately: recording a baseline
+    dirties the tree by creating the very file being recorded, so capturing the
+    revision afterwards would stamp every baseline ``-dirty`` and make the flag
+    meaningless. Record baselines from a clean tree; the resulting file names the
+    commit whose code produced the numbers, and lands in the commit after it.
+    """
     try:
         revision = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],

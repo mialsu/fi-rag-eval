@@ -94,7 +94,8 @@ golden label points at a chunk that does not exist, when the question set change
 the corpus is empty. All five paths have been exercised.
 
 Other targets: `make gate` (lint, format, types, tests, build — the commit gate), `make ingest`,
-`make db-up` / `make db-down`, `make eval-baseline` to re-record the baseline deliberately.
+`make db-up` / `make db-down`, `make eval-baseline` to re-record the baseline deliberately (run it
+from a clean tree, so the recorded commit identifies the code that produced the numbers).
 
 ## Known weaknesses
 
