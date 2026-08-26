@@ -2,7 +2,8 @@
 # Every target here is meant to be run by a human or by CI, with a real exit code.
 
 .DEFAULT_GOAL := help
-.PHONY: help dev gate lint fmt fmt-check typecheck test build eval docker-build clean
+.PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
+        ingest db-up db-down docker-build clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
@@ -33,13 +34,20 @@ build: ## Prove a clean clone reproduces this environment, and the package impor
 	uv sync --locked
 	uv run python -c "import fi_rag_eval; print(fi_rag_eval.__version__)"
 
-eval: ## THE product: compute the metric table against the golden set
-	@echo "make eval: NOT IMPLEMENTED. No retrieval pipeline and no golden set exist yet." >&2
-	@echo "" >&2
-	@echo "This target exits non-zero by design. It must never print a metric table that was" >&2
-	@echo "not actually computed -- a harness that reports a fabricated number is worse than" >&2
-	@echo "no harness. See DESIGN.md milestones M1-M3 and REVIEW-DEBT.md." >&2
-	@exit 1
+db-up: ## Start the local Postgres the harness measures against
+	docker compose up -d --wait
+
+db-down: ## Stop it (the data volume is tmpfs, so this discards the corpus)
+	docker compose down
+
+ingest: db-up ## Fetch, chunk and load the corpus described by corpus/manifest.yaml
+	uv run fi-rag-eval ingest
+
+eval: ingest ## THE product: compute the metric table and gate against the baseline
+	uv run fi-rag-eval eval
+
+eval-baseline: ingest ## Record this run as the baseline the gate compares against
+	uv run fi-rag-eval eval --write-baseline
 
 docker-build: ## Container image (a /ship-time gate, not a per-commit one)
 	@echo "docker-build: NOT IMPLEMENTED -- no Dockerfile until the service exists (M3)." >&2

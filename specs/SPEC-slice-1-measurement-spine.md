@@ -152,3 +152,90 @@ applicability · Docker or Cloud Run · any API key or paid call.
 - Conditional answers, branch-labelled golden entries, complete-set recall headline → **ADR-0003**
 - Clause chunking with two carve-outs, and stable chunk addressing → **ADR-0004**
 - Domain profile: `cli-tools` + deploy graft + eval-integrity layer → **ADR-0001**
+
+---
+
+## Measured result — 26 Aug 2026
+
+Run on commit `81c496c` + this slice, `k=5`, N=8 questions / 10 required chunks, at €0.
+Reproduce with `make eval`.
+
+| Metric | Value | N |
+|---|---|---|
+| **complete-set recall@5** (headline) | **0.875** | 8 questions |
+| per-chunk recall@5 (diagnostic) | 0.900 | 10 chunks |
+| MRR (diagnostic) | 0.812 | 8 questions |
+| misses: zero-overlap / ranked-out | 0 / 1 | 1 of 10 chunks |
+
+### The number: prediction REFUTED
+
+Predicted 0.25–0.50. Measured **0.875** — not a near miss, a different regime. The
+prediction was not conservative, it was wrong, and the reason matters more than the number.
+
+**The dominant cause is the golden set, not the retriever.** Measured, not guessed: on
+average **60% of each question's stemmed content words appear verbatim in its target
+chunk** (per question: 33%, 40%, 44%, 50%, 67%, 67%, 78%, 80%). The questions were written
+with the source PDF open, so they inherited its vocabulary — "biojäteastia",
+"tyhjennysväli", "erilliskeräysvelvoite", "kesäaikana" are the document's own words. A
+resident asks *"milloin biojätteet viedään?"*. This is `CLAUDE.md`'s golden-set leakage
+watch-item, arriving on day one and self-inflicted.
+
+So 0.875 is a real number honestly computed, and it measures **an instrument that is
+easier than the task**. It is not evidence that lexical-only retrieval is good enough.
+
+### A harness bug the first run hid
+
+The first execution of this harness reported **0.750**. That number was void: `or_tsquery`
+builds a tsquery literal over lexemes the stemmer has already produced, and it was being
+passed through `to_tsquery`, which stems them **again** — `biojät` → `biojä`, `tarkoit` →
+`tarkoi`. Queries silently stopped matching chunks containing the term verbatim, and the
+miss diagnostic mislabelled a reachable chunk as `zero-overlap`.
+
+Worth stating plainly: the bug made the harness report a *lower* number, so nothing looked
+wrong. It was caught only because a `zero-overlap` verdict on a chunk that shares a word
+with the question is arithmetically impossible, and the diagnostic made that visible. Fixed
+by casting instead of parsing; `tests/test_retrieval.py` pins it.
+
+### The mechanism claims
+
+| Claim | Verdict | Evidence |
+|---|---|---|
+| 1. Most misses will be zero-overlap | **undetermined** | 1 miss total, and it is ranked-out. N gives the claim no power |
+| 2. `kunnan` stems to `kun`, causing precision noise | **confirmed** | `kunnan` → `kun`; bare `kun` is a stopword and is dropped entirely. Bonus finding: `Turku` → `turku` but `Turun` → `turu`, so the municipality name does not stem consistently across its own inflections — this lands in slice 2, where municipality enters the query |
+| 3. The short definition chunks will be over-retrieved | **refuted, mechanism inverted** | Definition chunks are 39% of the corpus and **0% of every top-5** |
+
+Claim 3 was wrong because the premise was wrong. `ts_rank` at its **default normalisation
+(0) does not divide by document length**, so a long clause accumulates more matched-term
+weight than a short one. Definition chunks average 203 characters against 1,202 for whole
+clauses; on the one failing question the correlation between chunk length and `ts_rank` is
+**+0.673**, and all eight top-ranked chunks are longer than the 40-word definition that was
+the answer. Short chunks are systematically *under*-retrieved, not over-retrieved.
+
+### What this changes for slice 3
+
+The decision rule in the prediction ("mostly zero-overlap → lemmatisation; mostly
+ranked-out → BM25") cannot fire: one miss decides nothing. The measurement instead surfaced
+a candidate that was not on the list, and a cheaper one:
+
+1. **`ts_rank` normalisation.** The only failure this run produced is a short chunk losing
+   to long ones on unnormalised term weight. `ts_rank(tsv, q, 32)` — or `2`, dividing by
+   length — is a one-argument change addressing the one observed failure. Measure it before
+   anything larger.
+2. **Fix the golden set first, though.** With 60% leakage the harness cannot detect an
+   improvement or a regression in the thing it is meant to measure. Rewriting the questions
+   in a resident's vocabulary is now the highest-value work in the project, and it comes
+   before any retrieval change — measurement wins ties (`CLAUDE.md`).
+
+Lemmatisation (`dict_voikko`) and a BM25 extension stay on the list, unranked, because this
+run produced no evidence for either. Compound splitting remains a demonstrated corpus-level
+gap (4 of 4 term-pair tests) that simply did not bind on these eight questions.
+
+### What the number does not say
+
+- Nothing about the authority hard filter: one authority is ingested, so there is no second
+  jurisdiction to leak from (`REVIEW-DEBT.md`).
+- Nothing about answer quality, groundedness, citations or refusal — no model ran.
+- Little about complete-set vs per-chunk recall: only 2 of 8 questions span more than one
+  chunk, so the two metrics nearly coincide here. They diverge on the ~50-question set.
+- Nothing generalisable: 8 questions puts the 95% interval on 0.875 at roughly ±0.23. The
+  headline is a single-digit-precision figure and must be read as one.

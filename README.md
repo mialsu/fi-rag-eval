@@ -3,10 +3,12 @@
 Finnish-language document question answering over municipal waste regulations — built so that
 **answer quality is measured, not asserted**.
 
-> **Status: design phase.** Nothing here runs yet. This repo contains
-> [DESIGN.md](DESIGN.md) and its acceptance criteria, plus the project scaffold and its build
-> gates. `make gate` is green — which proves the toolchain and nothing more. `make eval` exits
-> non-zero by design until there is a metric table to actually compute. Build starts 31 Aug 2026.
+> **Status: the harness runs; the pipeline it measures is one slice deep.** `make eval`
+> ingests one authority's regulations, retrieves with Postgres full-text search alone, scores a
+> hand-labelled golden set, prints the table below and fails on regression. No embeddings, no
+> reranker, no language model, no judge yet — those are the next slices.
+>
+> **Read the caveat under the table before quoting any number.**
 
 ## Why this exists
 
@@ -39,20 +41,35 @@ cannot resolve. Keyword search does not do this, and an unmeasured chatbot canno
 
 ## Measured quality
 
-Filled in from the first real evaluation run. Until then it stays empty rather than aspirational.
+Every number here was computed by `make eval`, never typed in. A dash means the slice that
+would compute it does not exist yet.
 
-| Metric | Value | Notes |
-| --- | --- | --- |
-| **Complete-set recall@5** | — | headline: did retrieval find *every* clause the answer depends on |
-| Per-chunk recall@5 / MRR | — | diagnostics only |
-| Answer groundedness | — | share of claims supported by cited context |
-| Branch coverage | — | share of the required conditional branches the answer states |
-| Over-claim rate | — | answers that flatten a conditional or resolve what the sources can't |
-| Citation accuracy | — | cited chunk actually contains the claim |
-| Refusal precision / recall | — | correctly declining unanswerable questions |
-| Judge–human agreement | — | the judge is validated, not trusted |
-| p95 latency | — | |
-| Cost per query | — | |
+Retrieval: **lexical only** — Postgres `ts_rank` over the `finnish` text-search configuration.
+That is deliberately the weakest sensible baseline, and it is **not BM25**: `ts_rank` has no
+inverse document frequency and, at its default normalisation, no document-length normalisation
+either.
+
+| Metric | Value | N | Notes |
+| --- | --- | --- | --- |
+| **Complete-set recall@5** | **0.875** | 8 questions | headline: did retrieval find *every* clause the answer depends on |
+| Per-chunk recall@5 | 0.900 | 10 chunks | diagnostic — awards partial credit, so never the headline |
+| MRR | 0.812 | 8 questions | diagnostic |
+| Misses: unreachable / out-ranked | 0 / 1 | 1 chunk | zero stem overlap vs. matched but below k |
+| Answer groundedness | — | | needs the answering slice |
+| Branch coverage | — | | needs the answering slice |
+| Over-claim rate | — | | needs the answering slice |
+| Citation accuracy | — | | needs the answering slice |
+| Refusal precision / recall | — | | needs the answering slice |
+| Judge–human agreement | — | | needs the judge |
+| p95 latency / cost per query | — | | no model runs yet; this slice costs €0 |
+
+**The caveat, because the number is flattering and shouldn't be trusted:** the golden set has
+only 8 questions, and they were written with the source PDF open. Measured consequence — **60%
+of each question's stemmed content words appear verbatim in its target chunk.** The harness is
+currently easier than the task, and 0.875 will fall when the questions are rewritten in a
+resident's vocabulary. That rewrite outranks every retrieval improvement on the list. The
+prediction registered before this run was 0.25–0.50; it was refuted, and *why* is written up in
+[the slice spec](specs/SPEC-slice-1-measurement-spine.md#measured-result--26-aug-2026).
 
 ## Stack
 
@@ -60,13 +77,45 @@ Python · FastAPI · PostgreSQL + pgvector · LiteLLM · Docker · GitHub Action
 
 ## Running it
 
-Will be documented here once there is something to run. The bar is: clone, `make dev`, `make eval`,
-and you get the same table as above on your own machine.
+Needs Docker, [uv](https://docs.astral.sh/uv/), and `poppler-utils` (for `pdftotext`).
+
+```sh
+make dev     # create the environment
+make eval    # start Postgres, fetch + chunk + load the corpus, score, print the table
+```
+
+`make eval` is reproducible from a clean clone: the source PDFs are not in git, but
+[`corpus/manifest.yaml`](corpus/manifest.yaml) pins their URLs and SHA-256 digests, and
+ingestion refuses to load a document that does not match — or one that parses to a different
+number of clauses than the golden labels were written against.
+
+It exits non-zero when a metric falls below [`eval/baseline.json`](eval/baseline.json), when a
+golden label points at a chunk that does not exist, when the question set changes size, or when
+the corpus is empty. All five paths have been exercised.
+
+Other targets: `make gate` (lint, format, types, tests, build — the commit gate), `make ingest`,
+`make db-up` / `make db-down`, `make eval-baseline` to re-record the baseline deliberately.
 
 ## Known weaknesses
 
-To be filled in honestly alongside the metrics. A README that lists no weaknesses has not been
-evaluated.
+Kept honestly, and at more length in [REVIEW-DEBT.md](REVIEW-DEBT.md).
+
+- **The golden set leaks its source vocabulary** (60%, measured). The top item above; it makes
+  the headline optimistic and, worse, blinds the harness to the vocabulary gap it exists to
+  measure.
+- **N=8.** The 95% interval on 0.875 is about ±0.23, and one question flipping moves it by
+  0.125. Only 2 of 8 questions span multiple chunks, so complete-set and per-chunk recall have
+  not yet diverged the way ADR-0003 expects them to.
+- **The ranker's defaults are wrong for this corpus, on purpose.** `ts_rank` at normalisation 0
+  does not divide by document length, so short chunks lose: definition chunks are 39% of the
+  corpus and 0% of every top-5. Left in as the baseline; fixing it is a slice-3 candidate.
+- **The authority hard filter is untested.** Only one authority is ingested, so the worst
+  failure mode in the design — answering from the wrong jurisdiction — has nothing to leak
+  from yet.
+- **Finnish compounds are not split.** `biojäte` does not match `biojäteastia` under snowball
+  stemming (4 of 4 term-pair tests failed). It did not bind on these eight questions; it will.
+- **No CI.** The regression gate has been proven red by hand on this machine, which is not the
+  same as proven in CI.
 
 ## Licence
 

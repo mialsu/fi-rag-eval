@@ -1,0 +1,151 @@
+"""The command-line surface: ``fi-rag-eval ingest`` and ``fi-rag-eval eval``.
+
+Exit codes are a feature, not an afterthought -- CI reads them. Zero means the
+run completed and every metric held. Anything else means the table on stdout,
+if there is one, must not be trusted.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+from fi_rag_eval import db
+from fi_rag_eval.chunking import ChunkingError
+from fi_rag_eval.evaluate import DEFAULT_K, EvaluationError, evaluate
+from fi_rag_eval.extract import ExtractionError
+from fi_rag_eval.golden import GoldenSetError, load_golden_set
+from fi_rag_eval.ingest import IngestError, ingest
+from fi_rag_eval.manifest import ManifestError, load_manifest
+from fi_rag_eval.metrics import MetricsError
+from fi_rag_eval.report import (
+    Baseline,
+    BaselineError,
+    compare,
+    format_ingest,
+    format_run,
+    git_commit,
+)
+
+DEFAULT_MANIFEST = Path("corpus/manifest.yaml")
+DEFAULT_GOLDEN = Path("corpus/golden/lounais-suomi.yaml")
+DEFAULT_RAW_DIR = Path("data/raw")
+DEFAULT_BASELINE = Path("eval/baseline.json")
+
+HANDLED = (
+    ManifestError,
+    GoldenSetError,
+    ExtractionError,
+    ChunkingError,
+    IngestError,
+    EvaluationError,
+    MetricsError,
+    BaselineError,
+    db.DatabaseError,
+)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="fi-rag-eval",
+        description="Evaluation harness for Finnish waste-regulation retrieval.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    ingest_parser = subparsers.add_parser(
+        "ingest", help="fetch, chunk and load the corpus described by the manifest"
+    )
+    ingest_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    ingest_parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
+
+    eval_parser = subparsers.add_parser(
+        "eval", help="score the golden set and print the metric table"
+    )
+    eval_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    eval_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
+    eval_parser.add_argument("--k", type=int, default=DEFAULT_K)
+    eval_parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=DEFAULT_BASELINE,
+        help="recorded run to gate against; a missing file is reported, not tolerated",
+    )
+    eval_parser.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="record this run as the baseline instead of gating against it",
+    )
+    eval_parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="print the table without gating (for exploring, never for CI)",
+    )
+    return parser
+
+
+def _ingest(args: argparse.Namespace) -> int:
+    manifest = load_manifest(args.manifest)
+    with db.connect() as conn:
+        report = ingest(conn, manifest, args.raw_dir)
+    print(format_ingest(report))
+    print(f"ingest: {report.chunks} chunks loaded")
+    return 0
+
+
+def _eval(args: argparse.Namespace) -> int:
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    with db.connect() as conn:
+        summary = db.corpus_summary(conn)
+        if not summary:
+            raise EvaluationError(
+                "the corpus is empty. Run `make ingest` first -- an eval over an "
+                "empty corpus would score zero and blame retrieval for it."
+            )
+        run = evaluate(conn, manifest=manifest, golden=golden, k=args.k)
+
+    commit = git_commit()
+    print(format_run(run, commit=commit))
+
+    if args.write_baseline:
+        baseline = Baseline.from_metrics(run.metrics, commit)
+        baseline.write(args.baseline)
+        print(f"\nbaseline recorded at {args.baseline} (commit {commit})")
+        return 0
+
+    if args.no_baseline:
+        print("\nno regression gate applied (--no-baseline)")
+        return 0
+
+    if not args.baseline.is_file():
+        print(
+            f"\nno baseline at {args.baseline}: nothing to gate against. Record one "
+            "with `--write-baseline` once you believe the number.",
+            file=sys.stderr,
+        )
+        return 1
+
+    problems = compare(Baseline.load(args.baseline), run.metrics)
+    if problems:
+        print("\nREGRESSION — this run does not meet the recorded baseline:", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 1
+    print(f"\ngate: green against {args.baseline}")
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    handlers = {"ingest": _ingest, "eval": _eval}
+    try:
+        return handlers[args.command](args)
+    except HANDLED as exc:
+        print(f"fi-rag-eval {args.command}: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

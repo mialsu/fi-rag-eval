@@ -5,7 +5,10 @@ description = "Finnish-language QA over municipal waste regulations, with the ev
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
-dependencies = []
+dependencies = [
+  "psycopg[binary]>=3.2",
+  "PyYAML>=6.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -15,7 +18,10 @@ build-backend = "hatchling.build"
 packages = ["src/fi_rag_eval"]
 
 [dependency-groups]
-dev = ["ruff>=0.15", "mypy>=1.19", "pytest>=8.4"]
+dev = ["ruff>=0.15", "mypy>=1.19", "pytest>=8.4", "types-PyYAML>=6.0"]
+
+[project.scripts]
+fi-rag-eval = "fi_rag_eval.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -32,3 +38,4 @@ files = ["src", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers --strict-config"
+markers = ["requires_db: needs a live Postgres (see make db-up)"]

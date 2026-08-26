@@ -11,17 +11,23 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (26 Aug 2026)
 
-**Nothing is implemented.** This repo is scaffold plus design docs: `DESIGN.md` (the approved
-product design, milestones M1–M3) and `README.md`. There is no ingestion, no retrieval, no
-answering, no golden set, and no CI.
+**Slice 1 — the measurement spine — is built and has produced a real number.** One authority
+(Lounais-Suomi, 50 clauses → 82 chunks) is ingested into Postgres and retrieved with `ts_rank`
+over the `finnish` configuration. `make eval` scores 8 hand-labelled questions and prints a
+metric table; it exits 0 green and non-zero on regression. Nothing else exists.
 
-- `make gate` is green — and that green proves the **toolchain only**. The single test asserts that
-  the package imports. Do not read it as evidence about retrieval, answering, or metrics.
-- `make eval` and `make docker-build` **exit non-zero on purpose.** They are honest stubs, not
-  bugs. Do not "fix" them by making them pass — `make eval` must never print a metric table it did
-  not compute. They go green when the thing behind them exists (M1 / M3).
-- Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a doc,
-  an old note, or a past session says already works.
+- **The headline: complete-set recall@5 = 0.875 (N=8, k=5).** Real, reproducible, and
+  **not a quality estimate.** The golden set leaks 60% of its stemmed content words into its own
+  target chunks — the questions were written with the source PDF open. Read
+  `specs/SPEC-slice-1-measurement-spine.md` (Measured result) before quoting the number, and
+  `REVIEW-DEBT.md` before believing it. Fixing the golden set outranks every retrieval change.
+- **`make eval` and the gate have been seen red** on all five failure paths: degraded chunk,
+  deleted chunk, shrunk golden set, changed `k`, empty corpus.
+- **Not built:** embeddings, pgvector, reranking, any LLM call, a judge, answer generation,
+  citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build` still
+  exits non-zero on purpose — do not "fix" it.
+- Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
+  doc, an old note, or a past session says already works.
 
 ## Hard limits (immutable)
 - Never push, open a PR, deploy, publish, or release without the Owner's explicit go. Local
@@ -41,7 +47,10 @@ Run them all with `make gate`. Every one below has been run, and has been proven
 - Build: `uv sync --locked && uv run python -c "import fi_rag_eval"` — proves a clean clone
   reproduces this environment. This is the per-commit build gate; the container image
   (`make docker-build`) is a `/ship`-time gate, not a per-commit one.
-- Live exercise: see **Verify like a user** below.
+- Live exercise: `make eval` (which runs `make db-up` then `make ingest` first). See
+  **Verify like a user** below. `make gate` does *not* run it, and the end-to-end tests inside
+  `make test` **skip** when Postgres is down — so a green `make gate` with the database
+  stopped proves the pure functions and nothing else. Requires Docker and `poppler-utils`.
 
 A gate you haven't run is not a gate. Green tests gate; they do not prove.
 
@@ -100,11 +109,18 @@ Verify that structurally:
 - A metric that is green because the harness is circular (labels derived from retriever output).
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
-- Golden-set leakage: scores climb while real answer quality doesn't.
+- Golden-set leakage: scores climb while real answer quality doesn't. **This is no longer
+  hypothetical — it is measured at 60% and is the project's top open item.**
 - The authority filter applied *after* rerank, or skipped when the field is absent.
 - Finnish compound words and inflection sinking lexical recall — it will look like a model problem
   and it isn't (`DESIGN.md:118`).
 - Latency and cost per query measured on a warm cache.
+- A ranker whose defaults are wrong for the corpus: `ts_rank`'s default normalisation (0) does
+  not divide by document length, so short chunks lose systematically. Measured: definition
+  chunks are 39% of the corpus and were 0% of every top-5.
+- A query stemmed a different number of times than the index. `to_tsquery` re-stems lexemes
+  that came out of `to_tsvector`; that bug shipped in the first run of this harness and made
+  the number look *worse*, not better, which is why nothing looked wrong.
 - A regression gate that cannot actually go red.
 
 ## Process rules

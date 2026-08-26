@@ -1,0 +1,20 @@
+# Local Postgres for the eval harness. Port 5434 deliberately: 5432 and 5433 are
+# taken by unrelated projects on this machine, and this container must never be
+# confused with one of those.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fi-rag-eval-postgres
+    environment:
+      POSTGRES_USER: fi_rag_eval
+      POSTGRES_PASSWORD: fi_rag_eval
+      POSTGRES_DB: fi_rag_eval
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fi_rag_eval -d fi_rag_eval"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data

@@ -1,0 +1,44 @@
+# The checked-in list of sources. Raw PDFs stay out of git (data/raw/ is ignored);
+# this file is what makes ingestion reproducible.
+#
+# `expected` is not documentation -- ingest asserts against it and refuses to load
+# a document that parses differently than it did when the golden set was labelled
+# by hand. Labels are the scarcest resource here; a silent re-parse is what
+# destroys them.
+version: 1
+authorities:
+  - key: lounais-suomi
+    name: Lounais-Suomen jätehuoltolautakunta
+    # ADR-0002: the authority publishes one uniform text for all of these. A
+    # municipality is user-facing input resolved through this list, and never
+    # appears on a chunk.
+    municipalities:
+      - Aura
+      - Kaarina
+      - Kemiönsaari
+      - Lieto
+      - Marttila
+      - Masku
+      - Mynämäki
+      - Naantali
+      - Nousiainen
+      - Paimio
+      - Parainen
+      - Pöytyä
+      - Raisio
+      - Rusko
+      - Salo
+      - Sauvo
+      - Turku
+      - Uusikaupunki
+    sources:
+      - filename: lounais-suomi.pdf
+        title: Jätehuoltomääräykset Lounais-Suomessa
+        url: https://lsjatehuoltolautakunta.fi/wp-content/uploads/sites/14/2025/12/Jatehuoltomaaraykset-Lounais-Suomessa_muutos_22.10.25_hyvaksytty.pdf
+        sha256: a6ea7755b63bb4e43f7b322d50a4f45983ad32b86455ed68ae1a95b4b0f76ccc
+        # Read out of 49 § Voimaantulo, not assumed. Ingest cross-checks it.
+        effective_date: 2024-08-01
+        expected:
+          clauses: 50
+          chunks: 82
+          definitions: 32
