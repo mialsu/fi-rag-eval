@@ -1,20 +1,30 @@
-# Local Postgres for the eval harness. Port 5434 deliberately: 5432 and 5433 are
-# taken by unrelated projects on this machine, and this container must never be
-# confused with one of those.
+# Local Postgres for the eval harness.
+#
+# The project name is pinned rather than derived from the directory, and the
+# container name is left to compose. That combination is what makes a second
+# checkout of this repo *reuse* this database instead of colliding with it -- and
+# "clone it and run `make eval`" is the project's own reproducibility claim, so
+# the first thing a second checkout does must not be an error. Sharing is safe
+# here because every ingest reloads the whole corpus from the manifest.
+name: fi-rag-eval
+
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: fi-rag-eval-postgres
+    # Port 5434 deliberately: 5432 and 5433 belong to unrelated projects on this
+    # machine, and this container must never be confused with one of those.
+    ports:
+      - "5434:5432"
     environment:
       POSTGRES_USER: fi_rag_eval
       POSTGRES_PASSWORD: fi_rag_eval
       POSTGRES_DB: fi_rag_eval
-    ports:
-      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fi_rag_eval -d fi_rag_eval"]
       interval: 2s
       timeout: 3s
       retries: 30
     tmpfs:
+      # The corpus is rebuilt from the manifest on every ingest, so there is
+      # nothing here worth persisting -- and nothing here that can go stale.
       - /var/lib/postgresql/data
