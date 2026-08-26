@@ -3,8 +3,10 @@
 Finnish-language document question answering over municipal waste regulations — built so that
 **answer quality is measured, not asserted**.
 
-> **Status: design phase.** Nothing here runs yet. This repo currently contains
-> [DESIGN.md](DESIGN.md) and its acceptance criteria. Build starts 31 Aug 2026.
+> **Status: design phase.** Nothing here runs yet. This repo contains
+> [DESIGN.md](DESIGN.md) and its acceptance criteria, plus the project scaffold and its build
+> gates. `make gate` is green — which proves the toolchain and nothing more. `make eval` exits
+> non-zero by design until there is a metric table to actually compute. Build starts 31 Aug 2026.
 
 ## Why this exists
 
