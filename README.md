@@ -32,7 +32,7 @@ cannot resolve. Keyword search does not do this, and an unmeasured chatbot canno
 ## What it will do
 
 - Ingest and chunk public Finnish waste regulations and national waste law.
-- Retrieve with a hybrid of BM25 and vector search, then rerank.
+- Retrieve with a hybrid of lexical full-text and vector search, then rerank.
 - Answer with inline citations — conditionally, one citation per branch — and **refuse** when the
   retrieved context doesn't support an answer.
 - Score itself against a golden set on every pull request, and fail CI on regression.

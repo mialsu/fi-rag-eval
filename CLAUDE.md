@@ -101,7 +101,7 @@ Verify that structurally:
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
 - Golden-set leakage: scores climb while real answer quality doesn't.
-- The municipality filter applied *after* rerank, or skipped when the field is absent.
+- The authority filter applied *after* rerank, or skipped when the field is absent.
 - Finnish compound words and inflection sinking lexical recall — it will look like a model problem
   and it isn't (`DESIGN.md:118`).
 - Latency and cost per query measured on a warm cache.

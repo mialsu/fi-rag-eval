@@ -12,7 +12,7 @@ refusal, and measure that answer quality well enough to catch a regression befor
 | Term | Means | Notes |
 |---|---|---|
 | Jätelaki | The Finnish national Waste Act. | The national floor every municipality builds on. |
-| Jätehuoltomääräykset | A municipality's own waste-management regulations, sitting on top of `jätelaki`. | The per-municipality layer. This is what differs and what makes the municipality filter load-bearing. |
+| Jätehuoltomääräykset | An Authority's waste-management regulations, sitting on top of `jätelaki` and binding every municipality in its area. | The per-authority layer. This is what differs between jurisdictions and what makes the authority filter load-bearing. |
 | Source | One original public document (a PDF or HTML page) as published by its authority. | The unit of ingestion, listed in the manifest. |
 | Manifest | The checked-in list of source URLs that makes ingestion reproducible. | Raw documents stay out of git; the manifest is what is versioned. |
 | Property type | Whether a property is residential or non-residential (business, parish, wellbeing services county, state). Selects which clauses and momentit bind it. | A determining variable. The MVP models residential only. |
@@ -23,7 +23,7 @@ refusal, and measure that answer quality well enough to catch a regression befor
 | Chunk | One clause-level passage of a source, the unit that is embedded, retrieved and cited. | Clause-level by decision, not fixed-window — a chunk straddling two clauses produces a citation that does not defend the claim. |
 | Authority | The municipal waste-management authority (*jätehuoltoviranomainen*), often a joint regional board (*jätelautakunta*), that approves and publishes one uniform set of regulations for every municipality in its area. | **The unit of publication, and the hard filter's key.** Turku is one of 18 municipalities under Lounais-Suomen jätehuoltolautakunta. Carries its own identity, effective dates and supersession. |
 | Municipality | A Finnish *kunta*. The resident's user-facing input, resolved to exactly one Authority through a checked-in map. | **Never appears on a chunk.** Two municipalities under one Authority have identical regulations, and answering them identically is correct, not a bug. |
-| Hybrid retrieval | Lexical (Postgres full-text, BM25-ish) union vector (pgvector) candidate generation. | Neither alone; the union is then reranked. |
+| Hybrid retrieval | Lexical (Postgres full-text) union vector (pgvector) candidate generation. | Neither alone; the union is then reranked. Postgres `ts_rank` is **not** BM25 — no inverse document frequency — so say `ts_rank` when that is what is meant. |
 | Rerank | The second-stage scoring that orders the union of candidates before they reach the model. | |
 | Refusal | A first-class output: declining to answer because the retrieved context does not support one. | Evaluated like any other answer. A refusal is a correct answer to an unanswerable question. |
 | Conditional answer | The product's normal output shape: the regulation's own branch structure, one citation per branch, with unresolved conditions surfaced rather than silently picked. | Most obligations are conditioned on area, dwelling count or bin type, so a single-value answer is usually a wrong answer. |

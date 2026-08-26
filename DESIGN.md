@@ -35,7 +35,9 @@ The second is the one this project is really about.
 
 - Ingestion and chunking of Finnish PDF/HTML regulations, with the **authority** as a first-class
   filter and the municipality as user-facing input resolved to it (ADR-0002).
-- Hybrid retrieval: PostgreSQL full-text search (BM25-ish) plus pgvector similarity, then a reranker.
+- Hybrid retrieval: PostgreSQL full-text search plus pgvector similarity, then a reranker. Note the
+  native lexical ranker (`ts_rank`) is **not** BM25 — it has no inverse document frequency — so a
+  BM25 extension is an option if measurement shows the lexical arm is the bottleneck.
 - Answer generation with inline citations and an explicit refusal path.
 - An evaluation harness with a hand-built golden set, run locally and in CI.
 - Structured logging of latency, token counts and cost per query.
@@ -56,7 +58,7 @@ PDF/HTML sources
       ▼
   ingest ──► chunk (structure-aware, clause-level) ──► embed ──► PostgreSQL + pgvector
                                                                    │
-query ──► retrieve (BM25 ∪ vector, municipality filter) ──► rerank ─┘
+query ──► retrieve (lexical ∪ vector, authority filter) ──► rerank ─┘
       │
       ▼
   answer (LiteLLM) ──► citations + refusal check ──► response
@@ -132,7 +134,7 @@ comment and fails on a drop beyond a set threshold.
 | Risk | Mitigation |
 | --- | --- |
 | The golden set is the project; a lazy one makes every number meaningless | Hand-write it first, before any tuning, and include adversarial cases |
-| Finnish compound words break lexical search | Test BM25 alone early; add lemmatisation if recall is poor |
+| Finnish compound words break lexical search | Test the lexical arm alone early — and note `ts_rank` is not BM25. Add lemmatisation (`dict_voikko` splits compounds) if recall is poor |
 | LLM judge disagrees with human judgement | Report judge–human agreement on a fixed sample every run |
 | Scope creep into a chat product | Non-goals above are binding; the UI stays minimal |
 

@@ -11,8 +11,14 @@ document to a printed metric table — before any model is involved, so that eve
 decision is justified by a number rather than by faith.
 
 It answers one question: **how good is lexical-only retrieval on Finnish waste regulations?**
-`DESIGN.md:118` asks for exactly that comparison ("Test BM25 alone early; add lemmatisation if
-recall is poor") and it has never been run.
+`DESIGN.md` asks for exactly that comparison ("Test BM25 alone early; add lemmatisation if recall is
+poor") and it has never been run.
+
+One correction to that framing, which this spec adopts throughout: **Postgres `ts_rank` is not
+BM25.** It scores term frequency and document length but carries no inverse document frequency, so
+it cannot down-weight a term that appears everywhere in the corpus. Slice 1 therefore measures
+`ts_rank`, a weaker baseline than BM25, and every number it produces is labelled as such. True BM25
+in Postgres needs an extension, which slice 1 deliberately does not add.
 
 ## Solution shape
 
@@ -33,39 +39,81 @@ golden.yaml (6–8 entries) ──► retrieve ──► score ──► make ev
   atomic. Per ADR-0004.
 - **Addressing** — `lounais-suomi@<effective_date>#<clause>[.<sub>]`, content hash stored alongside.
   An unresolvable address is a hard error.
-- **Retrieval** — Postgres full-text search with the `finnish` configuration. **No pgvector, no
-  embeddings, no reranker.**
+- **Retrieval** — Postgres full-text search with the `finnish` configuration, ranked by `ts_rank`.
+  **No pgvector, no embeddings, no reranker, no BM25 extension.**
 - **Golden set** — 6–8 entries, `required_chunks` only. Branch checklists arrive with the answering
   slice; the entry file format is ADR-0003's from the start so nothing is relabelled later.
 - **Surface** — `make eval` prints the metric table, asserts N, and exits 0 green / non-zero on
   regression or on any unresolvable label.
 
-**Metrics:** complete-set recall@5 (headline) · per-chunk recall@5, MRR (diagnostics) · N.
+- **Miss diagnostic** — for every required chunk that was *not* retrieved, record whether it shares
+  any stemmed token with the query. Pure arithmetic, no model, no extra cost. This separates the two
+  confounded causes of a low score: a **morphology** failure (zero overlap — the chunk was
+  unreachable) from a **ranking** failure (overlap existed but the chunk ranked below k, which is
+  where IDF would have helped). Without it, a disappointing number cannot tell us what slice 3
+  should be.
+
+**Metrics:** complete-set recall@5 (headline) · per-chunk recall@5, MRR (diagnostics) · miss
+breakdown, zero-overlap vs ranked-out · N.
 
 ## Pre-registered prediction
 
 Written **before** the first run, deliberately, so the result confirms or refutes a stated
-hypothesis instead of being rationalised after the fact.
+hypothesis instead of being rationalised after the fact. Revised 26 Aug 2026 after further
+measurement corrected part of the original grounds — see the note at the end of this section.
 
-> **Complete-set recall@5 will be under 0.3** using the `finnish` text-search configuration.
+### The number
 
-Grounds, measured during shaping against a live Postgres 17:
+> **Complete-set recall@5 will land between 0.25 and 0.50**, using the `finnish` text-search
+> configuration and `ts_rank` (**not** BM25 — see below).
 
-| test | result |
+Two forces pull in opposite directions, which is why the range is wide:
+
+| Direction | Cause |
 |---|---|
-| `biojäte` finds `biojäteastia` | false |
-| `erilliskeräys` finds `erilliskeräysvelvoite` | false |
-| `tyhjennys` finds `tyhjennysväli` | false |
-| `jäteastia` finds `jäteastioiden` | false |
-| `taajama` finds `taajamassa` | true |
+| **Down** | No compound splitting — 4 of 4 term-pair tests failed |
+| **Down** | No IDF in `ts_rank`, against a corpus where `jätteiden` (76×), `kiinteistön` (71×) and `kunnan` (54×) act as near-stopwords |
+| **Up** | The corpus is only ~89 chunks (~60 clauses + 29 definition entries), so top-5 covers 5.6% of it — far easier than any published benchmark |
 
-Compound splitting is absent, as expected of a Snowball stemmer. The fourth row is the real problem:
-that is not a compound but the *same word inflected* — `jäteastia` stems to `jäteast`, while
-`jäteastioiden` stems to `jäteastio`. Finnish snowball produces two stems for one lemma on this
-vocabulary.
+### The mechanism — the falsifiable half
 
-**If recall lands materially higher than 0.3, the prediction was wrong and the reason must be
-understood before touching retrieval.** A pleasant surprise is a finding, not a licence to move on.
+A wide range is hard to be wrong about. These are the real claims:
+
+1. **Most misses will be zero-overlap, not ranked-out** — the required chunk shares no stemmed token
+   with the query at all, rather than being retrieved and ranked below 5.
+2. **`kunnan` stems to `kun`**, colliding with one of the commonest Finnish conjunctions, so expect
+   precision noise on any question mentioning the municipality.
+3. **The 29 short definition chunks will be over-retrieved**, because without IDF short chunks
+   dense in common terms score well.
+
+Claim 1 is what decides slice 3, and the diagnostic below is what tests it:
+
+- mostly zero-overlap → slice 3 is **lemmatisation** (`dict_voikko`, which splits compounds)
+- mostly ranked-out → slice 3 is **a BM25 extension**, because the missing signal is IDF
+
+**If any of this is wrong, the reason must be understood before touching retrieval.** A pleasant
+surprise is a finding, not a licence to move on.
+
+### Measured grounds
+
+Against a live Postgres 17, `finnish` configuration:
+
+| Test | Result | Reading |
+|---|---|---|
+| `biojäte` finds `biojäteastia` | false | compound not split (`biojät` vs `biojäteast`) |
+| `erilliskeräys` finds `erilliskeräysvelvoite` | false | compound not split |
+| `tyhjennys` finds `tyhjennysväli` | false | compound not split |
+| `jäteastia` finds `jäteastioiden` | false | stem-boundary failure (`jäteast` vs `jäteastio`) |
+| `taajama` finds `taajamassa` | true | inessive handled |
+| `biojäte` finds `biojätteet` / `biojätteen` / `biojätettä` | **true** | all stem to `biojät` |
+| `jätteiden` → `jät`, `kunnan` → `kun` | — | over-short stems, collision risk |
+
+**Correction to the original grounds.** The first version of this spec claimed Finnish snowball
+"fails even ordinary inflection on this vocabulary". That was overstated. Inflection mostly works —
+the whole `biojäte` family shares one stem. The `jäteastia` case is a specific stem-boundary
+failure, not the general rule. Compound splitting is the genuine, reproducible gap, and the missing
+IDF is the second one. Recorded rather than quietly edited, because a pre-registered prediction
+whose grounds change silently is worth nothing.
 
 ## Tracer slices
 
