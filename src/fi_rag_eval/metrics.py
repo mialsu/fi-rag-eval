@@ -13,6 +13,7 @@ buy a bin -- so it must never be the headline.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -165,4 +166,79 @@ def compute(outcomes: Sequence[QuestionOutcome], *, k: int) -> Metrics:
         misses_ranked_out=sum(1 for m in misses if m.kind is MissKind.RANKED_OUT),
         lexical_leakage=leaked_total / lexemes_total if lexemes_total else 0.0,
         leakage_lexemes=lexemes_total,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Discordance:
+    """How two cells disagree question by question, and whether that can register.
+
+    Two cells are scored on the **same** questions, so comparing them is a
+    *paired* test and the absolute-difference interval is the wrong instrument.
+    Only the questions where the two disagree carry information: `a_only` passed
+    in the first cell and failed in the second, `b_only` the reverse. Questions
+    both cells pass, or both fail, tell you nothing about which is better.
+
+    This is why slice 4 exists. At N=21 the best cell has three failures, so
+    fixing *every remaining miss* yields three discordant questions and p=0.25 --
+    there was no result the vector layer could have produced that would register
+    at all. Reported per run so a reader is never left to assume a small delta
+    means something.
+    """
+
+    a_only: int
+    """Passed in cell A, failed in cell B."""
+
+    b_only: int
+    """Failed in cell A, passed in cell B."""
+
+    @property
+    def discordant(self) -> int:
+        """``d``: how many questions the two cells disagree about."""
+        return self.a_only + self.b_only
+
+    @property
+    def p_value(self) -> float:
+        """Exact two-sided McNemar p: a binomial sign test over the discordant pairs.
+
+        Under the null the two cells are equally good, so each discordant question
+        is a fair coin. No normal approximation and no continuity correction --
+        both are unusable at this N, which is the whole point of reporting it.
+
+        With every discordant question flipping the same way this reduces to
+        ``2 x 0.5^d``: d=5 gives 0.062 and d=6 gives 0.031, so **six questions
+        must flip for a paired win at p<0.05.**
+        """
+        n = self.discordant
+        if n == 0:
+            return 1.0
+        tail = sum(math.comb(n, i) for i in range(min(self.a_only, self.b_only) + 1))
+        return min(1.0, float(2.0 * tail / 2**n))
+
+
+def discordance(a: Sequence[QuestionOutcome], b: Sequence[QuestionOutcome]) -> Discordance:
+    """Compare two cells' outcomes over the same questions, in the same order.
+
+    Requires the same question ids in the same order: a paired test over two
+    different populations is not a paired test, and silently zipping mismatched
+    lists is how that mistake would be made.
+    """
+    if len(a) != len(b):
+        raise MetricsError(
+            f"cannot pair {len(a)} outcomes against {len(b)}: a paired test needs the "
+            "same questions on both sides"
+        )
+    mismatched = [
+        (left.question_id, right.question_id)
+        for left, right in zip(a, b, strict=True)
+        if left.question_id != right.question_id
+    ]
+    if mismatched:
+        raise MetricsError(
+            f"outcomes are not in the same question order: {mismatched[:3]}. Pairing "
+            "two cells on position requires they scored the same set, in order."
+        )
+    return Discordance(
+        a_only=sum(1 for x, y in zip(a, b, strict=True) if x.complete and not y.complete),
+        b_only=sum(1 for x, y in zip(a, b, strict=True) if y.complete and not x.complete),
     )

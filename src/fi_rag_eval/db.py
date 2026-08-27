@@ -122,6 +122,14 @@ class Hit:
     address: str
     citation: str
     rank: float
+    authority_key: str
+    """Read from the stored row, **not** parsed back out of the address.
+
+    `evaluate` asserts every hit belongs to the question's own authority. Deriving
+    that from the address would re-check the string this module composed a moment
+    earlier; reading the column checks the row the WHERE clause actually filtered
+    on, which is the thing that could regress (slice 4, D9).
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,7 +216,20 @@ def insert_chunks(
     authority_key: str,
     effective_date: date,
     chunks: Iterable[Chunk],
+    document: str,
 ) -> int:
+    """Load one document's chunks, stamping each citation with the document.
+
+    ``document`` is the source's title plus its published edition, and it is
+    joined onto the clause-level citation here rather than in `chunking` -- which
+    reads one document and knows nothing about how it is published. With two
+    authorities in the corpus a bare ``23 § KERÄYSVÄLINETYYPIT`` no longer says
+    whose 23 §, and with six editions of Pirkanmaa's text sharing one address the
+    edition is the only place a human learns which one they are reading (D3).
+
+    The body is untouched: the citation is display-only and is not indexed, so
+    this changes what a reader sees and no metric.
+    """
     rows = []
     for chunk in chunks:
         address = ChunkAddress(
@@ -224,7 +245,7 @@ def insert_chunks(
                 effective_date,
                 chunk.clause,
                 chunk.sub_key,
-                chunk.citation,
+                f"{chunk.citation} ({document})",
                 chunk.text,
                 hashlib.sha256(chunk.text.encode("utf-8")).hexdigest(),
             )
@@ -329,8 +350,8 @@ def search(
     with conn.cursor() as cur:
         cur.execute(
             sql.SQL(
-                "SELECT address, citation, ts_rank({column}, query, %s) AS rank "
-                "FROM chunk, CAST(%s AS tsquery) AS query "
+                "SELECT address, citation, ts_rank({column}, query, %s) AS rank, "
+                "authority_key FROM chunk, CAST(%s AS tsquery) AS query "
                 "WHERE authority_key = %s AND effective_date = %s AND {column} @@ query "
                 "ORDER BY rank DESC, address ASC LIMIT %s"
             ).format(column=sql.Identifier(analyser.column)),
@@ -342,6 +363,7 @@ def search(
                 address=str(row[0]),
                 citation=str(row[1]),
                 rank=float(str(row[2])),
+                authority_key=str(row[3]),
             )
             for position, row in enumerate(cur.fetchall(), start=1)
         ]

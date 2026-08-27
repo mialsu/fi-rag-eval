@@ -25,6 +25,7 @@ from fi_rag_eval.extract import Extraction, extract
 from fi_rag_eval.manifest import Authority, Manifest, Source
 
 _VOIMAANTULO = re.compile(r"tulevat\s+voimaan\s+(\d{1,2})\.(\d{1,2})\.(\d{4})")
+_FRONT_MATTER_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
 _DOWNLOAD_TIMEOUT_SECONDS = 60
 
 
@@ -146,6 +147,54 @@ def read_effective_date(clauses: Sequence[Clause]) -> date:
     return matches.pop()
 
 
+def read_front_matter_dates(front_matter: str) -> tuple[date, ...]:
+    """Every ``DD.MM.YYYY`` date in the front matter, sorted and de-duplicated.
+
+    This is what makes the manifest's `edition` label falsifiable instead of a
+    hand-written string nobody can check. The front matter is where an authority
+    records its approval and amendment history -- Pirkanmaa's reads *"Hyväksytty
+    ... 19.5.2021, päivitetty 7.6.2023, 6.3.2024, 9.4.2025 ja 22.10.2025"* -- so a
+    republished document with a sixth amendment changes this list, and ingest
+    refuses to load it under the old edition label.
+
+    Deliberately shape-agnostic: it does not try to understand *which* date is
+    the approval and which the amendments, because the two documents in the
+    corpus already write that three different ways. It only has to detect change.
+    """
+    return tuple(
+        sorted(
+            {
+                date(int(year), int(month), int(day))
+                for day, month, year in _FRONT_MATTER_DATE.findall(front_matter)
+            }
+        )
+    )
+
+
+def assert_edition(source: Source, front_matter: str) -> None:
+    """The manifest's edition label must still match the document's own history.
+
+    Without this the label is a hand-written string with nothing tying it to the
+    PDF -- and an unverifiable edition on every citation is the same defect as an
+    unverifiable metric in the README, just aimed at a human reader instead of at
+    CI. Pirkanmaa's text has been amended five times since the Voimaantulo date
+    its address keys on, so the citation is the only place a reader learns which
+    of the six editions they are being shown (slice 4, D3).
+    """
+    dates = read_front_matter_dates(front_matter)
+    if dates != source.edition.front_matter_dates:
+        raise IngestError(
+            f"{source.filename}: the front matter carries the dates "
+            f"{[d.isoformat() for d in dates]}, the manifest's edition "
+            f"{source.edition.label!r} was recorded against "
+            f"{[d.isoformat() for d in source.edition.front_matter_dates]}.\n"
+            "The document's approval or amendment history has moved, so the edition "
+            "label every citation carries is now wrong. Read the new front matter and "
+            "update the edition deliberately -- an edition nobody checked is exactly "
+            "the misleading citation the edition field exists to prevent."
+        )
+
+
 def prepare(source: Source, raw_dir: Path) -> tuple[Extraction, list[Clause], list[Chunk], bool]:
     path, downloaded = fetch(source, raw_dir)
     extraction = extract(path)
@@ -159,6 +208,8 @@ def prepare(source: Source, raw_dir: Path) -> tuple[Extraction, list[Clause], li
             f"manifest says {source.effective_date}. The effective date is part of "
             "every chunk address, so this is a hard error."
         )
+
+    assert_edition(source, extraction.front_matter)
 
     definitions = sum(1 for chunk in chunks if chunk.sub_key is not None)
     actual = (len(clauses), len(chunks), definitions)
@@ -261,6 +312,7 @@ def _ingest_source(
         authority_key=authority.key,
         effective_date=source.effective_date,
         chunks=chunks,
+        document=source.document,
     )
     if loaded != len(chunks):  # pragma: no cover - executemany is all-or-nothing
         raise IngestError(f"{source.filename}: loaded {loaded} of {len(chunks)} chunks")

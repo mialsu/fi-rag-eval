@@ -25,7 +25,7 @@ from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
 from fi_rag_eval.ingest import IngestReport
-from fi_rag_eval.metrics import Metrics
+from fi_rag_eval.metrics import Metrics, discordance
 
 RANKER_NOTE = (
     "Postgres ts_rank over a tsvector, normalisation as shown per cell. NOT BM25: "
@@ -305,6 +305,7 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
     published = grid.published
     first = published.metrics
     harvested = sum(1 for r in published.runs if r.question.phrasing is Phrasing.HARVESTED)
+    paired = len({r.question.pair for r in published.runs if r.question.pair is not None})
     lines = [
         "fi-rag-eval — lexical retrieval grid",
         f"commit {commit}   k={grid.k}   {len(grid.cells)} cells",
@@ -318,6 +319,12 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
         "spanning more than one chunk",
         f"            phrasing: {harvested} harvested verbatim from resident-facing pages, "
         f"{first.questions - harvested} authored",
+        *_wrapped(
+            "            ",
+            "authorities: "
+            + " · ".join(f"{key} {metrics.questions}" for key, metrics in published.by_authority())
+            + f";  {paired} paired question(s) — one text labelled once per authority",
+        ),
         *_wrapped("index size: ", format_lexeme_counts(lexemes)),
         "",
         f"{'cell':<20}{'recall@' + str(grid.k):>9}{'per-chunk':>11}{'MRR':>8}"
@@ -349,7 +356,13 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
             "  and lost by ranking — a different fix from the one that was applied.",
             "",
             f"published headline: {PUBLISHED.name} — the cell the README quotes. Moving it is",
-            "  the Owner's decision, with a deliberate re-baseline.",
+            "  the Owner's decision, with a deliberate re-baseline. The headline is POOLED",
+            "  over every authority in the set; the rows below say where it comes from and",
+            "  are diagnostics, not headlines of their own.",
+            "",
+            format_by_authority(published),
+            "",
+            format_power(grid),
             "",
             f"per question x cell   (P = every required chunk inside the top {grid.k}, . = not)",
             f"  {'':<40}" + "".join(f"{run.cell.short:>5}" for run in grid.cells),
@@ -364,6 +377,85 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
     best = grid.best
     if best.cell != PUBLISHED:
         lines.extend(["", format_cell_detail(best)])
+    return "\n".join(lines)
+
+
+def format_by_authority(run: EvaluationRun) -> str:
+    """One cell's metrics broken down per authority (slice 4, D11).
+
+    Printed because the pooled headline hides real heterogeneity: one authority's
+    questions have had three slices of implicit fitting and the other's none. It
+    is *not* gated per authority -- the gate defends the pooled number of every
+    cell -- so a row moving here is a thing to look at, not a thing to trust.
+    """
+    rows = run.by_authority()
+    lines = [
+        f"per authority — {run.cell.name}   (diagnostic; the gate defends the pooled row)",
+        f"  {'authority':<20}{'N':>4}{'recall@' + str(run.k):>10}{'per-chunk':>11}"
+        f"{'MRR':>8}{'leakage':>10}{'zero-ovl':>10}{'ranked-out':>12}",
+    ]
+    for key, metrics in rows:
+        lines.append(
+            f"  {key:<20}{metrics.questions:>4}{metrics.complete_set_recall:>10.3f}"
+            f"{metrics.per_chunk_recall:>11.3f}{metrics.mean_reciprocal_rank:>8.3f}"
+            f"{metrics.lexical_leakage:>10.3f}{metrics.misses_zero_overlap:>10}"
+            f"{metrics.misses_ranked_out:>12}"
+        )
+    if len(rows) > 1:
+        lines.append(
+            "  A row here cannot register an improvement on its own: six discordant questions"
+        )
+        lines.append(
+            "  are needed for p<0.05, which no single authority's slice of this set can reach."
+        )
+    return "\n".join(lines)
+
+
+def format_power(grid: GridRun) -> str:
+    """What this run can and cannot resolve: discordant counts and exact McNemar p.
+
+    Every pair of cells is scored on the same questions, so the comparison is
+    **paired** and an absolute-difference interval is the wrong test. Only the
+    questions two cells disagree about carry information, and with all of them
+    flipping one way the exact test gives ``2 x 0.5^d`` -- so six must flip for
+    p<0.05 at any N.
+
+    Printed as two triangles rather than 66 lines, and printed at all so that a
+    reader never has to assume a 0.048 delta between two cells means something
+    (slice 4, D10). The regression gate needs none of this: it is deterministic at
+    any N. Power is only about claiming an improvement is *real*.
+    """
+    cells = grid.cells
+    heads = "".join(f"{run.cell.short:>6}" for run in cells)
+    lines = [
+        "paired power — every cell against every other, over the same questions",
+        f"  d = questions the two disagree about; p = exact two-sided McNemar. "
+        f"N={cells[0].metrics.questions}",
+        "  d >= 6 is the threshold for p<0.05, whatever N is. Below it, a delta between",
+        "  two cells is not something this instrument can resolve.",
+        "",
+        f"  discordant d{'':<8}{heads}",
+    ]
+    pairs = {}
+    for i, left in enumerate(cells):
+        for j, right in enumerate(cells):
+            if i < j:
+                pairs[(i, j)] = discordance(
+                    [r.outcome for r in left.runs], [r.outcome for r in right.runs]
+                )
+    for i, left in enumerate(cells):
+        row = "".join(
+            "     ." if i == j else f"{pairs[(min(i, j), max(i, j))].discordant:>6}"
+            for j in range(len(cells))
+        )
+        lines.append(f"  {left.cell.name:<20}{row}")
+    lines.extend(["", f"  exact p{'':<13}{heads}"])
+    for i, left in enumerate(cells):
+        row = "".join(
+            "     ." if i == j else f"{pairs[(min(i, j), max(i, j))].p_value:>6.3f}"
+            for j in range(len(cells))
+        )
+        lines.append(f"  {left.cell.name:<20}{row}")
     return "\n".join(lines)
 
 

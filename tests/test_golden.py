@@ -97,3 +97,119 @@ questions:
     )
     with pytest.raises(GoldenSetError, match="non-empty"):
         load_golden_set(path, manifest)
+
+
+PAIR_ENTRY = textwrap.dedent(
+    """\
+    version: 1
+    questions:
+      - id: {id_a}
+        question: {question_a}
+        phrasing: authored
+        municipality: {municipality_a}
+        pair: {pair_a}
+        required_chunks:
+          - {chunk_a}
+        label_source: read by hand
+      - id: {id_b}
+        question: {question_b}
+        phrasing: authored
+        municipality: {municipality_b}
+        pair: {pair_b}
+        required_chunks:
+          - {chunk_b}
+        label_source: read by hand
+    """
+)
+
+WELL_FORMED_PAIR = {
+    "id_a": "kimppa-ls",
+    "question_a": "Voimmeko käyttää naapurin kanssa samaa astiaa?",
+    "municipality_a": "Turku",
+    "pair_a": "yhteinen-astia",
+    "chunk_a": "lounais-suomi@2024-08-01#7",
+    "id_b": "kimppa-pir",
+    "question_b": "Voimmeko käyttää naapurin kanssa samaa astiaa?",
+    "municipality_b": "Tampere",
+    "pair_b": "yhteinen-astia",
+    "chunk_b": "pirkanmaa@2021-07-01#8",
+}
+
+
+def write_pair(tmp_path: Path, **overrides: str) -> Path:
+    path = tmp_path / "pair.yaml"
+    path.write_text(PAIR_ENTRY.format(**{**WELL_FORMED_PAIR, **overrides}), encoding="utf-8")
+    return path
+
+
+def test_a_well_formed_pair_loads_and_is_reported(tmp_path: Path, manifest: Manifest) -> None:
+    golden = load_golden_set(write_pair(tmp_path), manifest)
+    assert golden.pairs == ("yhteinen-astia",)
+    assert golden.authorities == ("lounais-suomi", "pirkanmaa")
+
+
+def test_a_lone_half_of_a_pair_is_rejected(tmp_path: Path, manifest: Manifest) -> None:
+    """A pair exists to hold the text fixed while the authority changes."""
+    golden = write_pair(tmp_path, pair_b="something-else")
+    with pytest.raises(GoldenSetError, match="half/halves"):
+        load_golden_set(golden, manifest)
+
+
+def test_halves_that_ask_different_things_are_rejected(tmp_path: Path, manifest: Manifest) -> None:
+    golden = write_pair(tmp_path, question_b="Kuinka usein astia tyhjennetään?")
+    with pytest.raises(GoldenSetError, match="ask different things"):
+        load_golden_set(golden, manifest)
+
+
+def test_a_pair_that_does_not_cross_authorities_is_rejected(
+    tmp_path: Path, manifest: Manifest
+) -> None:
+    """Two halves in one jurisdiction cannot show the rules differ."""
+    golden = write_pair(
+        tmp_path,
+        municipality_b="Kaarina",
+        chunk_b="lounais-suomi@2024-08-01#9",
+    )
+    with pytest.raises(GoldenSetError, match=r"labelled against authority"):
+        load_golden_set(golden, manifest)
+
+
+def test_a_directory_of_files_loads_as_one_pooled_set(tmp_path: Path, manifest: Manifest) -> None:
+    """One file per authority on disk, one pooled set in the metrics (D11)."""
+    (tmp_path / "a-lounais.yaml").write_text(
+        ENTRY.format(phrasing="authored", source=""), encoding="utf-8"
+    )
+    (tmp_path / "b-pirkanmaa.yaml").write_text(
+        textwrap.dedent(
+            """\
+            version: 1
+            questions:
+              - id: p
+                question: Mitä keräysväline tarkoittaa?
+                phrasing: authored
+                municipality: Tampere
+                required_chunks:
+                  - pirkanmaa@2021-07-01#2.kerausvalineella
+                label_source: 2 § MÄÄRITELMÄT
+            """
+        ),
+        encoding="utf-8",
+    )
+    golden = load_golden_set(tmp_path, manifest)
+    assert [q.id for q in golden.questions] == ["q", "p"], "filename order, so N is stable"
+    assert golden.authorities == ("lounais-suomi", "pirkanmaa")
+
+
+def test_an_id_repeated_across_two_files_is_rejected(tmp_path: Path, manifest: Manifest) -> None:
+    """Merging must not hide a collision the single-file check would have caught."""
+    for name in ("a.yaml", "b.yaml"):
+        (tmp_path / name).write_text(ENTRY.format(phrasing="authored", source=""), encoding="utf-8")
+    with pytest.raises(GoldenSetError, match="duplicate question ids"):
+        load_golden_set(tmp_path, manifest)
+
+
+def test_an_empty_golden_directory_is_an_error_not_an_empty_set(
+    tmp_path: Path, manifest: Manifest
+) -> None:
+    with pytest.raises(GoldenSetError, match=r"no \*\.yaml golden-set files"):
+        load_golden_set(tmp_path, manifest)

@@ -38,7 +38,76 @@ authorities:
         sha256: a6ea7755b63bb4e43f7b322d50a4f45983ad32b86455ed68ae1a95b4b0f76ccc
         # Read out of 49 § Voimaantulo, not assumed. Ingest cross-checks it.
         effective_date: 2024-08-01
+        # What a human reads in a citation. `front_matter_dates` is every date in
+        # the document's front matter, and ingest refuses to load a document whose
+        # amendment history has moved -- so the label cannot go stale unnoticed.
+        edition:
+          label: 1.8.2024 lähtien, 25 § muutettu 22.10.2025
+          front_matter_dates:
+            - 2024-05-30   # hyväksytty, jätehuoltolautakunta § 17
+            - 2024-08-01   # voimassa lähtien
+            - 2025-10-22   # 25 §:n muutos
         expected:
           clauses: 50
           chunks: 82
           definitions: 32
+
+  - key: pirkanmaa
+    # The authority's own name carries no geography and would not be unique in
+    # principle, so the key names the area instead (slice 4, D2). Tampere is the
+    # vastuukunta but only 1 of 17 municipalities, and naming an authority after one
+    # member municipality is the mistake ADR-0002 exists to prevent.
+    name: Alueellinen jätehuoltolautakunta
+    # Read from 1 § SOVELTAMISALA, which lists 17 kunnat. SASTAMALA IS DELIBERATELY
+    # ABSENT: the document claims it only "(Mouhijärven ja Suodenniemen osalta)" --
+    # two former municipalities merged into Sastamala in 2009 -- so these rules bind
+    # part of the kunta and not the rest. Listing it would make the harness
+    # confidently wrong for most of Sastamala's residents, which is product failure
+    # mode #1 wearing a correct-looking citation. See `partial_municipalities` below
+    # and ADR-0002's amendment note: a municipality does NOT always resolve to
+    # exactly one authority.
+    municipalities:
+      - Hämeenkyrö
+      - Ikaalinen
+      - Juupajoki
+      - Kangasala
+      - Lempäälä
+      - Mänttä-Vilppula
+      - Nokia
+      - Orivesi
+      - Parkano
+      - Pirkkala
+      - Pälkäne
+      - Ruovesi
+      - Tampere
+      - Vesilahti
+      - Virrat
+      - Ylöjärvi
+    partial_municipalities:
+      Sastamala: the former Mouhijärvi and Suodenniemi areas only (1 § SOVELTAMISALA)
+    sources:
+      - filename: pirkanmaa.pdf
+        title: Kunnalliset jätehuoltomääräykset
+        url: https://www.tampere.fi/sites/default/files/2026-04/Kunnalliset-jatehuoltomaaraykset--1.5.2026-alkaen-_0.pdf
+        sha256: 69b4663b01c8007df21bc9d29ba3fba50e150e24d90dc39423fe468472e95892
+        # Read out of 47 § VOIMAANTULO: "tulevat voimaan 1.7.2021". The authority
+        # publishes this text as "1.5.2026 alkaen" after five amendments, so the
+        # address names 2021 for text amended since -- deliberately, per D3, because
+        # re-keying costs relabelling every question. The edition below is what a
+        # human actually reads in the citation, and REVIEW-DEBT.md records the cost.
+        effective_date: 2021-07-01
+        edition:
+          label: 1.5.2026 alkaen
+          front_matter_dates:
+            - 2021-05-19   # hyväksytty, alueellinen jätehuoltolautakunta § 27
+            - 2023-06-07   # päivitetty § 25
+            - 2024-03-06   # päivitetty § 13
+            - 2025-04-09   # päivitetty § 18
+            - 2025-10-22   # päivitetty § 49
+        # Hand-read: 48 clauses (1..48, 0 LUKU chapters), and 2 § MÄÄRITELMÄT holds
+        # 41 bulleted definienda in strict alphabetical order from `alueellisella`
+        # to `yhdyskuntajätteellä`. 89 chunks = 47 whole clauses + 2 §'s preamble + 41.
+        expected:
+          clauses: 48
+          chunks: 89
+          definitions: 41

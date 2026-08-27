@@ -32,7 +32,8 @@ from fi_rag_eval.report import (
 )
 
 DEFAULT_MANIFEST = Path("corpus/manifest.yaml")
-DEFAULT_GOLDEN = Path("corpus/golden/lounais-suomi.yaml")
+DEFAULT_GOLDEN = Path("corpus/golden")
+"""A directory: one file per authority, pooled into one set (slice 4, D11)."""
 DEFAULT_RAW_DIR = Path("data/raw")
 DEFAULT_BASELINE = Path("eval/baseline.json")
 

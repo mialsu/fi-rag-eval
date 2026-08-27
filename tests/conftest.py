@@ -24,7 +24,8 @@ from fi_rag_eval.manifest import Manifest, load_manifest
 
 REPO = Path(__file__).resolve().parent.parent
 MANIFEST = REPO / "corpus" / "manifest.yaml"
-GOLDEN = REPO / "corpus" / "golden" / "lounais-suomi.yaml"
+GOLDEN = REPO / "corpus" / "golden"
+"""The whole directory, pooled -- exactly what `make eval` scores (slice 4, D11)."""
 RAW_DIR = REPO / "data" / "raw"
 
 

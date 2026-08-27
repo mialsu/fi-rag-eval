@@ -91,6 +91,25 @@ class EvaluationRun:
     runs: tuple[QuestionRun, ...]
     metrics: Metrics
 
+    def by_authority(self) -> tuple[tuple[str, Metrics], ...]:
+        """The same metrics computed per authority, as a diagnostic (slice 4, D11).
+
+        `metrics` is pooled over every question in the set, and it is the pooled
+        number that carries the statistical power the golden set was grown to buy.
+        These rows sit beneath it the way per-chunk recall and MRR already sit
+        beneath complete-set recall: they say *where* the pooled number comes from,
+        and neither of them is the headline.
+
+        A per-authority row over ~25 questions cannot register an improvement on
+        its own -- six discordant questions are needed for p<0.05 either way -- so
+        reading one as a verdict on an authority is the mistake this docstring
+        exists to prevent.
+        """
+        groups: dict[str, list[QuestionOutcome]] = {}
+        for run in self.runs:
+            groups.setdefault(run.authority_key, []).append(run.outcome)
+        return tuple((key, compute(runs, k=self.k)) for key, runs in sorted(groups.items()))
+
 
 @dataclass(frozen=True, slots=True)
 class GridRun:
@@ -140,6 +159,39 @@ def _resolve_labels(conn: psycopg.Connection[tuple[object, ...]], golden: Golden
             f"{detail}\n"
             "An unresolvable label is a hard error, never a skipped question: the "
             "alternative is a metric computed over a smaller N than the table claims."
+        )
+
+
+def assert_one_authority(hits: Sequence[db.Hit], authority_key: str, question_id: str) -> None:
+    """No hit may come from another authority. The hard filter, verified per run.
+
+    `db.search` applies the authority filter in the WHERE clause, before ranking,
+    so a foreign chunk is never a candidate (ADR-0002). That is the *design*; this
+    is the *check*, and it lives inside `evaluate` rather than only in a unit test
+    for one reason -- it cannot be skipped. Every question of every cell of every
+    run passes through it, so the filter cannot silently regress into a
+    post-ranking filter, or be dropped when the column is absent, without the run
+    going red.
+
+    What this verifies is **retrieval-layer isolation**, not refusal. A resident
+    asking municipality A's question with municipality B's filter set must be
+    *refused*, and refusing needs an answer to refuse; that is why the hard-filter
+    debt closes PARTIAL and not CLOSED (slice 4, D9/D12).
+    """
+    foreign = [
+        (hit.position, hit.address, hit.authority_key)
+        for hit in hits
+        if hit.authority_key != authority_key
+    ]
+    if foreign:
+        raise EvaluationError(
+            f"{question_id}: the top {len(hits)} for authority {authority_key!r} contains "
+            f"chunks from another authority: {foreign}.\n"
+            "The authority filter is the product's #1 failure mode (DESIGN.md:15,67): it "
+            "makes a cross-jurisdiction answer structurally impossible rather than merely "
+            "discouraged. A leak here means a resident can be told another municipality's "
+            "rules with a correct-looking citation, so the run fails rather than reporting "
+            "a number computed over mixed jurisdictions."
         )
 
 
@@ -267,6 +319,7 @@ def evaluate(
             analyser=cell.analyser,
             normalisation=cell.normalisation,
         )
+        assert_one_authority(hits, authority.key, question.id)
         retrieved = tuple(hit.address for hit in hits)
         required = set(question.required_addresses)
         # Leakage: how much of the question's vocabulary its own targets already

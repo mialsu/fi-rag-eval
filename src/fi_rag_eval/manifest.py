@@ -33,13 +33,42 @@ class ExpectedParse:
 
 
 @dataclass(frozen=True, slots=True)
+class Edition:
+    """Which published revision of a document this is, and how that claim is checked.
+
+    The chunk address keys on Voimaantulo (ADR-0004), which is the date the
+    document's own text declares. For Pirkanmaa that date is 2021-07-01 while the
+    authority publishes the text as "1.5.2026 alkaen" after five amendments, so
+    the address alone tells a human something true and misleading at once. The
+    edition is therefore declared here and carried into the citation, where it is
+    actually read (slice 4, D3).
+
+    `front_matter_dates` is what stops `label` from being an unfalsifiable
+    hand-written string: ingest reads every date out of the document's front
+    matter and refuses to load a document whose amendment history has moved.
+    """
+
+    label: str
+    """Human-facing, verbatim from how the authority publishes it: "1.5.2026 alkaen"."""
+
+    front_matter_dates: tuple[date, ...]
+    """Every date in the front matter, sorted. Asserted at ingest, never assumed."""
+
+
+@dataclass(frozen=True, slots=True)
 class Source:
     filename: str
     title: str
     url: str
     sha256: str
     effective_date: date
+    edition: Edition
     expected: ExpectedParse
+
+    @property
+    def document(self) -> str:
+        """How a citation names this document: title plus the edition a human reads."""
+        return f"{self.title}, {self.edition.label}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +76,17 @@ class Authority:
     key: str
     name: str
     municipalities: tuple[str, ...]
+    partial_municipalities: tuple[tuple[str, str], ...]
+    """Kunnat this authority covers only *in part*, with the part named.
+
+    Deliberately **not** merged into `municipalities`: a partially covered kunta
+    must not resolve, because most of its residents are bound by a different
+    authority's rules and answering them from this one is failure mode #1 with a
+    correct-looking citation (slice 4, D4). It is recorded rather than dropped so
+    the refusal can say *why*, and so the counterexample to ADR-0002's
+    one-authority-per-municipality model stays visible in the data.
+    """
+
     sources: tuple[Source, ...]
 
 
@@ -75,6 +115,21 @@ class Manifest:
             a for a in self.authorities if any(m.casefold() == folded for m in a.municipalities)
         ]
         if not matches:
+            partial = [
+                (a, part)
+                for a in self.authorities
+                for kunta, part in a.partial_municipalities
+                if kunta.casefold() == folded
+            ]
+            if partial:
+                detail = "; ".join(f"{a.key} covers only {part}" for a, part in partial)
+                raise ManifestError(
+                    f"the municipality {municipality!r} is covered only in part: {detail}. "
+                    "These regulations bind part of the kunta and not the rest, so the "
+                    "harness refuses rather than answering a resident from rules that may "
+                    "not bind them. A municipality does not always resolve to exactly one "
+                    "authority (ADR-0002, amended)."
+                )
             raise ManifestError(
                 f"no authority in the manifest covers the municipality {municipality!r}"
             )
@@ -95,7 +150,20 @@ def _require(mapping: Mapping[str, Any], key: str, where: str) -> Any:
 def _parse_date(value: Any, where: str) -> date:
     if isinstance(value, date):
         return value
-    raise ManifestError(f"{where}: effective_date must be a YYYY-MM-DD date, got {value!r}")
+    raise ManifestError(f"{where}: expected a YYYY-MM-DD date, got {value!r}")
+
+
+def _parse_edition(raw: Any, where: str) -> Edition:
+    if not isinstance(raw, Mapping):
+        raise ManifestError(f"{where}: edition must be a mapping with label and dates")
+    label = str(_require(raw, "label", where)).strip()
+    if not label:
+        raise ManifestError(f"{where}: edition label must not be empty")
+    raw_dates = _require(raw, "front_matter_dates", where)
+    if not isinstance(raw_dates, Sequence) or isinstance(raw_dates, str) or not raw_dates:
+        raise ManifestError(f"{where}: edition front_matter_dates must be a non-empty list")
+    dates = tuple(sorted(_parse_date(value, f"{where} edition") for value in raw_dates))
+    return Edition(label=label, front_matter_dates=dates)
 
 
 def _parse_source(raw: Mapping[str, Any], where: str) -> Source:
@@ -108,12 +176,30 @@ def _parse_source(raw: Mapping[str, Any], where: str) -> Source:
         url=str(_require(raw, "url", where)),
         sha256=str(_require(raw, "sha256", where)).lower(),
         effective_date=_parse_date(_require(raw, "effective_date", where), where),
+        edition=_parse_edition(_require(raw, "edition", where), where),
         expected=ExpectedParse(
             clauses=int(_require(expected, "clauses", where)),
             chunks=int(_require(expected, "chunks", where)),
             definitions=int(_require(expected, "definitions", where)),
         ),
     )
+
+
+def _parse_partial_municipalities(raw: Any, where: str) -> tuple[tuple[str, str], ...]:
+    """Kunnat covered only in part, as ``kunta: the part covered``.
+
+    Optional, and empty for an authority whose area is whole kunnat. Pirkanmaa's
+    1 § claims Sastamala only "Mouhijärven ja Suodenniemen osalta", which is the
+    counterexample to ADR-0002 (slice 4, D4).
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, Mapping) or not raw:
+        raise ManifestError(
+            f"{where}: partial_municipalities must be a non-empty mapping of "
+            "kunta -> the part of it this authority covers"
+        )
+    return tuple((str(kunta), str(part)) for kunta, part in raw.items())
 
 
 def load_manifest(path: Path) -> Manifest:
@@ -142,11 +228,22 @@ def load_manifest(path: Path) -> Manifest:
         raw_municipalities = _require(raw, "municipalities", where)
         if not isinstance(raw_municipalities, Sequence) or not raw_municipalities:
             raise ManifestError(f"{where}: municipalities must be a non-empty list")
+        municipalities = tuple(str(m) for m in raw_municipalities)
+        partial = _parse_partial_municipalities(raw.get("partial_municipalities"), where)
+        folded = {m.casefold() for m in municipalities}
+        overlap = sorted(kunta for kunta, _ in partial if kunta.casefold() in folded)
+        if overlap:
+            raise ManifestError(
+                f"{where}: {overlap} are listed both as fully and as partially covered. "
+                "A partially covered kunta must not resolve, so listing it in both places "
+                "would make the refusal unreachable."
+            )
         authorities.append(
             Authority(
                 key=key,
                 name=str(_require(raw, "name", where)),
-                municipalities=tuple(str(m) for m in raw_municipalities),
+                municipalities=municipalities,
+                partial_municipalities=partial,
                 sources=tuple(_parse_source(s, where) for s in raw_sources),
             )
         )

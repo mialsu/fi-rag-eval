@@ -30,6 +30,7 @@ from fi_rag_eval.addressing import slugify
 _CLAUSE = re.compile(r"^(?P<number>\d+)\s*§\s+(?P<title>\S.*?)\s*$")
 _CHAPTER = re.compile(r"^(?P<number>\d+)\s*LUKU\s+(?P<title>\S.*?)\s*$")
 _TOC_TAIL = re.compile(r"\s*\.{4,}\s*\d+\s*$")
+_BULLET = re.compile(r"(?m)^[ \t]*\u2022[ \t]*")
 _DOT_LEADER = re.compile(r"\.{4,}")
 _HEADING_WRAP_LIMIT = 3
 
@@ -234,38 +235,101 @@ def _definition_sub_keys(paragraphs: Sequence[str]) -> list[tuple[str, str]]:
     re-extraction and re-chunking, which is what ADR-0004 asks of an address.
     """
     prefixes = [_leading_words(p, _SUB_KEY_WORD_LIMIT) for p in paragraphs]
+    # Uniqueness is decided on the **slug**, not on the raw words. The two are not
+    # the same test: `slugify` casefolds and folds ä->a, so Lounais-Suomi's
+    # capitalised `Kunnan` and Pirkanmaa's bulleted `kunnan` are distinct words that
+    # would both keep a one-word prefix and then collide into one address.
+    keys = [[slugify("-".join(words[: n + 1])) for n in range(len(words))] for words in prefixes]
     keyed: list[tuple[str, str]] = []
     for index, words in enumerate(prefixes):
-        others = [other for position, other in enumerate(prefixes) if position != index]
+        others = [other for position, other in enumerate(keys) if position != index]
         for length in range(1, len(words) + 1):
-            head = words[:length]
-            if all(other[:length] != head for other in others):
-                keyed.append((slugify("-".join(head)), " ".join(head)))
+            candidate = keys[index][length - 1]
+            if all(len(other) < length or other[length - 1] != candidate for other in others):
+                keyed.append((candidate, " ".join(words[:length])))
                 break
         else:
             raise ChunkingError(
                 f"two definitions share their first {_SUB_KEY_WORD_LIMIT} words "
                 f"({' '.join(words)!r}); a chunk address cannot be built from the text."
             )
-    keys = [key for key, _ in keyed]
-    duplicates = {key for key in keys if keys.count(key) > 1}
+    # Belt and braces over the loop above, which compares prefixes of equal length.
+    # `slugify` also folds ä->a, so two definienda differing only in a vowel would
+    # each keep a distinct one-word prefix and still land on one address.
+    chosen = [key for key, _ in keyed]
+    duplicates = {key for key in chosen if chosen.count(key) > 1}
     if duplicates:
         raise ChunkingError(f"definition sub-keys collide after slugifying: {sorted(duplicates)}")
     return keyed
 
 
+def _definition_units(clause: Clause, blocks: Sequence[str]) -> list[str]:
+    """One string per defined term, from either delimiter the corpus uses.
+
+    Two authorities write 2 § in the same *shape* -- a preamble, then one unit
+    per definiendum -- with two different delimiters, and slice 4 measures both:
+
+    * Lounais-Suomi separates definitions by **blank lines**, each opening with
+      the defined term capitalised (``Biojätteellä``);
+    * Pirkanmaa lists 41 definitions as ``•  term …`` **bullets** inside a single
+      paragraph, each definiendum **lower-case** (``biojätteellä``).
+
+    The upper-case rule is what proves a blank-line-separated definition did not
+    lose its opening line. A bullet proves the same thing more directly, so it
+    replaces that check rather than being asked to satisfy it -- and text sitting
+    *before* the first bullet of a block is the failure the check exists for, so
+    it is a hard error instead of being glued onto its neighbour.
+    """
+    units: list[str] = []
+    for block in blocks:
+        if not _BULLET.search(block):
+            if not block[:1].isupper():
+                raise ChunkingError(
+                    f"{clause.number} § definition paragraph does not open with a defined "
+                    f"term: {block[:80]!r}. A definition that lost its opening line is "
+                    "a silently wrong chunk, so this is a hard error."
+                )
+            units.append(block)
+            continue
+        head, *items = _BULLET.split(block)
+        if head.strip():
+            raise ChunkingError(
+                f"{clause.number} § has text before the first bullet of a definition "
+                f"block: {head.strip()[:80]!r}. That is a definition which lost its "
+                "bullet, and joining it to its neighbour would be a silently wrong "
+                "chunk, so this is a hard error."
+            )
+        for item in items:
+            stripped = item.strip()
+            if not stripped[:1].isalpha():
+                raise ChunkingError(
+                    f"{clause.number} § bulleted definition does not open with a word: "
+                    f"{stripped[:80]!r}."
+                )
+            units.append(stripped)
+    return units
+
+
 def _split_definitions(clause: Clause) -> list[Chunk]:
     """Carve-out 1: one chunk per defined term.
 
-    Definitions are blank-line separated paragraphs, each opening with the
-    defined term in the adessive (``Biojätteellä``). The paragraph before the
-    first definition is the clause's own preamble and becomes the clause chunk.
+    The clause is a preamble followed by one unit per definiendum; which
+    delimiter separates those units is the document's choice, and
+    `_definition_units` reads both. The block before the first definition is the
+    clause's own preamble and becomes the clause chunk.
     """
     paragraphs = [block.strip() for block in re.split(r"\n\s*\n", clause.body) if block.strip()]
     if len(paragraphs) < 2:
         raise ChunkingError(
             f"{clause.number} § split into {len(paragraphs)} paragraph(s); expected a "
             "preamble followed by one paragraph per defined term."
+        )
+    if _BULLET.search(paragraphs[0]):
+        raise ChunkingError(
+            f"{clause.number} §'s preamble carries bulleted definitions: "
+            f"{paragraphs[0][:80]!r}. Left alone they would be indexed as part of the "
+            "preamble chunk and disappear as definitions of their own, so this is a "
+            "hard error rather than a quiet loss."
         )
 
     heading = f"{clause.number} § {clause.title}"
@@ -277,22 +341,15 @@ def _split_definitions(clause: Clause) -> list[Chunk]:
             text=f"{heading}\n{paragraphs[0]}",
         )
     ]
-    definitions = paragraphs[1:]
-    for paragraph in definitions:
-        if not paragraph[:1].isupper():
-            raise ChunkingError(
-                f"{clause.number} § definition paragraph does not open with a defined "
-                f"term: {paragraph[:80]!r}. A definition that lost its opening line is "
-                "a silently wrong chunk, so this is a hard error."
-            )
+    definitions = _definition_units(clause, paragraphs[1:])
     keyed = _definition_sub_keys(definitions)
-    for paragraph, (sub_key, term) in zip(definitions, keyed, strict=True):
+    for definition, (sub_key, term) in zip(definitions, keyed, strict=True):
         chunks.append(
             Chunk(
                 clause=clause.number,
                 sub_key=sub_key,
                 citation=f"{heading} — {term}",
-                text=paragraph,
+                text=definition,
             )
         )
     return chunks

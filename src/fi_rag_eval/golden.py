@@ -70,6 +70,22 @@ class Question:
     required_branches: tuple[Branch, ...]
     forbidden: tuple[str, ...]
     label_source: str
+    pair: str | None = None
+    """Names the paired question this is one half of, or ``None`` (slice 4, D7).
+
+    A **paired question** is one question *text* labelled twice, once per
+    authority, on a topic where the two authorities' rules genuinely differ and
+    their vocabulary forks (`jäteastia` / `keräysväline`). Both halves carry the
+    same slug here, and `load_golden_set` enforces that a slug names exactly two
+    entries with identical text and different authorities -- which is what makes
+    "the same question retrieves different chunks per authority" a checked
+    property rather than an eyeballed one.
+    """
+
+    @property
+    def authority(self) -> str:
+        """The authority every required chunk belongs to. Validated on load."""
+        return self.required_chunks[0].authority
 
     @property
     def required_addresses(self) -> tuple[str, ...]:
@@ -85,6 +101,20 @@ class GoldenSet:
 
     def count_by_phrasing(self, phrasing: Phrasing) -> int:
         return sum(1 for question in self.questions if question.phrasing is phrasing)
+
+    @property
+    def authorities(self) -> tuple[str, ...]:
+        """Every authority the set labels against, in first-seen order."""
+        seen: list[str] = []
+        for question in self.questions:
+            if question.authority not in seen:
+                seen.append(question.authority)
+        return tuple(seen)
+
+    @property
+    def pairs(self) -> tuple[str, ...]:
+        """The paired-question slugs, sorted. Validated on load."""
+        return tuple(sorted({q.pair for q in self.questions if q.pair is not None}))
 
 
 def _address(raw: Any, where: str) -> ChunkAddress:
@@ -152,6 +182,7 @@ def _parse_question(raw: Mapping[str, Any], manifest: Manifest, where: str) -> Q
         branches.append(Branch(claim=str(item["claim"]), chunk=chunk))
 
     forbidden = tuple(str(item) for item in raw.get("forbidden") or ())
+    pair = raw.get("pair")
     return Question(
         id=question_id,
         question=str(raw["question"]),
@@ -162,10 +193,68 @@ def _parse_question(raw: Mapping[str, Any], manifest: Manifest, where: str) -> Q
         required_branches=tuple(branches),
         forbidden=forbidden,
         label_source=str(raw["label_source"]),
+        pair=None if pair is None else str(pair),
     )
 
 
 def load_golden_set(path: Path, manifest: Manifest) -> GoldenSet:
+    """Load the golden set from one YAML file, or from a directory of them.
+
+    A directory loads every ``*.yaml`` inside it, in filename order, and merges
+    them into one set. The corpus has one file per authority -- each carrying its
+    own provenance header, because how its questions were worded is the most
+    important thing about it -- while the metrics are pooled over all of them
+    (slice 4, D11): one headline over the whole corpus the harness covers, with a
+    per-authority breakdown beneath it as a diagnostic.
+    """
+    if path.is_dir():
+        files = sorted(path.glob("*.yaml"))
+        if not files:
+            raise GoldenSetError(f"no *.yaml golden-set files in {path}")
+        questions = tuple(
+            question for file in files for question in _load_file(file, manifest).questions
+        )
+        return _validated(GoldenSet(questions=questions), str(path))
+    return _validated(_load_file(path, manifest), str(path))
+
+
+def _validated(golden: GoldenSet, where: str) -> GoldenSet:
+    """Whole-set invariants: unique ids, and well-formed paired questions."""
+    ids = [q.id for q in golden.questions]
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        raise GoldenSetError(f"{where}: duplicate question ids {duplicates}")
+
+    pairs: dict[str, list[Question]] = {}
+    for question in golden.questions:
+        if question.pair is not None:
+            pairs.setdefault(question.pair, []).append(question)
+    for slug, members in sorted(pairs.items()):
+        if len(members) != 2:
+            raise GoldenSetError(
+                f"{where}: paired question {slug!r} has {len(members)} half/halves "
+                f"({[q.id for q in members]}); a pair is exactly one question text "
+                "labelled once per authority, and a lone half measures nothing."
+            )
+        first, second = members
+        if first.question != second.question:
+            raise GoldenSetError(
+                f"{where}: the halves of paired question {slug!r} ask different things:\n"
+                f"  {first.id}: {first.question!r}\n"
+                f"  {second.id}: {second.question!r}\n"
+                "The pair exists to hold the question text fixed while the authority "
+                "changes; two different texts measure two different questions."
+            )
+        if first.authority == second.authority:
+            raise GoldenSetError(
+                f"{where}: both halves of paired question {slug!r} are labelled against "
+                f"authority {first.authority!r}. A pair that does not cross authorities "
+                "cannot show that the same question retrieves different rules."
+            )
+    return golden
+
+
+def _load_file(path: Path, manifest: Manifest) -> GoldenSet:
     if not path.is_file():
         raise GoldenSetError(f"golden set not found: {path}")
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -187,8 +276,4 @@ def load_golden_set(path: Path, manifest: Manifest) -> GoldenSet:
     )
     if len(questions) != len(raw_questions):
         raise GoldenSetError(f"{path}: every question must be a mapping")
-    ids = [q.id for q in questions]
-    duplicates = sorted({i for i in ids if ids.count(i) > 1})
-    if duplicates:
-        raise GoldenSetError(f"{path}: duplicate question ids {duplicates}")
     return GoldenSet(questions=questions)

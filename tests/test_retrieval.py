@@ -93,13 +93,21 @@ def test_a_chunk_containing_the_query_term_is_reachable(corpus: Connection) -> N
 
 
 def test_the_corpus_matches_the_manifest(corpus: Connection, manifest: Manifest) -> None:
-    summary = db.corpus_summary(corpus)
-    assert len(summary) == 1
-    source = manifest.authority("lounais-suomi").sources[0]
-    assert (summary[0].chunks, summary[0].definitions) == (
-        source.expected.chunks,
-        source.expected.definitions,
-    )
+    """Every authority the manifest lists is loaded, with the parse it was labelled at."""
+    summary = {(row.authority_key, row.effective_date): row for row in db.corpus_summary(corpus)}
+    expected = {
+        (authority.key, source.effective_date): source.expected
+        for authority in manifest.authorities
+        for source in authority.sources
+    }
+    assert set(summary) == set(expected)
+    for key, parse in expected.items():
+        row = summary[key]
+        assert (row.clauses, row.chunks, row.definitions) == (
+            parse.clauses,
+            parse.chunks,
+            parse.definitions,
+        ), key
 
 
 def test_every_golden_label_resolves(corpus: Connection, golden: GoldenSet) -> None:

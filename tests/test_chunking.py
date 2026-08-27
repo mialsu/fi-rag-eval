@@ -150,3 +150,107 @@ def test_whole_clauses_carry_their_heading_into_the_indexed_text() -> None:
         "3 § Asumisessa syntyvien jätteiden lajittelu- ja erilliskeräysvelvoitteet\n"
     )
     assert third.sub_key is None
+
+
+BULLET_BODY = BODY.replace(
+    textwrap.dedent(
+        """\
+        Näissä määräyksissä tarkoitetaan:
+
+        Biojätteellä biologisesti hajoavaa elintarvikejätettä.
+
+        Kunnan järjestämällä jätteenkuljetuksella jätelain 36 §:n mukaista kuljetusta.
+        """
+    ),
+    textwrap.dedent(
+        """\
+        Näissä määräyksissä tarkoitetaan:
+
+            •   biojätteellä eloperäistä elintarvike- ja puutarhajätettä, joka on
+                kokonaisuudessaan biologisesti hajoavaa,
+            •   kunnan järjestämällä jätteenkuljetuksella jätelain 36 §:n mukaista
+                kuljetusta,
+        """
+    ),
+)
+"""Pirkanmaa's shape: `• term ...` items, lower-case definiendum, one paragraph."""
+
+
+def test_bulleted_definitions_split_one_chunk_per_item() -> None:
+    """Pirkanmaa writes 2 § as bullets, not blank-line paragraphs (spec slice 4, D5)."""
+    chunks = chunk_clauses(split_clauses(BULLET_BODY, parse_toc(TOC)))
+    definitions = [c for c in chunks if c.clause == 2]
+    assert [c.sub_key for c in definitions] == [
+        None,
+        "biojatteella",
+        "kunnan-jarjestamalla",
+        "kunnan-jatehuoltojarjestelmalla",
+    ]
+    assert definitions[0].text.endswith("Näissä määräyksissä tarkoitetaan:")
+    assert definitions[1].text.startswith("biojätteellä eloperäistä")
+    assert definitions[1].citation == "2 § Määritelmät — biojätteellä"
+
+
+def test_a_bulleted_definiendum_may_be_lower_case() -> None:
+    """The bullet is the evidence the item is whole, so the upper-case rule lifts.
+
+    Without this the whole of Pirkanmaa's 2 § is rejected: every one of its 41
+    definienda is lower-case.
+    """
+    chunks = chunk_clauses(split_clauses(BULLET_BODY, parse_toc(TOC)))
+    assert any(c.sub_key == "biojatteella" for c in chunks if c.clause == 2)
+
+
+def test_an_unbulleted_definition_still_has_to_open_with_a_defined_term() -> None:
+    """Lifting the rule for bullets must not lift it for the paragraph shape."""
+    body = BODY.replace(
+        "Biojätteellä biologisesti hajoavaa elintarvikejätettä.",
+        "biologisesti hajoavaa elintarvikejätettä.",
+    )
+    with pytest.raises(ChunkingError, match="does not open with a defined term"):
+        chunk_clauses(split_clauses(body, parse_toc(TOC)))
+
+
+def test_text_before_the_first_bullet_is_a_hard_error_not_a_silent_join() -> None:
+    """A definition that lost its bullet would otherwise vanish into the one above."""
+    body = BULLET_BODY.replace(
+        "    •   biojätteellä eloperäistä",
+        "    jatkuu edelliseltä sivulta,\n    •   biojätteellä eloperäistä",
+    )
+    with pytest.raises(ChunkingError, match="before the first bullet"):
+        chunk_clauses(split_clauses(body, parse_toc(TOC)))
+
+
+def test_a_preamble_holding_bullets_is_a_hard_error() -> None:
+    """Bullets in the preamble would silently swallow real definitions."""
+    body = BULLET_BODY.replace(
+        "Näissä määräyksissä tarkoitetaan:\n\n    •   biojätteellä",
+        "Näissä määräyksissä tarkoitetaan:\n    •   biojätteellä",
+    )
+    with pytest.raises(ChunkingError, match="preamble"):
+        chunk_clauses(split_clauses(body, parse_toc(TOC)))
+
+
+def test_the_paragraph_shape_is_untouched_by_the_bullet_rule() -> None:
+    """Prediction 6: Lounais-Suomi's 82/32 counts must not move."""
+    plain = chunk_clauses(split_clauses(BODY, parse_toc(TOC)))
+    assert [(c.clause, c.sub_key) for c in plain if c.clause == 2] == [
+        (2, None),
+        (2, "biojatteella"),
+        (2, "kunnan-jarjestamalla"),
+        (2, "kunnan-jatehuoltojarjestelmalla"),
+    ]
+
+
+def test_a_sub_key_is_unique_on_the_slug_not_on_the_raw_words() -> None:
+    """`slugify` casefolds, so two definienda differing only in case still collide.
+
+    Surfaced by Pirkanmaa, whose 41 definienda are lower-case where
+    Lounais-Suomi's are capitalised: comparing raw words let `kunnan` and
+    `Kunnan` both keep a one-word prefix and then slugify to one address.
+    """
+    chunks = chunk_clauses(split_clauses(BULLET_BODY, parse_toc(TOC)))
+    keys = [c.sub_key for c in chunks if c.clause == 2 and c.sub_key is not None]
+    assert len(keys) == len(set(keys))
+    assert "kunnan-jarjestamalla" in keys
+    assert "kunnan-jatehuoltojarjestelmalla" in keys
