@@ -311,7 +311,13 @@ a runaway: a retry storm, an accidental loop, a bug that re-answers.
 harness retries cheerfully into 429s, and the project finds out from a billing page rather than a
 gate. A ceiling that lives only in a dashboard is a standard with no enforcer.
 
-### D9 — answerer `gpt-oss-20b`, judge `llama-3.3-70b`, and `CONTEXT.md:59` gets tightened → **ADR-0008**
+### D9 — answerer `qwen/qwen3.6-27b`, judge `gpt-oss-120b`, and `CONTEXT.md:59` gets tightened → **ADR-0008**
+
+> **AMENDED 27 Aug 2026 by tracer slice 1, before any harness code.** As shaped, this read
+> *answerer `gpt-oss-20b`, judge `llama-3.3-70b`*. The Llama does not exist on the account and the
+> smoke test disqualified the gpt-oss answerer on comprehension. The original text is left below
+> so the reasoning that was overturned stays visible; the evidence is in **Tracer slice 1 —
+> measured result** and in ADR-0008's amendment.
 
 `CONTEXT.md:59` currently requires only *"a different model than the one under test"*. **That is
 too weak and this slice tightens it to a different model *family*.** A judge sharing the answerer's
@@ -658,6 +664,80 @@ Four of the five carried here at shaping time have been answered. What remains i
   slice 5, and slice 4's AC8 already pins that the refusal message names the partial coverage.
   Slice 5 makes that message **user-visible for the first time** — Sastamala now gets a refusal a
   person reads rather than a query that quietly does not run. No sub-municipal coverage model.
+
+---
+
+## Tracer slice 1 — measured result (27 Aug 2026)
+
+`5 golden questions x 2 candidate answerers = 10 calls. 40,191 prompt + 5,667 completion tokens,
+~$0.01. Real published-cell top-5 from the ingested corpus, not hand-picked chunks.`
+
+**AC1: MET.** The smoke test ran before any harness code and produced a verdict that changed the
+slice. The probe itself was throwaway (stdlib `urllib`, job scratch dir) and is not in the repo.
+
+### The verdict
+
+**`gpt-oss-20b` is disqualified as the answerer.** Not for being weak — a weak system under test is
+the point — but because on `biojatteen-kerays-jarjestaminen`, **with the required chunk `#15`
+retrieved at rank 4**, it inverted the conditional: it stated that properties composting under
+`17 §` must collect bio-waste separately, when `15 §` exempts them. An inversion under *perfect
+retrieval* makes comprehension failures and retrieval failures indistinguishable, which would make
+**prediction 5 — the one that decides slice 6 — untestable.** Its Finnish also carried real errors:
+`las` for `lasi`, `maittuminen` (not a word), `jos kiinteistö kompostoivat`, `lukittuihin kaappeihin`
+for `lukituissa kaapeissa`.
+
+**`qwen/qwen3.6-27b` passed.** On the same question it reproduced all three of the golden entry's
+required branches exactly — the >10 000-resident taajama threshold at one dwelling, the taajama
+threshold at five, and the `17 §` exemption — each cited by address in the requested bracket format.
+
+**Revised pair (D9, ADR-0008 amended): answerer `groq/qwen/qwen3.6-27b`, judge
+`groq/openai/gpt-oss-120b`.** Different families, strongest available judge.
+
+### Four findings the slice did not anticipate
+
+1. **`llama-3.3-70b-versatile` is not on this account, and there is no Llama at all.** ADR-0008's
+   pair was read off the public docs. Caught by listing models before spending anything — the
+   cheapest possible place to catch it.
+2. **Both candidates are reasoning models, and ADR-0008's token estimate assumed they were not.**
+   Reasoning tokens bill as output. Measured: ~450–850 output tokens per answer against the ~350
+   assumed. The first probe run returned **empty content** from `gpt-oss-20b` because a 700-token
+   cap was consumed entirely by hidden reasoning. **The ~$0.067/run and the ~600K per-run ceiling
+   (D8) must both be re-derived from `completion_cost()` once the real pair runs** — and Qwen's
+   Groq pricing is unconfirmed, so the figure must not be quoted until measured.
+3. **Refusal behaviour depends on reasoning being enabled, and that is a genuine trade-off.** With
+   reasoning on, Qwen's trace explicitly concluded the excerpts were insufficient for
+   `naapuruston-yhteiskerays`. With `reasoning_effort: none` it answered anyway. Refusal quality may
+   therefore be something the project *pays tokens for*, which nothing in the spec anticipated.
+   Pre-registered as prediction 7 below.
+4. **Per-model parameter vocabulary differs.** `gpt-oss` accepts `reasoning_effort: low|medium|high`;
+   `qwen` rejects anything but `none|default` with an HTTP 400. Direct evidence for D10's boundary —
+   this is exactly what LiteLLM normalises, and it appeared on the second call of the project.
+
+### The result that most supports the slice's premise
+
+On `naapuruston-yhteiskerays` the required `8 § Korttelikeräys` was **ranked out**, and **neither
+model refused.** Both answered confidently from `7 §` kimppa — a *voluntary* neighbour arrangement —
+when the question was about *plan-mandated* block collection. A textbook confident wrong answer
+produced by incomplete retrieval, on the first five questions ever put to this system. It is exactly
+what the answer metrics exist to catch, and it is early support for prediction 5.
+
+### Prediction added before the build, not after
+
+7. **Refusal recall is materially higher with reasoning enabled than with it off**, and the token
+   cost of enabling it is 2–4x the completion tokens. If false — refusal quality is indifferent to
+   reasoning — then reasoning stays off and the cost model is the cheaper one.
+
+### Spec deltas from this slice
+
+- **D9's pair is amended**, above, with the original left visible.
+- **The token and cost figures in D7/D8 and ADR-0008 are now known to be low**, because they
+  assumed non-reasoning models. They are not corrected by estimate — they are marked
+  *to be re-measured* from `completion_cost()`, which is what D10 chose LiteLLM for.
+- **`qwen/qwen3.8-27b` was never tested.** 3.6 is chosen because it is the one measured. Recorded
+  rather than quietly upgraded.
+- **The slice-4 `Python-urllib` 403 confession generalises.** Groq's edge rejects the default
+  urllib User-Agent exactly as tampere.fi did. Not a blocker — LiteLLM and the `openai` SDK set
+  their own — but the debt entry is broader than the corpus fetch it was written about.
 
 ## Spec deltas
 

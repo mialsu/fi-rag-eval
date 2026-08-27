@@ -65,9 +65,49 @@ collect 429s while never noticing.
 
 **3. `CONTEXT.md:59` is tightened from "a different model" to "a different model *family*".**
 
-**4. The pair is answerer `groq/openai/gpt-oss-20b`, judge `groq/llama-3.3-70b-versatile`** —
-OpenAI lineage against Meta lineage, judge stronger than the answerer, answerer on the cheap tier
-the guard-rail asks for. Both are production models; neither can be withdrawn like a preview.
+**4. ~~The pair is answerer `groq/openai/gpt-oss-20b`, judge `groq/llama-3.3-70b-versatile`.~~
+AMENDED 27 Aug 2026, before any harness code — see below.** The original pairing was chosen from
+Groq's public docs. It did not survive contact with the account.
+
+## Amendment, 27 Aug 2026 — the pair, revised twice by evidence
+
+**First, `llama-3.3-70b-versatile` does not exist on this account.** There is no Llama at all. The
+text models actually served are `allam-2-7b` (Arabic-focused), `groq/compound` and `compound-mini`
+(agentic systems that bundle tools — wrong for a judge), `openai/gpt-oss-120b`, `openai/gpt-oss-20b`,
+`qwen/qwen3.6-27b` and `qwen/qwen3.8-27b`. Caught by listing the models before spending anything.
+
+That created a tension the docs had hidden: **the strongest judge (`gpt-oss-120b`) is the same
+family as the cheapest answerer (`gpt-oss-20b`)**, so decision 3 above and "cheapest adequate
+model" could not both be honoured with a strong judge.
+
+**Second, the capability smoke test disqualified `gpt-oss-20b` as the answerer — on comprehension,
+not on price.** Five golden questions, the published cell's real top-5, both candidates, 10 calls,
+~$0.01:
+
+- On `biojatteen-kerays-jarjestaminen`, with the required chunk `#15` retrieved at rank 4,
+  **`qwen/qwen3.6-27b` reproduced all three of the golden entry's required branches exactly** —
+  the >10 000-resident taajama threshold at one dwelling, the taajama threshold at five, and the
+  `17 §` composting exemption — each cited by address in the requested format.
+- **`gpt-oss-20b` inverted that same conditional**, stating that properties composting under `17 §`
+  are obliged to collect bio-waste separately when `15 §` exempts them. A flattened conditional —
+  this project's failure mode #1 — **produced with the required chunk successfully retrieved.** Its
+  Finnish also carried real errors (`las` for `lasi`, `maittuminen`, `jos kiinteistö kompostoivat`,
+  `lukittuihin kaappeihin` for `lukituissa kaapeissa`).
+
+The disqualifier is precise, and it is not "the answerer is weak" — a weak system under test is
+fine, the harness exists to measure it. It is that **an inversion under perfect retrieval makes
+comprehension failures and retrieval failures indistinguishable**, which would make the spec's
+prediction 5 — the one that decides slice 6 — untestable.
+
+**The revised pair: answerer `groq/qwen/qwen3.6-27b`, judge `groq/openai/gpt-oss-120b`.** Different
+families, the strongest available judge, and the answerer chosen on measured Finnish comprehension.
+"Cheapest adequate model by default" is honoured on **adequate** rather than on **cheapest**, which
+is what the word was there for.
+
+Two consequences carried into the spec rather than buried here: **Qwen's Groq pricing is
+unconfirmed**, so this ADR's ~$0.067/run must be re-measured from `completion_cost()` and not
+quoted until it is; and **`qwen/qwen3.8-27b` was never tested** — 3.6 is chosen because it is the
+one that was measured, which is the only reason this project accepts.
 
 ## Rejected alternatives
 
