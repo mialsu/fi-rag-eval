@@ -179,3 +179,28 @@ def test_a_partially_covered_municipality_refuses_and_says_why(
 def test_a_fully_covered_municipality_still_resolves(manifest: Manifest) -> None:
     assert manifest.resolve_municipality("Tampere").key == "pirkanmaa"
     assert manifest.resolve_municipality("Turku").key == "lounais-suomi"
+
+
+def test_the_eval_output_shows_the_edition_a_reader_would_cite(
+    corpus: Connection[tuple[object, ...]],
+    manifest: Manifest,
+    golden: GoldenSet,
+    morphology: Morphology,
+) -> None:
+    """AC7. The address says 2021; the citation must say 1.5.2026.
+
+    Pirkanmaa's text declares `47 § VOIMAANTULO: tulevat voimaan 1.7.2021` and is
+    published as the 1.5.2026 edition after five amendments, so the address is
+    true and misleading at once (ADR-0006). This is the line that fixes it where
+    it is read, so it is checked rather than assumed.
+    """
+    from fi_rag_eval.report import format_citations
+
+    run = evaluate(corpus, manifest=manifest, golden=golden, cell=PUBLISHED, morphology=morphology)
+    printed = format_citations(run)
+    assert "Kunnalliset jätehuoltomääräykset, 1.5.2026 alkaen" in printed
+    pirkanmaa_line = next(
+        line for line in printed.split("\n") if line.strip().startswith("pirkanmaa")
+    )
+    assert "2021" not in pirkanmaa_line, "the edition, not the Voimaantulo date"
+    assert "lounais-suomi" in printed

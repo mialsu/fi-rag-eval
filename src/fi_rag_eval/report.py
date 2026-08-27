@@ -362,6 +362,8 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
             "",
             format_by_authority(published),
             "",
+            format_citations(published),
+            "",
             format_power(grid),
             "",
             f"per question x cell   (P = every required chunk inside the top {grid.k}, . = not)",
@@ -377,6 +379,29 @@ def format_grid(grid: GridRun, *, commit: str, lexemes: dict[Analyser, int]) -> 
     best = grid.best
     if best.cell != PUBLISHED:
         lines.extend(["", format_cell_detail(best)])
+    return "\n".join(lines)
+
+
+def format_citations(run: EvaluationRun) -> str:
+    """One real retrieved citation per authority, exactly as a human would read it.
+
+    Printed because a citation is the product's whole claim to trustworthiness and
+    it is otherwise invisible: the metric table shows addresses, and an address
+    names the date the text came into force rather than the edition. Pirkanmaa's
+    address says 2021 while its text is published as the 1.5.2026 edition after
+    five amendments (ADR-0006), so this line is where a reader learns which of the
+    six they are being shown -- and where a stale edition label would be noticed.
+    """
+    seen: dict[str, str] = {}
+    for question_run in run.runs:
+        if question_run.authority_key not in seen and question_run.hits:
+            seen[question_run.authority_key] = question_run.hits[0].citation
+    lines = ["citations — one retrieved chunk per authority, as a reader sees it"]
+    for authority, citation in sorted(seen.items()):
+        lines.append(f"  {authority:<16} {citation}")
+    lines.append(
+        "  The address keys on Voimaantulo; the edition in brackets is what a human reads."
+    )
     return "\n".join(lines)
 
 
