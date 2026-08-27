@@ -603,28 +603,44 @@ Four of the five carried here at shaping time have been answered. What remains i
 
 ### Open
 
-- **Do refusal questions get a groundedness score, and what is groundedness' denominator?**
-  **BLOCKS tracer slice 3.** Proposed below and **awaiting the Owner's confirmation** — recorded as
-  a proposal rather than folded silently into a decision.
+**None.** All five are answered below. Tracer slices 1–3 have no blockers left.
 
-  The naive answer (exclude refusals) is not enough, because the hole is the *inverse* case: an
-  answerable question that is **wrongly refused**. If that scored groundedness 1.0 — nothing
-  unsupported was said — the system could raise its published groundedness by refusing hard
-  questions. **A metric that rewards cowardice.** The proposed model:
+### Answered since shaping
+
+- ~~**Do refusal questions get a groundedness score, and what is groundedness' denominator?**~~
+  **RESOLVED 27 Aug 2026 — and answering it exposed a contradiction in `CONTEXT.md` that has been
+  there since 26 Aug.** `:47` defined groundedness over *"claims **in an answer**"* (denominator =
+  branches stated) while `:92-94` said *"the denominator is therefore set by hand per question"*
+  (denominator = branches required). Both were being cited as canonical.
+
+  **Decided: the `:47` reading. Groundedness = supported / branches STATED.**
 
   | Metric | Denominator | Refusal questions |
   |---|---|---|
-  | Groundedness | claims **made** | excluded entirely |
-  | Branch coverage | claims **required** | excluded entirely |
-  | Over-claim | forbidden items | **included** |
+  | Groundedness | branches **stated** | excluded entirely |
+  | Branch coverage | branches **required** | excluded entirely |
+  | Over-claim | **forbidden** items | **included** |
   | Refusal precision / recall | see D5 | the population |
 
-  A false refusal therefore scores **0 on branch coverage** — cowardice is punished there, rather
-  than by distorting groundedness into something it cannot compute. A refusal emitting any citation
-  is a defect, checked arithmetically. This is what forced D11's pairing rule to grow branch
-  coverage as a second mandatory companion.
+  *Why this reading:* the project already rejected the alternative's shape one layer down.
+  `metrics.py`'s docstring refuses per-chunk recall as a headline because it *"awards partial credit
+  for a retrieval that produces a confidently wrong answer"*. A required-branch denominator blends
+  *did it say enough* with *was what it said supported* into one number, when branch coverage
+  already measures the first.
 
-### Answered since shaping
+  *Why `:92-94` did not settle it:* **its stated rationale is satisfied by both readings.** The judge
+  answers the same narrow yes/no questions — *is branch X stated? is it supported?* — under either;
+  only the arithmetic afterwards differs. That paragraph was fixing the claim *unit* and the
+  *judge's task*, and its denominator sentence reached into a decision it was not making. Amended
+  in `CONTEXT.md`, not quietly reinterpreted.
+
+  *The cost, accepted:* groundedness under this reading **is** gameable by saying less — an answer
+  stating one well-supported branch of five scores 1.0. That is exactly why D11 makes **branch
+  coverage a load-bearing mandatory companion rather than a diagnostic**, and why a wrongly-refused
+  answerable question scores **0 on branch coverage**. Cowardice is punished there, not by
+  distorting groundedness into something it cannot compute. A refusal emitting any citation is a
+  defect, checked arithmetically.
+
 
 - ~~**The monthly cap figure at Groq.**~~ **$25/month, set by the Owner on 27 Aug 2026.** ~370 runs.
 - ~~**Should the frozen agreement sample be held out from the scored set?**~~ **Not a real

@@ -41,10 +41,10 @@ refusal, and measure that answer quality well enough to catch a regression befor
 | Golden set | The hand-written, hand-answered question set the harness scores against. | ~50 questions. Written before any tuning, deliberately adversarial. |
 | Required chunk set | The set of chunk ids a question cannot be answered correctly without. Recall is computed over the whole set. | Set-valued, not a single id — the bio-waste question needs the obligation clause, the interval table and the composting exemption. |
 | Required branch | One conditional branch a correct answer must state, paired with the chunk that supports it. **This is the unit a "claim" means here.** | Hand-enumerated per question. Makes the groundedness denominator explicit instead of inferred, and turns judging into narrow yes/no calls. |
-| Branch coverage | The share of a question's required branches that the answer actually states. | Localises failure: you learn *which* branch was dropped, not merely that a metric fell. |
+| Branch coverage | The share of a question's required branches that the answer actually states. Denominator = branches **required**. | Localises failure: you learn *which* branch was dropped, not merely that a metric fell. **Load-bearing, not diagnostic:** it is what stops a system raising its groundedness by refusing the hard questions. |
 | Forbidden claim | A branch or assertion a correct answer must NOT make — flattening a conditional into one value, or resolving a determining variable the corpus cannot resolve. | |
 | Over-claim rate | The share of answers that assert a forbidden claim. | The metric that catches confident wrongness, this project's failure mode #1. |
-| Groundedness | The share of claims in an answer that are supported by the cited context. | Judged by model, validated against hand labels. |
+| Groundedness | The share of the required branches an answer **actually states** that are supported by the cited context. Denominator = branches **stated**, never branches required. | Judged by model, validated against hand labels. Gameable by saying less, so it is never published without **branch coverage** and **judge–human agreement** beside it. |
 | Citation accuracy | Whether a cited chunk actually contains the claim it is attached to. | A citation that does not contain the claim is worse than no citation. |
 | Analyser | The thing that turns text into the terms an index and a query are matched on. Four are in play: `snowball` (Postgres stemming, the original) and three voikko lemma variants that add compound splitting. | The corpus and the question must always go through the **same** analyser. They did not once, and it produced a flatteringly wrong number. |
 | Cell | **One complete measurement of the whole golden set, under one analyser and one ranking setting.** 4 analysers x 3 `ts_rank` normalisations = 12 cells, all scored in a single run, all honest. | Named `analyser/normalisation`, e.g. `snowball/0`, `lemma-reasm/1`. Cells exist so a change can be attributed: everything is held still except the one thing being varied. |
@@ -88,10 +88,17 @@ Words we haven't fully pinned down yet — resolve before they cause a bug.
   toimialueen kunnissa"*), and Turku is 1 of 18 municipalities under one board. The filter keys on
   the Authority; the *kunta* is input only. Note this contradicts `README.md:18-19`, which claims
   municipalities each publish their own — that line needs correcting.
-- ~~**What counts as one "claim"** for groundedness?~~ **RESOLVED 26 Aug 2026.** A claim is one
-  **required branch**, hand-enumerated in the golden-set entry. The denominator is therefore set by
-  hand per question rather than inferred from the answer text, which is what makes it stable
-  run-to-run and what lets the judge answer narrow yes/no questions instead of grading prose.
+- ~~**What counts as one "claim"** for groundedness?~~ **RESOLVED 26 Aug 2026; the denominator
+  sentence AMENDED 27 Aug 2026.** A claim is one **required branch**, hand-enumerated in the
+  golden-set entry — that is what keeps the judge's task stable run-to-run and lets it answer narrow
+  yes/no questions instead of grading prose. **The original wording went on to say "the denominator
+  is therefore set by hand per question", which contradicted this file's own Groundedness entry and
+  settled a question it was not deciding.** What is hand-set is the claim *unit* and the *judge's
+  task*; each metric's denominator is its own, and they are now stated explicitly in the table
+  above — groundedness over branches **stated**, branch coverage over branches **required**,
+  over-claim over **forbidden** items. The judge answers the same narrow yes/no questions under
+  either reading; only the arithmetic afterwards differs. Decided in
+  `specs/SPEC-slice-5-answering-and-judge.md`.
 - ~~**Whether a partially-supported answer is a refusal case.**~~ **PARTLY RESOLVED 26 Aug 2026.**
   A missing *determining variable* is **not** a refusal — it is a conditional answer with the
   condition surfaced. Still open: whether a question whose *subject matter* is genuinely absent
