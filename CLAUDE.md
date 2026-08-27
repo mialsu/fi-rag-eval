@@ -11,53 +11,73 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (27 Aug 2026)
 
-**Slices 1–3 are built: the measurement spine, an honest golden set, and a lemmatising analyser
-measured as a grid.** One authority (Lounais-Suomi, 50 clauses → 82 chunks) is ingested into
-Postgres and retrieved lexically. `make eval` scores 21 hand-labelled questions in **12 cells**
-— 4 analysers × 3 `ts_rank` normalisations — prints a table plus a per-question × cell pass
-matrix, and exits non-zero if **any** cell regresses. Nothing else exists.
+**Slices 1–4 are built: the measurement spine, an honest golden set, a lemmatising analyser
+measured as a grid, and a second authority.** Two authorities are ingested into Postgres and
+retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
+chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
+— 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
+per-question × cell pass matrix and a paired-power matrix, and exits non-zero if **any** cell
+regresses. Nothing else exists.
 
-- **Published headline: complete-set recall@5 = 0.762 (N=21, k=5) in the `snowball/0` cell.
-  Lexical leakage = 0.372.** Never quote the first without the second. The published cell is
-  deliberately still the snowball control: **`lemma-reasm/1` measures 0.857**, and moving the
-  published headline is the Owner's decision with a deliberate re-baseline, not something the
-  winning number does by itself. `evaluate.PUBLISHED` is the single place that decides, and the
-  gate fails if it moves without a re-record.
-- **Lemmatisation is voikko, in Python — not `dict_voikko`.** Every doc written before 27 Aug
-  named a Postgres text-search dictionary that **does not exist**: `postgres:17-alpine` ships only
-  `dict_snowball`/`dict_int`/`dict_xsyn`, and neither libvoikko nor a Finnish hunspell dictionary
-  is in the Alpine repositories. See `docs/adr/0005-lemmatisation-in-python-as-a-measured-grid.md`.
+- **Published headline: complete-set recall@5 = 0.680 (N=50, k=5) in the `snowball/0` cell.
+  Lexical leakage = 0.332.** Never quote the first without the second. **This is NOT comparable to
+  the old 0.762 (N=21)** — the population changed. Per authority, as a diagnostic: Lounais-Suomi
+  0.724 (N=29), Pirkanmaa 0.619 (N=21).
+- **The instrument has statistical power for the first time.** Two cells are scored on the same
+  questions, so comparing them is a **paired** test: six discordant questions must flip one way for
+  p<0.05, at any N. At N=21 no comparison in the grid could reach that at any effect size. At N=50
+  `lemma-reasm/0` (0.820) beats the published cell at **d=9, p=0.039**. `make eval` prints d and
+  the exact McNemar p for every pair of cells, so nobody has to assume a 0.048 delta means
+  something. **The ±0.18 absolute interval that slice 3 and this file used was the wrong
+  statistic** — corrected in both specs; the correction made the argument for slice 4 *stronger*.
+- **The published cell is still `snowball/0`, and moving it is now an evidence-backed question
+  rather than a preference.** `evaluate.PUBLISHED` is the single place that decides, and the gate
+  fails if it moves without a re-record. The cost of moving is quantified: the N target for
+  detecting a half-of-misses fix rises from ~51 to ~84 on a lemma cell.
+- **Slice 4's strongest prediction was REFUTED, and it changes slice 5.** The two authorities do
+  use different words for the same things (`jäteastia`/`keräysväline`,
+  `korttelikeräys`/`lähikeräysjärjestelmä`, `aluekeräyspiste`/`aluejätepiste`) and it *does* cost
+  recall — a paired question passes for Pirkanmaa and fails for Lounais-Suomi from identical text.
+  But zero-overlap misses stayed at **0**: the fork surfaces as a **ranking** failure, not an
+  unreachable one, because a question shares plenty of other lexemes with its target. Per the
+  spec's pre-registered decision rule (`< 4` synonym-caused zero-overlap misses), **the vector
+  layer's case has weakened twice and must be re-argued from evidence, not from the plan.**
+  Prediction 2 was also refuted: Pirkanmaa scores *higher* than Lounais-Suomi in 5 of 12 cells,
+  and its questions are *less* leaky, so "its questions are easier" is not supported by the metric
+  nominated to test it. **Slice 5 is the Owner's call and is not pre-registered.**
+- **A slice-3 finding was retracted by the bigger set.** "Length normalisation helps only the split
+  analyser" is false at N=50: normalisation 1 now *helps* `lemma-baseform` and is *neutral* for both
+  split analysers. It rested on a one-question gain at N=21 (d=3, p=0.25) — never resolvable. The
+  surviving claim is narrow: length normalisation costs the control cell and does not clearly help
+  any lemma cell.
+- **Lemmatisation is voikko, in Python — not `dict_voikko`.** `postgres:17-alpine` ships only
+  `dict_snowball`/`dict_int`/`dict_xsyn`, and neither libvoikko nor a Finnish hunspell dictionary is
+  in the Alpine repositories. See `docs/adr/0005-lemmatisation-in-python-as-a-measured-grid.md`.
   Requires the **system packages** `libvoikko1` and `voikko-fi`; `uv sync` cannot supply them.
-- **`ts_rank` normalisation 32 was the wrong flag, and that is a slice-3 correction.** It is
-  `rank / (rank + 1)` — strictly monotonic, so it cannot reorder anything. The settings that
-  divide by document length are 1 and 2. Slice 1's length finding holds, but correcting it is
-  **not** a free win: normalisation 1 costs the control cell 0.143 of its headline and only *gains*
-  recall in the compound-splitting cell. That sign flip is the interaction the grid existed to find.
-- **Zero-overlap misses are gone: 4 → 0** under the reassembling analyser. Every remaining miss is
-  reachable and lost in the *ranking*, which is a different failure with a different fix. That
-  includes `taloyhtiö`/`asunto`/`keskusta` (#13/#15), so slice 2's "unreachable" finding is now
-  sharper: the resident's words do reach those clauses and carry no weight in them.
-- **Leakage rose 0.372 → 0.619 across the lemma cells with no question edited**, exactly as the
-  debt entry predicted. The gate survived it **by construction**: leakage is recorded and compared
-  per cell, so each is measured against its own reference. Do not "fix" a leakage rise by editing a
-  question — that is the failure mode the metric exists to catch.
+- **A second authority adds ZERO distractors to an existing question.** The filter is applied
+  before ranking and `ts_rank` has no IDF. Measured: with Pirkanmaa ingested and the questions
+  untouched, all 12 cells scored *identically* to the N=21 baseline. `SPEC-slice-2`'s claim that
+  the headline "should be expected to fall when the corpus grows, and the second authority roughly
+  doubles it" is **corrected there** — that claim would otherwise excuse a drop from elsewhere.
+- **The authority hard filter is verified at the retrieval layer, PARTIAL not CLOSED.** Every
+  question's top-k is asserted to hold zero foreign-authority chunks, inside `evaluate`, for 50×12;
+  seen red by deleting the WHERE clause, with a companion test proving foreign chunks really do
+  enter the top-5 without it. But `CLAUDE.md`'s specified behaviour is *refusal*, and refusing needs
+  an answering layer. Do not read a green filter assertion as a verified refusal.
+- **ADR-0002 is amended: a municipality does NOT always resolve to exactly one authority.**
+  Pirkanmaa's 1 § claims Sastamala only "(Mouhijärven ja Suodenniemen osalta)", so Sastamala is
+  omitted from the map and refuses with a message naming the partial coverage. A Mouhijärvi
+  resident is refused an answer that exists — accepted, and the *model* question (a level between
+  authority and municipality) is the Owner's.
+- **`18 a § KOMPOSTOINTI-ILMOITUS` is a real Pirkanmaa clause missing from the corpus.** It is
+  absent from the document's own table of contents, so the body/TOC cross-check is silent and its
+  text is absorbed into 18 §'s chunk. Two clauses, one address. No golden question points at
+  Pirkanmaa 18 § — do not add one before this is fixed.
 - **Not built:** embeddings, pgvector, reranking, any LLM call, a judge, answer generation,
-  citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build` still exits
+  citations, refusal, a third authority, CI, Docker, Cloud Run. `make docker-build` still exits
   non-zero on purpose — do not "fix" it.
-- **The authority hard filter is still unverified** — one authority means nothing to leak from.
-  Read `specs/SPEC-slice-2-golden-set-rewrite.md` for why the corpus-breadth non-goal moved it.
-- **Slice 4 is the golden set and a second authority — the Owner overrode the pre-registered
-  rule, deliberately, on 27 Aug 2026.** The slice-3 spec pre-registered slice 4 as the vector
-  layer. That rule was written before slice 3 measured that **every remaining miss is a *ranking*
-  failure, not a reach failure**, and before it was clear that a 2-question gain at N=21 sits
-  inside the ±0.18 interval — i.e. the instrument cannot currently resolve what the vector layer
-  would buy. So: grow the question set toward ~50, ingest a second authority, and verify the
-  authority hard filter. The vector layer moves to slice 5. The override is recorded in the
-  slice-3 spec beside the rule it supersedes, never silently.
-  **⚠️ This is in tension with the Owner's own corpus-breadth non-goal below.** Read both before
-  shaping: the non-goal's condition is *"until the existing ones' metrics are trustworthy"*, and
-  the argument is that slice 3 largely met it — but the tension is real and was flagged, not
-  glossed.
+- **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
+  that cannot reach d=6 and a held-out set that never can.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
   doc, an old note, or a past session says already works.
 
@@ -144,8 +164,9 @@ Verify that structurally:
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
 - Golden-set leakage: scores climb while real answer quality doesn't. **Measured every run and
-  gated to never rise, per cell.** It was 60% in slice 1 and is 37% now in the published cell; the
-  reference for real questions is 39%. A rising headline with rising leakage is not an improvement.
+  gated to never rise, per cell.** It was 60% in slice 1, 37% at N=21, and is **33.2% now** in the
+  published cell at N=50 — the 29 questions slice 4 added are *less* leaky than the 21 they joined,
+  so the set got harder, not easier. The reference for real harvested questions is 39%. A rising headline with rising leakage is not an improvement.
   Note that a *better analyser* raises leakage on its own, with no question edited (0.372 → 0.619
   in slice 3) — which is why each cell is gated against its own recorded value and never against
   another cell's. Comparing across cells would fail the gate for a reason that has nothing to do

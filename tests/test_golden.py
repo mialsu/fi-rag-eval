@@ -39,7 +39,8 @@ def write(tmp_path: Path, phrasing: str, source: str = "") -> Path:
 
 
 def test_the_real_golden_set_loads_and_records_its_provenance(manifest: Manifest) -> None:
-    golden = load_golden_set(REPO / "corpus" / "golden" / "lounais-suomi.yaml", manifest)
+    """The whole directory: a pair spans two files, so one file alone is incomplete."""
+    golden = load_golden_set(REPO / "corpus" / "golden", manifest)
     harvested = golden.count_by_phrasing(Phrasing.HARVESTED)
     assert harvested > 0, "at least some wording must come from outside our own reading"
     assert harvested + golden.count_by_phrasing(Phrasing.AUTHORED) == len(golden)
@@ -149,8 +150,16 @@ def test_a_well_formed_pair_loads_and_is_reported(tmp_path: Path, manifest: Mani
 
 
 def test_a_lone_half_of_a_pair_is_rejected(tmp_path: Path, manifest: Manifest) -> None:
-    """A pair exists to hold the text fixed while the authority changes."""
-    golden = write_pair(tmp_path, pair_b="something-else")
+    """A pair exists to hold the text fixed while the authority changes.
+
+    The second entry asks something else and claims no pair, so only the first
+    declares one -- which isolates this rule from the identical-text rule.
+    """
+    golden = write_pair(
+        tmp_path,
+        question_b="Kuinka usein astia tyhjennetään?",
+        pair_b="~",
+    )
     with pytest.raises(GoldenSetError, match="half/halves"):
         load_golden_set(golden, manifest)
 
@@ -159,6 +168,12 @@ def test_halves_that_ask_different_things_are_rejected(tmp_path: Path, manifest:
     golden = write_pair(tmp_path, question_b="Kuinka usein astia tyhjennetään?")
     with pytest.raises(GoldenSetError, match="ask different things"):
         load_golden_set(golden, manifest)
+
+
+def test_a_single_file_is_incomplete_when_a_pair_spans_two(manifest: Manifest) -> None:
+    """Loading one authority's file alone must not silently score half a pair."""
+    with pytest.raises(GoldenSetError, match="half/halves"):
+        load_golden_set(REPO / "corpus" / "golden" / "pirkanmaa.yaml", manifest)
 
 
 def test_a_pair_that_does_not_cross_authorities_is_rejected(

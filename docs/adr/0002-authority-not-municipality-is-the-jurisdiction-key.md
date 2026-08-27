@@ -56,3 +56,41 @@ therefore needs two authorities to test the filter at all.
 
 **Living with.** The user says "Turku" and means an 18-municipality document. Every surface must
 resolve that without implying Turku has its own rules.
+
+---
+
+## Amendment, 2026-08-27 (slice 4) — a municipality does NOT always resolve to exactly one authority
+
+This ADR's model says a Municipality resolves to **exactly one** Authority, and
+`manifest.resolve_municipality` enforces it: two authorities claiming one kunta is a hard error,
+because silently picking one is the cross-jurisdiction answer the filter exists to prevent.
+
+Ingesting Pirkanmaa produced a **counterexample read straight from the document**. Its
+`1 § SOVELTAMISALA` lists the area as:
+
+> Hämeenkyrön, Ikaalisten, Juupajoen, Kangasalan, Lempäälän, Mänttä-Vilppulan, Nokian, Oriveden,
+> Parkanon, Pirkkalan, Pälkäneen, Ruoveden, **Sastamalan (Mouhijärven ja Suodenniemen osalta)**,
+> Tampereen, Vesilahden, Virtain ja Ylöjärven muodostamalla alueella.
+
+Sastamala is claimed **only for its former Mouhijärvi and Suodenniemi areas** — two municipalities
+merged into Sastamala in 2009, whose waste authority did not follow the merger. The rest of
+Sastamala is bound by a different authority's rules. The map is therefore **not a function** for
+Sastamala, and no amount of care in the manifest makes it one.
+
+**What slice 4 did about it (D4):** Sastamala is omitted from `municipalities` and recorded in a
+new `partial_municipalities` field, so `resolve_municipality("Sastamala")` raises with a message
+naming the partial coverage rather than the generic "no authority covers this municipality". The
+16 whole kunnat resolve normally. No golden question uses Sastamala.
+
+**What that costs:** a resident of Mouhijärvi or Suodenniemi is refused an answer the regulations
+do in fact give them. That is the same trade this project already makes for taajama boundaries —
+an honest refusal beats a confident wrong answer — and it is the right trade at this scale, because
+listing Sastamala would make the harness confidently wrong for *most* of the kunta's residents,
+which is product failure mode #1 wearing a correct-looking citation.
+
+**What is still unresolved, and is the Owner's call, not this ADR's:** whether the design
+eventually needs a level between Authority and Municipality. Finnish municipal mergers leave
+former municipalities under different waste authorities, so this will recur as the corpus grows;
+it is not a Pirkanmaa quirk. Modelling it needs a fourth level nothing else in the design has, and
+it is deliberately out of slice 4's scope. Recorded in `REVIEW-DEBT.md` and in the slice-4 spec's
+open questions.

@@ -134,6 +134,21 @@ prediction table and it is now the dominant remaining explanation. **This number
 expected to fall when the corpus grows**, and the second authority roughly doubles it. A
 retrieval score over an 82-chunk corpus is not comparable to any published benchmark.
 
+> **CORRECTED 27 Aug 2026 (slice 4). The second half of that claim is simply false, and leaving it
+> standing would have been dangerous.** A second authority adds **exactly zero** distractors to an
+> existing question: `db.search` applies the authority filter in the WHERE clause *before* ranking,
+> and `ts_rank` has no inverse document frequency, so nothing about another authority's 89 chunks
+> can reach or reweight a Lounais-Suomi query. **Measured:** with Pirkanmaa ingested and the
+> question set untouched, all 12 cells scored **identically** to the recorded N=21 baseline, to
+> every decimal, and the gate stayed green. Over the original 21 questions the numbers are still
+> exactly 16/21 and 18/21 at N=50.
+>
+> The headline *did* fall, 0.762 → 0.680, and it fell **entirely because the population changed** —
+> 29 harder, less leaky questions joined it. This corrected claim would otherwise have been
+> available later to excuse a drop that came from somewhere else, which is precisely the kind of
+> ready-made excuse this project cannot afford. The first sentence stands: a score over a small
+> corpus is not comparable to a published benchmark.
+
 ## Non-goals
 
 Unchanged from slice 1, plus: no second authority, no lemmatisation, no `ts_rank` normalisation

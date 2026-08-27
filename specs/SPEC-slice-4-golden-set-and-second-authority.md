@@ -1,6 +1,8 @@
 # SPEC — slice 4: the golden set and a second authority
 
-**Status:** shaped 27 Aug 2026 after `/grill-with-docs`. Awaiting the Owner's go to build.
+**Status:** **BUILT 27 Aug 2026.** Shaped after `/grill-with-docs`; predictions scored in
+**Measured result** at the end of this file, refutations first. Two of six predictions were
+refuted, including the strongest one, and a slice-3 finding was retracted.
 **Weight:** Standard.
 **Decided by the Owner over a pre-registered rule.** Slice 3 pre-registered slice 4 as the vector
 layer. The Owner overrode that on 27 Aug 2026; the override sits beside the rule it supersedes in
@@ -116,6 +118,13 @@ in one authority's vocabulary will systematically under-retrieve in the other's 
 miss diagnostic will report it as **zero-overlap** — the class slice 3 drove from 4 to 0. Slice 4
 therefore reopens that class for a *different mechanism with a different fix*, and measuring that
 is worth more to the instrument than another 29 questions on one corpus would be.
+
+> **⚠️ MEASURED AND WRONG about the mechanism, right about the effect.** The fork is real and it
+> does cost recall — but it surfaces as **ranked-out**, not zero-overlap. A question shares plenty
+> of *other* lexemes with its target even when the key noun shares no stem, so "zero overlap" is a
+> far stronger condition than "the synonym is bridged". Zero-overlap misses stayed at **0** in
+> every `lemma-reasm` cell. See **Measured result → Prediction 3**; this paragraph is left as
+> written because a prediction edited after the fact measures nothing.
 
 ### Sastamala is not covered whole — and that contradicts ADR-0002
 
@@ -361,3 +370,155 @@ scores a vacuous 1.0. That is correct until there is an answer to refuse.
   `harvested` share at or above today's 6-of-21 is unknown until the labelling starts. If they do
   not, the honest move is fewer harvested questions recorded as such — never an `authored`
   question relabelled `harvested`.
+
+---
+
+## Measured result (27 Aug 2026)
+
+Scored honestly against the pre-registered predictions above. **Refutations first.**
+`N=50, k=5, 12 cells, 53 required chunks, 171 chunks over two authorities.`
+
+### Refuted
+
+**Prediction 3 — REFUTED, and it was the strongest prediction here.**
+*Predicted:* zero-overlap misses return, 0 → 3–8 in `lemma-reasm/1`, concentrated in the paired
+questions and attributable to the synonym fork.
+*Measured:* **0.** Not 3, not 1 — zero-overlap misses stay at 0 in every `lemma-reasm` cell, and at
+0 for Pirkanmaa in every lemma cell. The control cell's count rose 4 → 6 with the population, and
+the reassembling analyser still absorbs all of it.
+
+The vocabulary fork is **real** — `naapuruston-yhteiskerays` passes for Pirkanmaa (11 § at rank 1)
+and fails for Lounais-Suomi in 10 of 12 cells, from *identical* question text — but it surfaces as
+**ranked-out**, not as unreachable. The reasoning error is now obvious in hindsight: a question
+shares plenty of *other* lexemes with its target even when the key noun shares no stem, so
+"zero overlap" is a much weaker condition than "the synonym is bridged". In the Lounais-Suomi half
+the top-5 even contains `2 § Määritelmät — Korttelikeräyksellä`, the *definition* of the very
+concept, while the operative 8 § ranks below it: the concept is reached and the wrong chunk wins.
+
+**This fires the spec's decision rule for slice 5: `< 4` synonym-caused zero-overlap misses, so the
+vector layer's case has weakened twice and must be re-argued from evidence, not from the plan.**
+
+**Prediction 2 — REFUTED as stated.**
+*Predicted:* Pirkanmaa scores below Lounais-Suomi in **every one** of the 12 cells, gap 0.05–0.20.
+*Measured:* below in **7 of 12**. Pirkanmaa scores *higher* in 5, including the best cell
+(`lemma-reasm/0`: **0.857 vs 0.793**). Gaps run −0.110 to +0.154, and only 4 of 12 fall inside the
+predicted band. In the published cell the prediction does hold (0.724 vs 0.619, gap +0.105).
+
+The spec said: *"If Pirkanmaa scores higher, the likeliest explanation is that its questions are
+easier than intended, and the leakage number per authority is where to look first."* Looked:
+in `snowball/0`, leakage is **0.341 for Lounais-Suomi and 0.323 for Pirkanmaa** — Pirkanmaa's
+questions are marginally *less* leaky, so the "easier questions" explanation is **not supported by
+the metric the spec nominated to test it.** What the per-authority split does show is that the two
+authorities respond differently to the analyser axis, which is a finding rather than a defect.
+
+The spec's slice-5 rule for this case reads *"the golden set is the suspect, not the retriever, and
+slice 5 is a golden-set audit rather than any retrieval work."* Both refutations now point away
+from the vector layer, from different directions. **That is the Owner's call, not this spec's.**
+
+**A slice-3 finding did not survive N=50, and this is the clearest thing the bigger set bought.**
+Slice 3 concluded that dividing by document length costs the control and unsplit cells recall and
+*gains* it for the reassembled one, and called that sign flip "the interaction the grid existed to
+find". At N=50 the clean interaction is gone:
+
+| analyser | norm 0 → norm 1 | slice 3 said | now |
+|---|---|---|---|
+| snowball | 0.680 → 0.640 | costs | **costs** ✓ |
+| lemma-baseform | 0.740 → **0.780** | costs | **helps** ✗ |
+| lemma-safe | 0.760 → 0.760 | costs | **neutral** ✗ |
+| lemma-reasm | 0.820 → 0.820 | gains | **neutral** ✗ |
+
+The slice-3 claim rested on a **one-question** gain at N=21 — d=3, p=0.25 — which was never a
+result that instrument could resolve. The honest statement now is the narrow one: *length
+normalisation costs the control cell and does not clearly help any lemma cell.* Not a better score;
+the **retraction of a conclusion that was noise**. Pinned by
+`test_length_normalisation_costs_only_the_control_cell_now`.
+
+### Confirmed
+
+**Prediction 1 — CONFIRMED.** Pooled `snowball/0` complete-set recall **0.680**, inside the
+predicted 0.60–0.72 (from 0.762 at N=21).
+
+**Prediction 4 — CONFIRMED.** The filter assertion passed on the first run, across all 50 questions
+× 12 cells. Its value is the red test, and it was seen red by deleting the jurisdiction WHERE
+clause; a companion test proves foreign chunks genuinely do enter the top-5 without it.
+
+**Prediction 5 — CONFIRMED, and the uncertain direction resolved: leakage FELL in every cell.**
+snowball 0.372 → **0.332**, baseform 0.506 → **0.442**, safe 0.568 → **0.506**, reasm 0.619 →
+**0.550**. The 29 new questions are *less* leaky than the 21 they joined, so the golden set got
+**harder**, not easier — the one direction that needs no excuse. Re-baselined per cell as always.
+
+**Prediction 6 — CONFIRMED.** Lounais-Suomi still parses to exactly **82 chunks, 32 definitions**
+after the definitions carve-out learned bullets.
+
+### The result the slice existed to produce
+
+At N=21 **no** comparison in the grid could reach p<0.05 at any effect size. At N=50:
+
+| vs published `snowball/0` | d | favours it | favours published | exact p |
+|---|---|---|---|---|
+| **`lemma-reasm/0`** (0.820) | 9 | 8 | 1 | **0.039** ✓ |
+| `lemma-reasm/1` (0.820) | 11 | 9 | 2 | 0.065 |
+| `lemma-safe/1` (0.760) | 12 | 8 | 4 | 0.388 |
+| `lemma-baseform/1` (0.780) | 11 | 8 | 3 | 0.227 |
+
+**The instrument can now resolve a retrieval improvement.** That is what D6 was chosen to buy, and
+it is the only thing on this page that could not have been obtained any other way.
+
+**And the continuity is exact, which is what makes the new headline honest.** Computed over the
+original 21 questions alone, `snowball/0` still scores **16/21** and `lemma-reasm/1` still
+**18/21** — identical to the slice-3 baseline, not merely close. The pooled headline moved because
+the *population* moved, and provably not because anything in slices 1–3 was disturbed. A second
+authority adds **zero** distractors to an existing question: the filter runs before ranking and
+`ts_rank` has no IDF. Pinned by
+`test_the_original_21_questions_still_score_exactly_what_they_scored`.
+
+### Published headline
+
+**Complete-set recall@5 = 0.680 (N=50, k=5) in `snowball/0`, at lexical leakage 0.332.**
+Per authority, as a diagnostic: Lounais-Suomi 0.724 (N=29), Pirkanmaa 0.619 (N=21).
+**Not comparable to the old 0.762 (N=21)** — the population changed.
+
+### Acceptance criteria
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| AC1 | Pirkanmaa ingests: 48 clauses, counts matching a hand-read `expected` | **MET** | `make ingest`, exit 0: 48 clauses / 89 chunks / 41 definitions; 41 definienda hand-read in strict alphabetical order |
+| AC2 | Lounais-Suomi still produces exactly 82 chunks, 32 definitions | **MET** | same run; the `expected` block is unchanged |
+| AC3 | `make eval` scores 50 questions in 12 cells and exits 0 | **MET** (after re-baseline) | table prints `golden set: 50 questions, 53 required chunks`; exit 0 |
+| AC4 | No question skipped or errored; N equals the golden set's length | **MET** | `evaluate` has no skip path; 50 rows in the pass matrix |
+| AC5 | Every question's top-k contains zero foreign-authority chunks | **MET** | asserted in `evaluate` for 50×12; seen red by deleting the WHERE clause — **not** by mislabelling a municipality, see the spec delta below |
+| AC6 | The 8 paired questions retrieve different required chunks per authority from identical text | **MET** | enforced at load; `naapuruston-yhteiskerays` passes for one authority and fails for the other in the published cell |
+| AC7 | A Pirkanmaa citation names the 1.5.2026 edition, not 2021 | **MET** | `11 § LÄHIKERÄYSJÄRJESTELMÄ (Kunnalliset jätehuoltomääräykset, 1.5.2026 alkaen)` |
+| AC8 | `resolve_municipality("Sastamala")` raises, naming the partial coverage | **MET** | unit test, three casings |
+| AC9 | Per cell pair, `d` and its exact McNemar p are printed | **MET** | two 12×12 triangles in the eval output |
+| AC10 | The gate fails on any cell regressing, seen red on a deliberate break | **MET** | see below |
+| AC11 | README headline pooled, N=50, per-authority breakdown, explicit not-comparable note | **MET** | README diff |
+| AC12 | Every new label carries a `label_source`; no label adjusted after seeing retriever output | **MET** | 29 new entries, each quoting the clause and sentence; question text fixed before the target clause was looked up |
+
+**Slice verdict: the worst of the above — MET.**
+
+### Spec deltas
+
+- **AC5's proposed red-proof does not work, and the correction matters.** The spec said to see the
+  filter assertion red "by mislabelling a municipality". That is impossible:
+  `golden._parse_question` already rejects a question whose municipality resolves to one authority
+  while its labels point at another, so such a question never reaches `evaluate`; and if it did,
+  the search would run against the wrong authority and return *that* authority's own chunks —
+  every hit native, the assertion silent, the question merely a miss. The assertion defends against
+  a regression in the **search**, not against a labelling error. Seen red by deleting the
+  jurisdiction WHERE clause instead, with a companion test proving the hazard is real.
+- **D4's "explicit comment" was not sufficient for AC8.** A YAML comment cannot reach an error
+  message. The manifest gained a structured `partial_municipalities` field so the refusal can name
+  the partial coverage, which is what AC8 demands.
+- **A latent defect was surfaced and fixed, not deferred:** definition sub-key uniqueness was
+  decided on raw words while the address is slugified, so Lounais-Suomi's `Kunnan` and Pirkanmaa's
+  `kunnan` would both keep a one-word prefix and collide into one address. Now decided on the slug.
+- **Four new confessions the spec did not anticipate**, all found by ingesting a second document:
+  `18 a § KOMPOSTOINTI-ILMOITUS` is a real clause absent from its own table of contents and
+  absorbed into 18 §'s chunk; two hyphen joins corrupt real words; 37 bare page-number lines
+  survive in Pirkanmaa's body and none in Lounais-Suomi's. See `REVIEW-DEBT.md`.
+- **Harvested share fell, as the open question anticipated:** 4 of the 29 new questions are
+  harvested (all from `pjhoy.fi/ukk/`, verbatim from raw HTML), giving 10 of 50 overall against
+  6 of 21 before. Neither the Pirkanmaa authority nor either operator publishes a resident FAQ with
+  question-form headings on the non-biojäte topics this slice needed. **No authored question was
+  relabelled `harvested`.**

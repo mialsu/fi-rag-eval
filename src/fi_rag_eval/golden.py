@@ -225,6 +225,22 @@ def _validated(golden: GoldenSet, where: str) -> GoldenSet:
     if duplicates:
         raise GoldenSetError(f"{where}: duplicate question ids {duplicates}")
 
+    texts: dict[str, list[Question]] = {}
+    for question in golden.questions:
+        texts.setdefault(question.question, []).append(question)
+    undeclared = {
+        text: [q.id for q in members]
+        for text, members in texts.items()
+        if len(members) > 1 and len({q.pair for q in members}) != 1
+    }
+    if undeclared:
+        raise GoldenSetError(
+            f"{where}: these question texts appear more than once without being declared "
+            f"a pair: {undeclared}. Two entries asking the same thing IS a paired "
+            "question; declaring it makes the comparison visible and checked, and "
+            "leaving it undeclared hides a measurement the set is already taking."
+        )
+
     pairs: dict[str, list[Question]] = {}
     for question in golden.questions:
         if question.pair is not None:

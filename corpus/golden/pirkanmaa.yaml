@@ -1,0 +1,670 @@
+# Golden set -- Alueellinen jätehuoltolautakunta (Pirkanmaa), edition 1.5.2026 alkaen.
+#
+# ==============================================================================
+# WHY A SECOND AUTHORITY, AND WHAT IT MEASURES THAT ONE COULD NOT
+# ==============================================================================
+#
+# The two authorities use DIFFERENT WORDS FOR THE SAME THINGS. This is a
+# **synonym** gap, not a morphology gap, and no analyser can bridge it --
+# `keräysväline` and `jäteastia` share no stem, so slice 3's compound splitting
+# is irrelevant here:
+#
+#     the bin            Lounais-Suomi: jäteastia      Pirkanmaa: keräysväline
+#     shared bin         Lounais-Suomi: yhteinen       Pirkanmaa: kimppa
+#                                       jäteastia
+#     off-route point    Lounais-Suomi: aluekeräys-    Pirkanmaa: aluejätepiste
+#                                       piste
+#     neighbourhood      Lounais-Suomi: kortteli-      Pirkanmaa: lähikeräys-
+#     collection                        keräys                    järjestelmä
+#
+# Slice 3 drove zero-overlap misses from 4 to 0. This file is expected to reopen
+# that class for a DIFFERENT MECHANISM WITH A DIFFERENT FIX, and measuring that
+# is the whole reason this slice came before the vector layer.
+#
+# ==============================================================================
+# PAIRED QUESTIONS
+# ==============================================================================
+#
+# Eight questions in this file carry a `pair:` slug and are labelled TWICE -- the
+# same question text, once here and once in lounais-suomi.yaml. They were chosen
+# on topics where the two authorities' rules genuinely differ AND their
+# vocabulary forks, and they carry three jobs at once:
+#
+#   1. the authority hard filter: identical text, two jurisdictions, and the
+#      required chunks must differ;
+#   2. `DESIGN.md:96`'s "answer differs between authorities" category, which had
+#      zero questions before this slice;
+#   3. the synonym measurement above.
+#
+# Loading enforces that a pair has exactly two halves, identical text, and
+# different authorities -- so "the same question retrieves different rules" is a
+# checked property, not an eyeballed one.
+#
+# ==============================================================================
+# PROVENANCE
+# ==============================================================================
+#
+# `phrasing: harvested` means the wording is copied VERBATIM from a public
+# resident-facing page and `phrasing_source` names it. Four questions here are
+# harvested, all from the operator's own FAQ. The Pirkanmaa authority publishes
+# no resident FAQ of its own and its operator's other FAQ is entirely about
+# biojäte -- which this file deliberately avoids, because biojäte and
+# kompostointi are already 11 of the 21 Lounais-Suomi questions. The honest
+# consequence is FEWER harvested questions, recorded as such: no authored
+# question has been relabelled `harvested` to make the share look better.
+#
+# LABELS ARE HAND-WRITTEN FROM THE SOURCE PDF. `label_source` names the clause
+# and the sentence each was read from. No label was taken from, checked against,
+# or adjusted after seeing retriever output; question text was fixed before the
+# target clause was looked up.
+#
+# NOT LABELLED HERE, DELIBERATELY: **18 § KOMPOSTOINTI**. The document's body
+# carries a clause `18 a § KOMPOSTOINTI-ILMOITUS` that its own table of contents
+# does not list, so it is absorbed into 18 §'s chunk and two clauses share one
+# address. See REVIEW-DEBT.md. Nothing here points at that chunk.
+version: 1
+questions:
+  # -------------------------------------------------------------- harvested
+  - id: pir-miksi-jatehuoltoon-liityttava
+    question: Miksi jätehuoltoon pitää liittyä? Miksi myös mökkiläisen?
+    phrasing: harvested
+    phrasing_source: https://pjhoy.fi/ukk/
+    municipality: Kangasala
+    required_chunks:
+      - pirkanmaa@2021-07-01#4
+    required_branches:
+      - claim: >-
+          Kotitalouden, vapaa-ajan asunnon sekä muun jätelain 32 §:n mukaisia toimintoja
+          harjoittavan on liityttävä kunnan jätehuoltojärjestelmään syntyvän jätteen määrästä
+          riippumatta.
+        chunk: pirkanmaa@2021-07-01#4
+      - claim: >-
+          Vapaa-ajan asunto on nimenomaisesti mainittu, ja jos samalla kiinteistöllä on monta
+          asuin- tai vapaa-ajan rakennusta, jokaisen on oltava jätehuollon piirissä.
+        chunk: pirkanmaa@2021-07-01#4
+      - claim: Liittymisvelvollisuus alkaa kiinteistön hallinnasta lukien.
+        chunk: pirkanmaa@2021-07-01#4
+    forbidden:
+      - Velvoitteen esittäminen jätteen määrästä riippuvana.
+      - Vapaa-ajan asunnon esittäminen velvoitteen ulkopuolisena.
+    label_source: >-
+      4 § VELVOLLISUUS LIITTYÄ KUNNAN JÄTEHUOLTOJÄRJESTELMÄÄN: "Kotitalouden, vapaa-ajan
+      asunnon sekä muun jätelain 32 §:n mukaisia toimintoja harjoittavan on jätelain
+      velvoittamana liityttävä kunnan jätehuoltojärjestelmään ja noudatettava näitä
+      jätehuoltomääräyksiä syntyvän jätteen määrästä riippumatta."; "Liittymisvelvollisuus
+      alkaa kiinteistön hallinnasta lukien."
+
+  - id: pir-kolmen-viikon-tyhjennysvali
+    question: Miksi jäteastialle ei voi saada kolmen viikon tyhjennysväliä?
+    phrasing: harvested
+    phrasing_source: https://pjhoy.fi/ukk/
+    municipality: Nokia
+    required_chunks:
+      - pirkanmaa@2021-07-01#23
+    required_branches:
+      - claim: >-
+          Määräykset asettavat pisimmän sallitun tyhjennysvälin jätelajeittain, eivät listaa
+          sallittuja välejä: sekajätteellä 4 viikkoa ilman biojätteen erilliskeräystä tai
+          kompostointia, ja 8 viikkoa niiden kanssa.
+        chunk: pirkanmaa@2021-07-01#23
+      - claim: >-
+          Tyhjennysvälin on lisäksi sovelluttava Pirkanmaan Jätehuolto Oy:n
+          jätteenkuljetusjärjestelmään, mikä on kolmen viikon välin varsinainen este.
+        chunk: pirkanmaa@2021-07-01#23
+    forbidden:
+      - Kolmen viikon välin esittäminen jätehuoltomääräyksissä kiellettynä.
+      - Pisimmän sallitun välin esittäminen ainoana sallittuna välinä.
+    label_source: >-
+      23 § KERÄYSVÄLINEIDEN TYHJENNYSVÄLIT, taulukko "Pisin mahdollinen jätehuoltomääräysten
+      mukainen tyhjennysväli": sekajäte 4 viikkoa / 8 viikkoa; sama pykälä:
+      "Keräysvälineiden tyhjennysvälin on sovelluttava Pirkanmaan Jätehuolto Oy:n
+      jätteenkuljetusjärjestelmään."
+
+  - id: pir-jateastia-rikki
+    question: Mitä teen, kun jäteastia on mennyt rikki?
+    phrasing: harvested
+    phrasing_source: https://pjhoy.fi/ukk/
+    municipality: Ylöjärvi
+    required_chunks:
+      - pirkanmaa@2021-07-01#26
+    required_branches:
+      - claim: >-
+          Keräysvälineen haltijan on huolehdittava keräysvälineidensä kunnossapidosta niin,
+          ettei niistä aiheudu terveys-, haju- tai roskaantumishaittaa, haittaeläinten
+          houkuttelua tai turvallisuusriskiä käyttäjille tai tyhjentäjille.
+        chunk: pirkanmaa@2021-07-01#26
+      - claim: >-
+          Vastuu puhtaanapidosta on haltijalla siltä osin kuin toimenpiteet eivät sisälly
+          jätetaksaan veloituksettomina palveluina.
+        chunk: pirkanmaa@2021-07-01#26
+    forbidden:
+      - Kunnossapitovastuun esittäminen yksin jäteyhtiölle kuuluvana.
+    label_source: >-
+      26 § KERÄYSVÄLINEEN KUNNOSSAPITO: "Keräysvälineen haltijan on huolehdittava
+      keräysvälineidensä kunnossapidosta siten, etteivät ne aiheuta terveyshaittaa,
+      hajuhaittaa, ympäristön likaantumista tai roskaantumista, houkuttele haittaeläimiä tai
+      aiheuta turvallisuusriskiä käyttäjille tai tyhjentäjille."; "siltä osin kuin em.
+      toimenpiteet eivät sisälly veloituksettomina palveluina jätetaksaan". Kysymys on
+      asukkaan sanoin: sana "keräysväline" ei esiinny kysymyksessä lainkaan.
+
+  - id: pir-liukas-tie-jateauto
+    question: >-
+      Kuljettajan mukaan tie oli niin liukas, että jäteastiaa ei päässyt jäteautolla
+      tyhjentämään. Mutta jos pihaan pääsee henkilöautolla, niin miksi ei jäteautolla?
+    phrasing: harvested
+    phrasing_source: https://pjhoy.fi/ukk/
+    municipality: Ruovesi
+    required_chunks:
+      - pirkanmaa@2021-07-01#30
+    required_branches:
+      - claim: >-
+          Kiinteistön haltijan on huolehdittava kulkuväylän ja sijoituspaikan kunnossa- ja
+          puhtaanapidosta, ja lumen auraus sekä liukkauden torjunta on hoidettava niin, että
+          keräysvälineet voidaan turvallisesti siirtää tyhjennettäväksi.
+        chunk: pirkanmaa@2021-07-01#30
+      - claim: >-
+          Ajoväylän tulee kantaa jäteauton paino, joka on henkilöauton painoa selvästi
+          suurempi; yksityistiellä vastuu tien kestävyydestä on tienpitäjällä.
+        chunk: pirkanmaa@2021-07-01#30
+    forbidden:
+      - Henkilöauton kulkukelpoisuuden esittäminen riittävänä perusteena.
+      - Kunnossapitovastuun esittäminen jäteyhtiölle kuuluvana.
+    label_source: >-
+      30 § AJOVÄYLÄT JA KERÄYSVÄLINEIDEN SIIRTOVÄYLÄT KIINTEISTÖITTÄISESSÄ
+      JÄTTEENKULJETUKSESSA: "Lumen auraus ja liukkauden torjunta on hoidettava siten, että
+      keräysvälineet voidaan turvallisesti siirtää tyhjennettäväksi."; "Kiinteistöllä
+      sijaitsevan jätteenkuljetukseen käytettävän ajoväylän tulee kantaa tyhjennykseen
+      käytettävän jäteauton paino."
+
+  # --------------------------------------------------------------- authored
+  - id: pir-mika-on-keraysvaline
+    question: Mitä keräysväline tarkoittaa?
+    phrasing: authored
+    municipality: Tampere
+    required_chunks:
+      - pirkanmaa@2021-07-01#2.keraysvalineella
+    required_branches:
+      - claim: >-
+          Keräysvälineellä tarkoitetaan jätteen keräykseen käytettävää välinettä, joka voi
+          olla jäteastia, jätesäiliö, putkikeräysjärjestelmän koonta-aseman kontti tai
+          lietesäiliö, ja josta jäte tyhjennetään.
+        chunk: pirkanmaa@2021-07-01#2.keraysvalineella
+      - claim: >-
+          Termi on siis Lounais-Suomen "jäteastiaa" laajempi: jäteastia on yksi
+          keräysvälineen laji.
+        chunk: pirkanmaa@2021-07-01#2.keraysvalineella
+    forbidden:
+      - Keräysvälineen esittäminen jäteastian synonyyminä.
+    label_source: >-
+      2 § MÄÄRITELMÄT, kohta "keräysvälineellä jätteen keräykseen käytettävää välinettä, joka
+      voi olla jäteastia, jätesäiliö, putkikeräysjärjestelmän koonta-aseman kontti, johon jäte
+      ohjataan syöttöpisteiltä, lietesäiliö tms., josta jäte tyhjennetään". Lyhyt
+      määritelmächunk, jonka pitkät pykälät voittavat ts_rankissa normalisaatiolla 0.
+
+  - id: pir-mika-on-kimppa
+    question: Mitä kimppa tarkoittaa?
+    phrasing: authored
+    municipality: Lempäälä
+    required_chunks:
+      - pirkanmaa@2021-07-01#2.kimpalla
+    required_branches:
+      - claim: >-
+          Kimpalla tarkoitetaan kahden tai useamman nimetyn kiinteistön tai asuinhuoneiston
+          sopimuksen varaista yhteistä keräysvälinettä tai niiden kokonaisuutta.
+        chunk: pirkanmaa@2021-07-01#2.kimpalla
+    forbidden:
+      - Kimpan esittäminen nimeämättömien kiinteistöjen vapaana yhteiskäyttönä.
+    label_source: >-
+      2 § MÄÄRITELMÄT: "kimpalla kahden tai useamman nimetyn kiinteistön tai asuinhuoneiston
+      sopimuksen varaista yhteistä keräysvälinettä tai niiden kokonaisuutta". Sanaa
+      "kimppa" käyttävät molemmat viranomaiset, mutta vain Pirkanmaa määrittelee sen.
+
+  - id: pir-mika-on-harmaa-jatevesi
+    question: Mitä harmaa jätevesi tarkoittaa?
+    phrasing: authored
+    municipality: Pälkäne
+    required_chunks:
+      - pirkanmaa@2021-07-01#2.harmaalla
+    required_branches:
+      - claim: >-
+          Harmaalla jätevedellä tarkoitetaan asumisessa erilaisista pesutoiminnoista
+          syntynyttä jätevettä, joka ei sisällä virtsaa tai ulostetta eikä muuta käymälästä
+          tulevaa kiinteää tai nestemäistä jätettä.
+        chunk: pirkanmaa@2021-07-01#2.harmaalla
+    forbidden:
+      - Harmaan ja mustan jäteveden esittäminen samana asiana.
+    label_source: >-
+      2 § MÄÄRITELMÄT: "harmaalla jätevedellä asumisessa erilaisista pesutoiminnoista
+      syntynyttä jätevettä, joka ei sisällä virtsaa tai ulostetta eikä muuta käymälästä
+      tulevaa kiinteää tai nestemäistä jätettä". Määritelmä on se, joka ratkaisee 37 §:n
+      kolmen vuoden tyhjennysvälin -- Lounais-Suomi sanoo samasta asiasta "pesuvedet".
+
+  - id: pir-yhteinen-astia-naapurin-kanssa
+    question: Voimmeko sopia naapurin kanssa yhteisestä astiasta, ja kenelle siitä ilmoitetaan?
+    phrasing: authored
+    municipality: Vesilahti
+    required_chunks:
+      - pirkanmaa@2021-07-01#8
+    required_branches:
+      - claim: >-
+          Lähekkäin sijaitsevien kiinteistöjen haltijat voivat keskinäisen sopimuksen
+          perusteella käyttää yhteistä keräysvälinettä ja keräyspistettä (kimppa).
+        chunk: pirkanmaa@2021-07-01#8
+      - claim: >-
+          Kimpan perustamisesta, kerättävistä jätelajeista, keräysvälineistä, keräyspisteen
+          sijoittamisesta, maksuosuuksista ja yhteyshenkilöstä on sovittava KIRJALLISESTI
+          Pirkanmaan Jätehuolto Oy:n kanssa.
+        chunk: pirkanmaa@2021-07-01#8
+      - claim: >-
+          Kunnan ympäristönsuojeluviranomainen voi kieltää kimppa-astian käyttämisen, jos
+          käytöstä aiheutuu haittaa terveydelle tai ympäristölle.
+        chunk: pirkanmaa@2021-07-01#8
+    forbidden:
+      - Kirjallisen sopimuksen jättäminen mainitsematta.
+      - Yhteisen astian esittäminen pelkkänä naapurien keskinäisenä asiana.
+    label_source: >-
+      8 § KIMPPA ELI YHTEINEN KERÄYSPISTE: "Kiinteistöittäisessä jätteenkuljetuksessa
+      lähekkäin sijaitsevien kiinteistöjen haltijat voivat keskinäisen sopimuksen perusteella
+      käyttää yhteistä keräysvälinettä/-välineitä ja keräyspistettä."; "on sovittava
+      kirjallisesti Pirkanmaan Jätehuolto Oy:n kanssa."; "Kunnan
+      ympäristönsuojeluviranomainen voi kieltää kimppa-astian käyttämisen".
+
+  - id: pir-putkikerays-oma-astia
+    question: Alueellamme jätteet menevät putkeen. Tarvitaanko silti oma astia pihaan?
+    phrasing: authored
+    municipality: Tampere
+    required_chunks:
+      - pirkanmaa@2021-07-01#10
+    required_branches:
+      - claim: >-
+          Putkikeräysjärjestelmään liittyneiden kiinteistöjen yhteisesti järjestettyinä
+          keräysvälineinä toimivat putkikeräysjärjestelmän koonta-asema sekä täydentävät
+          lähikeräyspisteet niiden jätteiden osalta, joita putkessa ei kerätä.
+        chunk: pirkanmaa@2021-07-01#10
+      - claim: >-
+          Putkikeräysjärjestelmä on käytössä vain asuinalueilla, joiden kaavassa tai muussa
+          suunnittelussa on todettu toteutettavan keskitetty jätteenkeräysjärjestelmä ja
+          osoitettu paikat keräyspisteille.
+        chunk: pirkanmaa@2021-07-01#10
+    forbidden:
+      - Väite, ettei putkikeräysalueella tarvita mitään järjestelyä muille jätelajeille.
+    label_source: >-
+      10 § JÄTTEIDEN PUTKIKERÄYSJÄRJESTELMÄ: "Putkikeräysjärjestelmään liittyneiden
+      kiinteistöjen yhteisesti järjestettyinä jätteen keräysvälineinä toimivat jätteiden
+      putkikeräysjärjestelmän koonta-asema sekä niiden jätteiden osalta, joita ei kerätä
+      jätteiden putkikeräysjärjestelmässä, täydentävät lähikeräyspisteet."
+      Lounais-Suomen määräyksissä ei ole putkikeräystä koskevaa pykälää lainkaan.
+
+  - id: pir-jatteet-irrallaan-astiaan
+    question: Saako roskat laittaa astiaan irrallaan ilman pussia?
+    phrasing: authored
+    municipality: Pirkkala
+    required_chunks:
+      - pirkanmaa@2021-07-01#22
+    required_branches:
+      - claim: >-
+          Jätteet tulee keräysvälineen likaantumisen ja ympäristön roskaantumisen välttämiseksi
+          pakata ennen niiden sijoittamista keräysvälineeseen.
+        chunk: pirkanmaa@2021-07-01#22
+      - claim: >-
+          Biojätteen keräysvälineeseen ei saa laittaa pakkaamatonta eikä nestemäistä
+          biojätettä, ja biojätteet on tarvittaessa valutettava.
+        chunk: pirkanmaa@2021-07-01#22
+      - claim: >-
+          Keräysväline on aina täytettävä siten, että se voidaan tyhjentää koneellisesti.
+        chunk: pirkanmaa@2021-07-01#22
+    forbidden:
+      - Irtojätteen esittäminen sallittuna sekajäteastiassa.
+    label_source: >-
+      22 § KERÄYSVÄLINEEN TÄYTTÄMINEN: "Jätteet tulee keräysvälineen likaantumisen ja
+      ympäristön roskaantumisen välttämiseksi pakata ennen niiden sijoittamista
+      keräysvälineeseen."; "Biojätteen keräysvälineeseen ei saa laittaa pakkaamatonta eikä
+      nestemäistä biojätettä."; "Keräysväline on aina täytettävä siten, että se voidaan
+      tyhjentää koneellisesti."
+
+  - id: pir-ylimaarainen-sakki-astian-viereen
+    question: Saako ylimääräisen jätesäkin jättää astian viereen?
+    phrasing: authored
+    municipality: Ikaalinen
+    required_chunks:
+      - pirkanmaa@2021-07-01#25
+    required_branches:
+      - claim: >-
+          Keräysvälineen ulkopuolelle saa jättää jätettä vain poikkeustapauksissa, ja muu kuin
+          jätesäkissä tai pussissa oleva jäte on merkittävä selvästi lisäjätteeksi.
+        chunk: pirkanmaa@2021-07-01#25
+      - claim: >-
+          Lisäjätteen tulee olla jätettä, joka koostumuksensa, määränsä ja kokonsa puolesta
+          muutenkin kuuluisi kyseiseen keräysvälineeseen.
+        chunk: pirkanmaa@2021-07-01#25
+      - claim: >-
+          Irtojätesäkki tai muu jätepakkaus saa painaa korkeintaan 20 kg, ja jos lisäjäte-erä
+          on keräysvälineen tilavuutta suurempi, siitä on ilmoitettava etukäteen Pirkanmaan
+          Jätehuolto Oy:lle.
+        chunk: pirkanmaa@2021-07-01#25
+    forbidden:
+      - Lisäjätteen esittäminen aina sallittuna.
+      - Painorajan jättäminen mainitsematta.
+    label_source: >-
+      25 § LISÄJÄTE: "Keräysvälineen ulkopuolelle saa jättää jätettä vain
+      poikkeustapauksissa."; "Muu kuin jätesäkissä tai pussissa oleva kerättäväksi
+      tarkoitettu jäte on merkittävä selvästi lisäjätteeksi."; "Irtojätesäkki tai muu
+      jätepakkaus saa painaa korkeintaan 20 kg." Lounais-Suomen määräyksissä ei ole
+      lisäjätettä koskevaa pykälää.
+
+  - id: pir-tyhjennysten-keskeytys-tyhjilleen
+    question: Voiko astian tyhjennykset keskeyttää, kun talo on pitkään tyhjillään?
+    phrasing: authored
+    municipality: Virrat
+    required_chunks:
+      - pirkanmaa@2021-07-01#24
+    required_branches:
+      - claim: >-
+          Kiinteistöittäinen jätteenkuljetus voidaan keskeyttää määräajaksi kiinteistön
+          ollessa täysin käyttämättömänä.
+        chunk: pirkanmaa@2021-07-01#24
+      - claim: >-
+          Yhdestä viikosta kahteentoista kuukauteen kestävästä keskeytyksestä sovitaan
+          Pirkanmaan Jätehuolto Oy:n kanssa vähintään viikkoa ennen toivottua alkamista.
+        chunk: pirkanmaa@2021-07-01#24
+      - claim: >-
+          Yli vuoden kestävä keskeytys tai useampi kuin kaksi peräkkäistä lyhytaikaista
+          keskeytystä edellyttää poikkeamista jätehuoltomääräyksistä, jota haetaan
+          jätehuoltoviranomaiselta 46 §:n mukaisesti.
+        chunk: pirkanmaa@2021-07-01#24
+      - claim: Keräysväline on tyhjennettävä ennen keskeytyksen alkamista.
+        chunk: pirkanmaa@2021-07-01#24
+    forbidden:
+      - Keskeytyksen esittäminen mahdollisena osittain käytössä olevalle kiinteistölle.
+      - Yli vuoden keskeytyksen esittäminen pelkkänä sopimusasiana.
+    label_source: >-
+      24 § KERÄYSVÄLINEEN TYHJENNYSTEN KESKEYTTÄMINEN: "Kiinteistöittäinen jätteenkuljetus
+      voidaan keskeyttää määräajaksi kiinteistön ollessa täysin käyttämättömänä."; "on
+      sovittava jäteyhtiön kanssa vähintään viikkoa ennen"; "keskeytyksen myöntäminen
+      edellyttää poikkeamista jätehuoltomääräyksistä"; "Keräysväline on tyhjennettävä ennen
+      keskeytyksen alkamista." Lounais-Suomen 9 § vaatii kaksi viikkoa, ei yhtä.
+
+  - id: pir-helpotus-erityisesta-syysta
+    question: Voiko jätehuoltomääräyksistä saada helpotusta erityisestä syystä?
+    phrasing: authored
+    municipality: Juupajoki
+    required_chunks:
+      - pirkanmaa@2021-07-01#46
+    required_branches:
+      - claim: >-
+          Kiinteistön tai jätteen haltija voi perustellusta syystä hakea poikkeusta, ja
+          jätehuoltoviranomainen voi myöntää sen yksittäistapauksessa, jos jätehuollon
+          järjestäminen sitä erityisestä syystä edellyttää eikä poikkeamisesta aiheudu
+          ympäristö- tai terveyshaittaa.
+        chunk: pirkanmaa@2021-07-01#46
+      - claim: Poikkeaminen ei voi koskea lakisääteisistä velvoitteista vapauttamista.
+        chunk: pirkanmaa@2021-07-01#46
+    forbidden:
+      - Poikkeuksen esittäminen ehdottomana oikeutena.
+      - Väite, että poikkeuksella voi vapautua jätelain velvoitteista.
+    label_source: >-
+      46 § POIKKEAMINEN JÄTEHUOLTOMÄÄRÄYKSISTÄ: "Jätehuoltoviranomainen voi
+      yksittäistapauksessa myöntää poikkeuksen jätehuoltomääräyksen noudattamisesta, jos
+      jätehuollon järjestäminen sitä erityisestä syystä edellyttää eikä poikkeamisesta aiheudu
+      ympäristö- tai terveyshaittaa. Poikkeaminen ei voi koskea lakisääteisistä velvoitteista
+      vapauttamista."
+
+  # ------------------------------------------------- paired (see lounais-suomi.yaml)
+  - id: pir-naapuruston-yhteiskerays
+    question: Asuinalueellamme jätteet kerätään kaavan mukaan yhteiseen pisteeseen. Onko siihen pakko liittyä?
+    phrasing: authored
+    municipality: Tampere
+    pair: naapuruston-yhteiskerays
+    required_chunks:
+      - pirkanmaa@2021-07-01#11
+    required_branches:
+      - claim: >-
+          Alueilla, joilla on käytössä jätteiden lähikeräysjärjestelmä, kiinteistöillä on
+          VELVOLLISUUS liittyä kunnalliseen jätehuoltojärjestelmään ja kiinteistöittäiseen
+          jätteenkuljetukseen liittymällä lähikeräysjärjestelmään.
+        chunk: pirkanmaa@2021-07-01#11
+      - claim: >-
+          Alueet rajataan erillisillä jätehuoltolautakunnan päätöksillä, ellei muussa
+          suunnittelussa ole rajattu sitä, ketä pisteen käyttö koskee.
+        chunk: pirkanmaa@2021-07-01#11
+      - claim: >-
+          Lähikeräysjärjestelmässä kiinteistöjen keräysvälineet sijaitsevat kiinteistöille
+          osoitetulla yhteisellä keräyspaikalla.
+        chunk: pirkanmaa@2021-07-01#11
+    forbidden:
+      - Liittymisen esittäminen vapaaehtoisena lähikeräysalueella.
+    label_source: >-
+      11 § LÄHIKERÄYSJÄRJESTELMÄ: "Alueilla, joilla on käytössä jätteiden
+      lähikeräysjärjestelmä, kiinteistöillä on velvollisuus liittyä kunnalliseen
+      jätehuoltojärjestelmään ja kiinteistöittäiseen jätteenkuljetukseen liittymällä
+      lähikeräysjärjestelmään." Pirkanmaa sanoo tästä "lähikeräysjärjestelmä",
+      Lounais-Suomi "korttelikeräys" -- sanat eivät jaa yhtään vartaloa.
+
+  - id: pir-ei-jateautoa-mokille
+    question: Mökille ei tule jäteautoa. Minne jätteet pitää silloin viedä?
+    phrasing: authored
+    municipality: Orivesi
+    pair: ei-jateautoa-mokille
+    required_chunks:
+      - pirkanmaa@2021-07-01#9
+    required_branches:
+      - claim: >-
+          Kiinteistöittäisen jätteenkuljetuksen ulkopuolella sijaitsevat kiinteistöt käyttävät
+          aluejätepistettä.
+        chunk: pirkanmaa@2021-07-01#9
+      - claim: >-
+          Aluejätepisteen käyttöoikeus on ainoastaan jätetaksan mukaisen vuosimaksun
+          maksavilla asuin- ja vapaa-ajan kiinteistöillä.
+        chunk: pirkanmaa@2021-07-01#9
+      - claim: >-
+          Aluejätepiste on tarkoitettu kotitalouksien päivittäiselle jätteelle; sinne ei saa
+          viedä vaarallisia jätteitä, yritystoiminnan jätteitä eikä suuria kertaeriä tai
+          suurikokoisia jätteitä, ja käyttäjä kuljettaa jätteensä itse lajiteltuna ja
+          pakattuna.
+        chunk: pirkanmaa@2021-07-01#9
+    forbidden:
+      - Vuosimaksuehdon jättäminen mainitsematta.
+      - Aluejätepisteen esittäminen kaikelle jätteelle tarkoitettuna.
+    label_source: >-
+      9 § ALUEJÄTEPISTE: "Kiinteistöittäisen jätteenkuljetuksen ulkopuolella sijaitsevat
+      kiinteistöt käyttävät aluejätepistettä. Aluejätepisteen käyttöoikeus on ainoastaan
+      jätetaksan mukaisen vuosimaksun maksavilla asuin- ja vapaa-ajan kiinteistöillä."
+      Lounais-Suomen vastine on 10 §:n "aluekeräyspiste", eikä siinä ole vuosimaksuehtoa.
+
+  - id: pir-astian-merkinnat
+    question: Mitä jäteastian kylkeen tai kanteen pitää merkitä?
+    phrasing: authored
+    municipality: Hämeenkyrö
+    pair: astian-merkinnat
+    required_chunks:
+      - pirkanmaa@2021-07-01#21
+    required_branches:
+      - claim: >-
+          Jos kiinteistöllä, kimppa-astioissa tai aluejätepisteissä on useampia keräysvälineitä,
+          kerättävän jätelajin nimi on merkittävä selvästi kanteen ja/tai etuseinään riittävän
+          suurella kyltillä tai tekstitarralla, jossa on keräyksestä vastaavan tahon
+          yhteystiedot.
+        chunk: pirkanmaa@2021-07-01#21
+      - claim: >-
+          Jätelaji ilmoitetaan käyttämällä määräysten omia jätelajinimityksiä: sekajäte,
+          biojäte, paperi, kartonkipakkaukset, metalli, lasipakkaukset, muovipakkaukset.
+        chunk: pirkanmaa@2021-07-01#21
+      - claim: >-
+          Keräysväline, joka ei ole kiinteistön välittömässä läheisyydessä tai on ryhmässä
+          muiden kiinteistöjen keräysvälineiden kanssa, on merkittävä yksilöidysti esimerkiksi
+          kiinteistön numerolla tai kirjaimella.
+        chunk: pirkanmaa@2021-07-01#21
+    forbidden:
+      - Vapaamuotoisen jätelajinimityksen esittäminen sallittuna.
+    label_source: >-
+      21 § KERÄYSVÄLINEEN MERKITSEMINEN: "kerättävän jätelajin nimi tulee merkitä selvästi
+      keräysvälineen kanteen ja/-tai etuseinään ... Tarrassa tai kyltissä on oltava
+      keräyksestä vastaavan tahon yhteystiedot. Jätelaji ilmoitetaan käyttämällä näissä
+      jätehuoltomääräyksissä käytettyjä jätelajinimityksiä"; "on merkittävä yksilöidysti
+      esimerkiksi kiinteistön numeroa tai kirjainta vastaavalla merkinnällä." Pirkanmaa
+      vaatii osoitteen sijaan yksilöivän tunnuksen; Lounais-Suomen 24 § vaatii osoitetiedot.
+
+  - id: pir-jatetilan-lukitus
+    question: Saako jätetilan pitää lukossa, ja miten kuljettaja pääsee sisään?
+    phrasing: authored
+    municipality: Kangasala
+    pair: jatetilan-lukitus
+    required_chunks:
+      - pirkanmaa@2021-07-01#29
+    required_branches:
+      - claim: >-
+          Jos kiinteistön haltija on lukinnut jäteastian sijoituspaikalle johtavan reitin,
+          jätetilan oven tai portin lukituksessa on käytettävä kaksoispesäistä lukkoa niin,
+          että toiseen pesään sopii Pirkanmaan Jätehuolto Oy:n käyttämä yleisavain.
+        chunk: pirkanmaa@2021-07-01#29
+      - claim: >-
+          Jos kaksoispesälukko ei ole mahdollinen, voidaan käyttää SEINÄÄN UPOTETTAVAA
+          avainsäiliötä, joka sijoitetaan jätetilaan johtavan reitin välittömään läheisyyteen.
+        chunk: pirkanmaa@2021-07-01#29
+      - claim: >-
+          Kiinteistön haltija vastaa siitä, että avainsäiliöön sijoitetulla avaimella voidaan
+          avata vain jätehuollon järjestämiseksi tarvittavat tilat, sekä lukituksen asennus- ja
+          huoltokustannuksista ja toimintakuntoisuudesta.
+        chunk: pirkanmaa@2021-07-01#29
+    forbidden:
+      - Riippulukon tai koodilukon esittäminen Pirkanmaalla sallittuna vaihtoehtona.
+      - Kustannusvastuun esittäminen jäteyhtiölle kuuluvana.
+    label_source: >-
+      29 § JÄTETILOJEN LUKITUS: "on jätetilan oven tai portin lukituksessa käytettävä
+      kaksoispesäistä lukkoa niin, että toiseen pesään sopii Pirkanmaan Jätehuolto Oy:n
+      käyttämä yleisavain."; "voidaan käyttää seinään upotettavaa avainsäiliötä". Ero
+      Lounais-Suomen 29 §:ään on todellinen: siellä sallitaan myös riippulukko, koodilukko ja
+      pinta-avainsäiliö korkeusvaatimuksella, Pirkanmaalla ei.
+
+  - id: pir-jateauton-etaisyys
+    question: Kuinka lähelle astiaa jäteauton on päästävä?
+    phrasing: authored
+    municipality: Mänttä-Vilppula
+    pair: jateauton-etaisyys
+    required_chunks:
+      - pirkanmaa@2021-07-01#27
+    required_branches:
+      - claim: >-
+          Käsin siirrettävät keräysvälineet on sijoitettava paikkaan, johon jäteauto pääsee
+          esteettömästi vähintään VIIDEN metrin päähän keräysvälineestä.
+        chunk: pirkanmaa@2021-07-01#27
+      - claim: >-
+          Keräysväline voidaan kiinteistön olosuhteista johtuen sijoittaa kauemmaksi, mutta
+          tyhjennyksestä peritään tällöin jätetaksan mukainen lisämaksu.
+        chunk: pirkanmaa@2021-07-01#27
+      - claim: >-
+          Käsin siirrettävät keräysvälineet tulee sijoittaa kiinteistölle tai tulotien varteen,
+          tasaiselle, tukevalle, vaakasuoralle ja kulutusta kestävälle alustalle.
+        chunk: pirkanmaa@2021-07-01#27
+    forbidden:
+      - Lounais-Suomen kymmenen metrin rajan esittäminen Pirkanmaan rajana.
+      - Lisämaksumahdollisuuden jättäminen mainitsematta.
+    label_source: >-
+      27 § KERÄYSVÄLINEIDEN SIJOITTAMINEN: "Käsin siirrettävät keräysvälineet on sijoitettava
+      sellaiseen paikkaan, johon jäteauto pääsee esteettömästi vähintään 5 metrin päähän
+      keräysvälineestä. Kiinteistön olosuhteista johtuen keräysväline voidaan sijoittaa myös
+      tätä kauemmas, mutta tyhjennyksestä peritään tällöin jätetaksan mukainen lisämaksu."
+      Lounais-Suomen 28 § sanoo kymmenen metriä eikä tunne lisämaksua -- sama kysymys, eri
+      luku.
+
+  - id: pir-saostussailion-tyhjennys
+    question: Kuinka usein saostussäiliö on tyhjennettävä?
+    phrasing: authored
+    municipality: Parkano
+    pair: saostussailion-tyhjennys
+    required_chunks:
+      - pirkanmaa@2021-07-01#37
+    required_branches:
+      - claim: >-
+          Mustia jätevesiä sisältävistä saostussäiliöistä, pienpuhdistamojen lietetiloista ja
+          vastaavista jätevesiliete on poistettava aina tarvittaessa, kuitenkin vähintään
+          kerran vuodessa.
+        chunk: pirkanmaa@2021-07-01#37
+      - claim: >-
+          Pelkästään harmaavesilietteitä sisältävien saostussäiliöiden liete on poistettava
+          tarvittaessa, kuitenkin vähintään KOLMEN VUODEN välein.
+        chunk: pirkanmaa@2021-07-01#37
+      - claim: >-
+          Kiinteistön haltijan on pidettävä kirjaa lietteenpoistoista, eikä lietteitä saa
+          levittää metsään tai maastoon, sekoittaa muuhun jätteeseen tai toimittaa alueelliseen
+          keräyspisteeseen.
+        chunk: pirkanmaa@2021-07-01#37
+    forbidden:
+      - Lounais-Suomen yhden asukkaan ja vapaa-ajan asunnon kahden vuoden poikkeuksen
+        esittäminen Pirkanmaan sääntönä.
+      - Yhden tyhjennysvälin ilmoittaminen erittelemättä mustaa ja harmaata jätevettä.
+    label_source: >-
+      37 § LIETESÄILIÖIDEN TARKASTAMINEN JA TYHJENTÄMINEN: "Mustia jätevesiä sisältävistä
+      saostussäiliöistä ... vähintään kerran vuodessa."; "Pelkästään harmaavesilietteitä
+      sisältävien saostussäiliöiden ja vastaavien säiliöiden jätevesiliete on poistettava
+      tarvittaessa, kuitenkin vähintään kolmen vuoden välein." Pirkanmaa jakaa säännön
+      jäteveden LAADUN mukaan, Lounais-Suomen 36 § asukasmäärän ja käyttötarkoituksen mukaan.
+
+  - id: pir-vaarallisen-jatteen-tila
+    question: Taloyhtiössä kerätään maaleja ja akkuja. Millaisessa tilassa niitä saa säilyttää?
+    phrasing: authored
+    municipality: Nokia
+    pair: vaarallisen-jatteen-tila
+    required_chunks:
+      - pirkanmaa@2021-07-01#41
+    required_branches:
+      - claim: >-
+          Jos kiinteistön haltija on järjestänyt vaaralliselle jätelajille keräyksen, keräyksen
+          on tapahduttava erillisessä lukitussa tai valvotussa tilassa, tai jäte on kerättävä
+          lukittuihin kaappeihin tai astioihin.
+        chunk: pirkanmaa@2021-07-01#41
+      - claim: >-
+          Kutakin vaarallista jätelajia varten tulee olla oma merkitty jäteastiansa.
+        chunk: pirkanmaa@2021-07-01#41
+      - claim: >-
+          Nestemäiset vaaralliset jätteet on säilytettävä tarpeellisin merkinnöin varustettuna
+          nestettä läpäisemättömällä allastetulla alustalla, tiiviisti suljetuissa astioissa.
+        chunk: pirkanmaa@2021-07-01#41
+      - claim: >-
+          Kiinteistön haltijan on asetettava keräyspisteen käyttöohjeet kaikkien tilaa
+          käyttävien nähtäville ja tiedotettava käyttäjiä keräyksen järjestämisestä.
+        chunk: pirkanmaa@2021-07-01#41
+    forbidden:
+      - Väite, että velvoite koskee vain muita kuin omakotikiinteistöjä (se on Lounais-Suomen
+        rajaus, ei Pirkanmaan).
+    label_source: >-
+      41 § VAARALLISTEN JÄTTEIDEN KERÄYS KIINTEISTÖLLÄ: "Mikäli kiinteistön haltija on
+      järjestänyt vaarallisiin jätteisiin kuuluvalle jätelajille keräyksen, on keräyksen
+      tapahduttava erillisessä lukitussa tai valvotussa tilassa."; "Kutakin vaarallista
+      jätelajia varten tulee olla oma merkitty jäteastiansa."; "Nestemäiset vaaralliset
+      jätteet on säilytettävä ... nestettä läpäisemättömällä allastetulla alustalla."
+      Lounais-Suomen 44 § rajaa velvoitteen "muille kuin omakotikiinteistöille"; Pirkanmaa
+      sitoo sen siihen, onko keräys järjestetty.
+
+  - id: pir-tapahtuman-jatehuoltosuunnitelma
+    question: Järjestämme ulkoilmatapahtuman. Pitääkö jätehuollosta tehdä suunnitelma viranomaiselle?
+    phrasing: authored
+    municipality: Lempäälä
+    pair: tapahtuman-jatehuoltosuunnitelma
+    required_chunks:
+      - pirkanmaa@2021-07-01#43
+    required_branches:
+      - claim: >-
+          Kunnan ympäristönsuojeluviranomainen VOI tarvittaessa vaatia tapahtumajärjestäjältä
+          tapahtuman jätehuoltosuunnitelmaa -- suunnitelma ei siis ole automaattisesti
+          pakollinen kävijämäärän perusteella.
+        chunk: pirkanmaa@2021-07-01#43
+      - claim: >-
+          Yleisötilaisuuden järjestäjä vastaa tilaisuuden jätehuollosta, neuvonnasta ja
+          jätteiden erilliskeräyksestä näiden jätehuoltomääräysten mukaisesti.
+        chunk: pirkanmaa@2021-07-01#43
+      - claim: >-
+          Kierrätettävien jätteiden erilliskeräys on järjestettävä, mikäli 16 §:ssä esitettyjen
+          jätemäärien arvioidaan ylittyvän tilaisuuden aikana.
+        chunk: pirkanmaa@2021-07-01#43
+    forbidden:
+      - Lounais-Suomen tuhannen hengen ja kahden viikon säännön esittäminen Pirkanmaan
+        sääntönä.
+      - Suunnitelman esittäminen aina pakollisena.
+    label_source: >-
+      43 § YLEISÖTILAISUUKSIEN JÄTEHUOLTO: "Kunnan ympäristönsuojeluviranomainen voi
+      tarvittaessa vaatia tapahtumajärjestäjältä tapahtuman jätehuoltosuunnitelmaa."; "
+      Kierrätettävien jätteiden erilliskeräys on järjestettävä yleisötilaisuudessa, mikäli
+      näiden jätehuoltomääräysten 16 §:ssä esitettyjen jätemäärien arvioidaan ylittyvän".
+      Lounais-Suomen 41 § tekee suunnitelmasta pakollisen yli 1000 hengen ulkotapahtumassa ja
+      vaatii sen kaksi viikkoa ennen -- tämä on aito sääntöero, ei sanaero.

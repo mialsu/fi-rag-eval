@@ -17,10 +17,17 @@ import pytest
 from fi_rag_eval import db
 from fi_rag_eval.addressing import ChunkAddress
 from fi_rag_eval.analyse import Analyser, Morphology
-from fi_rag_eval.evaluate import GRID, Cell, EvaluationError, GridRun, evaluate
-from fi_rag_eval.golden import GoldenSet
+from fi_rag_eval.evaluate import (
+    GRID,
+    PUBLISHED,
+    Cell,
+    EvaluationError,
+    GridRun,
+    evaluate,
+)
+from fi_rag_eval.golden import GoldenSet, Question
 from fi_rag_eval.manifest import Manifest
-from fi_rag_eval.metrics import MissKind
+from fi_rag_eval.metrics import MissKind, discordance
 
 pytestmark = pytest.mark.requires_db
 
@@ -411,21 +418,35 @@ def test_the_lemma_analysers_stop_on_the_same_words_as_snowball(corpus: Connecti
     assert stopwords & {"kuinka", "usein", "monta", "biojäte"} == set()
 
 
-def test_the_snowball_control_cell_reproduces_the_slice_2_numbers(grid: GridRun) -> None:
-    """The control. Pre-registered as "0.762 exactly; if this moves, the harness is
-    broken, not improved".
+def test_the_original_21_questions_still_score_exactly_what_they_scored(
+    grid: GridRun, golden: GoldenSet
+) -> None:
+    """The continuity guarantee, kept when the population changed under it.
 
-    The literals below are the recorded slice-2 baseline at commit `ebdcb4a`,
-    before any of slice 3 existed. Slice 3 adds columns, an analyser, a
-    normalisation axis and a per-cell gate; none of it may touch the number the
-    README publishes.
+    Slices 1-3 pinned this as "0.762 exactly; if this moves, the harness is broken,
+    not improved". Slice 4 grows the set to 50 questions across two authorities, so
+    the *pooled* headline legitimately moves and pinning it would assert nothing.
+    What must not move is the measurement of the questions that already existed --
+    so the control is now computed over exactly those 21, and it still gives
+    16/21 and 18/21.
+
+    This is also the evidence for the README's "not comparable to 0.762" note: the
+    headline changed because the population changed, and provably not because
+    anything in slices 1-3 was disturbed. A second authority adds **zero**
+    distractors to an existing question -- the authority filter runs before
+    ranking and `ts_rank` has no IDF -- so these numbers are identical, not merely
+    close.
     """
-    metrics = grid.cell(Cell(Analyser.SNOWBALL, 0)).metrics
-    assert (metrics.questions, metrics.required_chunks, metrics.k) == (21, 24, 5)
-    assert metrics.complete_set_recall == pytest.approx(16 / 21)
-    assert metrics.per_chunk_recall == pytest.approx(18 / 24)
-    assert metrics.mean_reciprocal_rank == pytest.approx(0.5174603174603175)
-    assert metrics.lexical_leakage == pytest.approx(0.3717948717948718)
+    original = {q.id for q in golden.questions if q.authority == "lounais-suomi" and q.pair is None}
+    assert len(original) == 21, "the slice-2 question set must still be identifiable"
+    for cell, expected in (
+        (Cell(Analyser.SNOWBALL, 0), 16),
+        (Cell(Analyser.LEMMA_REASM, 1), 18),
+    ):
+        run = grid.cell(cell)
+        subset = [r.outcome for r in run.runs if r.question.id in original]
+        assert len(subset) == 21
+        assert sum(1 for o in subset if o.complete) == expected, cell.name
 
 
 def test_the_grid_scores_every_cell_over_exactly_the_same_questions(
@@ -450,9 +471,18 @@ def test_lemmatisation_closes_every_zero_overlap_miss(grid: GridRun) -> None:
     by_analyser = {
         run.cell.analyser: run.metrics for run in grid.cells if run.cell.normalisation == 0
     }
-    assert by_analyser[Analyser.SNOWBALL].misses_zero_overlap == 4
+    # Measured at N=50 over two authorities. Slice 2 saw 4 / 2 / 0 at N=21; the
+    # control's count grew with the population and the reassembler still absorbs
+    # all of it -- including the synonym fork between the two authorities, which
+    # the slice-4 spec predicted it could not (see the refutation pinned below).
+    assert by_analyser[Analyser.SNOWBALL].misses_zero_overlap == 6
     assert by_analyser[Analyser.LEMMA_BASEFORM].misses_zero_overlap == 2
     assert by_analyser[Analyser.LEMMA_REASM].misses_zero_overlap == 0
+    assert (
+        by_analyser[Analyser.SNOWBALL].misses_zero_overlap
+        > by_analyser[Analyser.LEMMA_BASEFORM].misses_zero_overlap
+        > by_analyser[Analyser.LEMMA_REASM].misses_zero_overlap
+    )
 
 
 def test_the_reassembler_earns_its_place_over_the_conservative_split(grid: GridRun) -> None:
@@ -470,23 +500,41 @@ def test_the_reassembler_earns_its_place_over_the_conservative_split(grid: GridR
         )
         for analyser in Analyser
     }
+    questions = grid.published.metrics.questions
     assert best[Analyser.LEMMA_REASM] > best[Analyser.LEMMA_SAFE]
-    assert (best[Analyser.LEMMA_REASM] - best[Analyser.LEMMA_SAFE]) * 21 == pytest.approx(1.0)
+    margin = (best[Analyser.LEMMA_REASM] - best[Analyser.LEMMA_SAFE]) * questions
+    # One whole question at N=21, three at N=50: the rule is "at least one", and
+    # the margin grew rather than evaporating when the set tripled.
+    assert margin >= 1.0, f"the reassembler wins by only {margin:.2f} questions"
 
 
-def test_length_normalisation_helps_only_the_split_analyser(grid: GridRun) -> None:
-    """The interaction claim, pre-registered and confirmed with a sign flip.
+def test_length_normalisation_costs_only_the_control_cell_now(grid: GridRun) -> None:
+    """A SLICE-3 FINDING THAT DID NOT SURVIVE N=50. Recorded, not smoothed over.
 
-    Dividing by document length *costs* the control cell and the unsplit lemma
-    cell recall, and *gains* it for the reassembled one. Splitting inflates the
-    lexemes in a chunk, which is exactly what unnormalised `ts_rank` over-rewards,
-    so the two changes cannot be measured one after the other -- a slice that did
-    would have concluded "length normalisation is harmful" and stopped.
+    Slice 3 measured, at N=21, that dividing by document length cost the control
+    and the unsplit lemma cell recall and *gained* it for the reassembled one, and
+    called that sign flip "the interaction the grid existed to find".
+
+    At N=50 the clean interaction is gone. Normalisation 1 now **helps**
+    `lemma-baseform` (0.740 -> 0.780), is **neutral** for both split analysers
+    (0.760 and 0.820 either way), and costs only the snowball control
+    (0.680 -> 0.640).
+
+    The slice-3 claim rested on a one-question gain at N=21 -- three discordant
+    questions, p=0.25 -- which was never a result the instrument could resolve.
+    This is the clearest thing the bigger question set bought: not a better score,
+    but the retraction of a conclusion that was noise. The honest statement now is
+    the narrow one: **length normalisation costs the control cell and does not
+    clearly help any lemma cell.**
     """
     recall = {run.cell: run.metrics.complete_set_recall for run in grid.cells}
-    for analyser in (Analyser.SNOWBALL, Analyser.LEMMA_BASEFORM, Analyser.LEMMA_SAFE):
-        assert recall[Cell(analyser, 1)] < recall[Cell(analyser, 0)], analyser
-    assert recall[Cell(Analyser.LEMMA_REASM, 1)] > recall[Cell(Analyser.LEMMA_REASM, 0)]
+    assert recall[Cell(Analyser.SNOWBALL, 1)] < recall[Cell(Analyser.SNOWBALL, 0)]
+    assert recall[Cell(Analyser.LEMMA_BASEFORM, 1)] > recall[Cell(Analyser.LEMMA_BASEFORM, 0)]
+    for analyser in (Analyser.LEMMA_SAFE, Analyser.LEMMA_REASM):
+        assert recall[Cell(analyser, 1)] == recall[Cell(analyser, 0)], analyser
+    # Normalisation 2 is still ruinous everywhere, which was never in doubt.
+    for analyser in Analyser:
+        assert recall[Cell(analyser, 2)] < recall[Cell(analyser, 0)], analyser
 
 
 def test_leakage_rises_under_lemmatisation_with_no_question_edited(grid: GridRun) -> None:
@@ -501,7 +549,9 @@ def test_leakage_rises_under_lemmatisation_with_no_question_edited(grid: GridRun
     reason that has nothing to do with the golden set getting easier.
     """
     leakage = {run.cell.analyser: run.metrics.lexical_leakage for run in grid.cells}
-    assert leakage[Analyser.SNOWBALL] == pytest.approx(0.3717948717948718)
+    # 0.332 at N=50, against 0.372 at N=21: the 29 new questions are LESS leaky
+    # than the 21 they joined, so the golden set got harder, not easier.
+    assert leakage[Analyser.SNOWBALL] == pytest.approx(0.33204633204633205)
     assert (
         leakage[Analyser.SNOWBALL]
         < leakage[Analyser.LEMMA_BASEFORM]
@@ -532,3 +582,103 @@ def test_the_resident_vocabulary_gap_becomes_a_ranking_failure_not_a_reach(
         outcome = next(r.outcome for r in run.runs if r.outcome.question_id == question)
         assert not outcome.complete, analyser
         assert {miss.kind for miss in outcome.misses} == kinds, analyser
+
+
+# --------------------------------------------------------------------- slice 4
+#
+# What the second authority bought, pinned so a later change has to argue with it.
+
+
+def test_a_paired_question_requires_different_chunks_per_authority(golden: GoldenSet) -> None:
+    """AC6. Identical text, two jurisdictions, two different sets of rules."""
+    by_pair: dict[str, list[Question]] = {}
+    for question in golden.questions:
+        if question.pair is not None:
+            by_pair.setdefault(question.pair, []).append(question)
+    assert len(by_pair) == 8, "D7 fixed the paired count at 8"
+    for slug, (first, second) in by_pair.items():
+        assert first.question == second.question, slug
+        assert first.authority != second.authority, slug
+        assert not set(first.required_addresses) & set(second.required_addresses), slug
+
+
+@pytest.mark.requires_db
+def test_the_authority_changes_the_answer_to_the_same_question(grid: GridRun) -> None:
+    """`DESIGN.md:96`'s "answer differs between authorities" category, measured.
+
+    Before this slice the category had zero questions, so nothing in the harness
+    could tell an authority-sensitive answer from an authority-blind one. Now at
+    least one paired question passes for one authority and fails for the other in
+    the published cell -- the same words, a different jurisdiction, a different
+    outcome.
+    """
+    published = grid.published
+    outcomes = {r.question.id: r for r in published.runs}
+    disagreeing = []
+    for run in published.runs:
+        if run.question.pair is None:
+            continue
+        other = next(
+            r
+            for r in published.runs
+            if r.question.pair == run.question.pair and r.question.id != run.question.id
+        )
+        if run.outcome.complete != other.outcome.complete:
+            disagreeing.append(run.question.pair)
+    assert disagreeing, (
+        "no paired question was decided differently by the two authorities, so the "
+        "set cannot yet show that the jurisdiction changes the answer"
+    )
+    assert outcomes  # the matrix printed above is the evidence
+
+
+@pytest.mark.requires_db
+def test_the_synonym_fork_is_a_ranking_failure_not_a_reach_failure(grid: GridRun) -> None:
+    """The slice-4 prediction that was REFUTED, pinned so it is not re-assumed.
+
+    The spec predicted zero-overlap misses returning to 3-8 in `lemma-reasm/1`,
+    because `keräysväline` and `jäteastia` share no stem and no analyser can
+    bridge them. Measured: **zero**. The vocabulary fork is real -- a paired
+    question genuinely passes for one authority and fails for the other -- but it
+    surfaces as *ranked-out*, not as unreachable, because a question shares plenty
+    of other lexemes with its target even when the key noun does not match.
+
+    That distinction decides slice 5: embeddings address synonymy, and a miss that
+    is already reachable is a ranking problem with a different fix.
+    """
+    for cell in (Cell(Analyser.LEMMA_REASM, 0), Cell(Analyser.LEMMA_REASM, 1)):
+        metrics = grid.cell(cell).metrics
+        assert metrics.misses_zero_overlap == 0, (
+            f"{cell.name} has {metrics.misses_zero_overlap} zero-overlap misses; if the "
+            "synonym fork has started making chunks unreachable, slice 5's mandate "
+            "changes and the spec's decision rule must be re-read"
+        )
+        assert metrics.misses_ranked_out > 0, "every remaining miss is a ranking failure"
+
+
+@pytest.mark.requires_db
+def test_the_instrument_can_now_resolve_a_cell_difference_at_all(grid: GridRun) -> None:
+    """The whole reason this slice preceded the vector layer.
+
+    Two cells are scored on the same questions, so the comparison is paired and
+    six discordant questions must flip one way for p<0.05. At N=21 the best cell
+    had three failures, so no result *any* retrieval change could have produced
+    would have registered. At N=50 at least one cell beats the published cell at
+    p<0.05 on the exact McNemar test -- the instrument has power for the first
+    time.
+    """
+    published = [r.outcome for r in grid.published.runs]
+    significant = []
+    for run in grid.cells:
+        if run.cell == PUBLISHED:
+            continue
+        result = discordance(published, [r.outcome for r in run.runs])
+        if result.p_value < 0.05 and run.metrics.complete_set_recall > (
+            grid.published.metrics.complete_set_recall
+        ):
+            significant.append((run.cell.name, result.discordant, result.p_value))
+    assert significant, (
+        "no cell beats the published cell at p<0.05, so this run cannot claim any "
+        "retrieval improvement is real -- which is the claim the golden set was grown "
+        "to make possible"
+    )

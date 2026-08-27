@@ -242,6 +242,13 @@ for the same reason as before: one authority, nothing to leak from.
 - **N is still 21**, and one question flipping moves the headline by ~0.048. Every predicted
   delta in this spec is one or two questions wide, which is inside the +/-0.18 interval. The
   mechanisms are what is being tested; the aggregate is a summary, not the evidence.
+  > **CORRECTED 27 Aug 2026 (slice 4): the ±0.18 absolute interval is the WRONG TEST here, and
+  > the correction makes this paragraph's point stronger.** Two cells are scored on the *same*
+  > questions, so the comparison is **paired**: only the questions the two cells disagree about
+  > carry information, and the exact McNemar test needs **six** of them flipping one way for
+  > p<0.05, at any N. With three failures in the best cell, fixing every remaining miss gave d=3,
+  > p=0.25 — so at N=21 there was no result *any* retrieval change could have produced that would
+  > have registered. Not "small relative to noise": **no power at any effect size.**
 
 ---
 
@@ -309,6 +316,9 @@ instead of two slices, and it held.
   did not anticipate that. Two facts this slice produced and the rule was written before:
   every remaining miss is now a ranking failure rather than a reach failure, and at N=21 the
   2-question gain the vector layer is predicted to buy (0.095) sits **inside** the ±0.18 interval.
+  *(Slice 4 correction: the right statistic is the paired exact McNemar test, not an absolute
+  interval — a 2-question gain is d=2, p=0.50. The override's conclusion holds and its reasoning
+  was understated; see `specs/SPEC-slice-4-*.md`, "The statistic that override should have used".)*
   A slice whose success cannot be measured is not a slice this project should run. Slice 4 is
   therefore the golden set plus a second authority — which also closes the authority hard filter,
   the design's #1 failure mode and still 100% unverified — and the vector layer becomes slice 5.
@@ -330,11 +340,34 @@ instead of two slices, and it held.
   baseline; an unmeasured normalisation argument. The missing-dictionary path is proven by unit
   test rather than by uninstalling the Owner's system package.
 
+### RETRACTED BY SLICE 4 — the length-normalisation interaction
+
+This slice's headline mechanism finding was that dividing by document length **costs** the control
+and unsplit lemma cells recall and **gains** it for the reassembled one, and that the sign flip was
+"the interaction the grid existed to find". Measured again at N=50 over two authorities:
+
+| analyser | norm 0 → norm 1 | this slice said | N=50 says |
+|---|---|---|---|
+| snowball | 0.680 → 0.640 | costs | **costs** ✓ |
+| lemma-baseform | 0.740 → **0.780** | costs | **helps** ✗ |
+| lemma-safe | 0.760 → 0.760 | costs | **neutral** ✗ |
+| lemma-reasm | 0.820 → 0.820 | gains | **neutral** ✗ |
+
+The claim rested on a **one-question** gain at N=21 — d=3, p=0.25 — which, by this slice's own
+corrected statistic, was never a result the instrument could resolve. The surviving statement is
+the narrow one: **length normalisation costs the control cell and does not clearly help any lemma
+cell.** Normalisation 2 remains ruinous everywhere, which was never in doubt.
+
+This is the clearest thing growing the golden set bought: not a better score, but the retraction of
+a conclusion that was noise. Pinned by `test_length_normalisation_costs_only_the_control_cell_now`.
+
 ### Still open
 
 - **Which cell is the published headline.** Unchanged at `snowball/0`, and the README says why.
   This is the Owner's decision and it carries a deliberate re-baseline.
-- N is still 21. Every delta in this slice is one or two questions wide, inside the ±0.18 interval.
+- ~~N is still 21. Every delta in this slice is one or two questions wide, inside the ±0.18
+  interval.~~ **CLOSED 27 Aug 2026 (slice 4): N=50.** And the interval was the wrong statistic —
+  the paired exact McNemar test is, and it needs six discordant questions for p<0.05 at any N.
   The mechanisms are the evidence; the aggregate is a summary.
 - The derivation-base cause (`tyhjennetään`/`tyhjennettävä`) is still unfixed and no longer costs
   anything measurable — it was never the reason a question failed.

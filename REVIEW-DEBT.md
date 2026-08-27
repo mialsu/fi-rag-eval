@@ -14,6 +14,144 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-27 (slice 4) — a real clause is missing from the corpus, and both halves of the document agree it is not there
+
+- **What:** Pirkanmaa's body contains `18 a § KOMPOSTOINTI-ILMOITUS`, a clause added by amendment.
+  Its own table of contents **does not list it**. `_CLAUSE` matches `^\d+\s*§`, so `18 a §` is
+  never a heading candidate, and the TOC cross-check cannot catch the omission because the TOC is
+  missing it too. The clause's text is therefore **absorbed into 18 § KOMPOSTOINTI's chunk**: one
+  address, 5,328 characters, two clauses. `23 §` and three other places cite "18 a §", so the
+  document itself refers to a clause the corpus cannot address.
+- **Where:** `src/fi_rag_eval/chunking.py` (`_CLAUSE`, `split_clauses`); `addressing._PATTERN`,
+  whose `#(?P<clause>\d+)` cannot express `#18a` either.
+- **What green tests do NOT prove here:** the strongest invariant this project has — "every body
+  heading is cross-checked against the document's own table of contents" — defends against the body
+  carrying *extra* `N §` headings. It is **silent** when a letter-suffixed clause is absent from
+  both halves. The two halves "agree" while both are wrong, so 48 clauses / 89 chunks / 41
+  definitions is a green assertion over an inventory that is genuinely incomplete.
+- **Cost, measured:** a resident asking about the composting notification would be cited "18 §"
+  when the rule is in "18 a §". No golden question points at Pirkanmaa 18 § — slice 4's D7
+  excluded biojäte and kompostointi from all 29 new questions for unrelated reasons, which happens
+  to keep the set clear of the one chunk known to be wrong. That is luck, not design.
+- **Disposition:** open. **Not fixed in slice 4 deliberately:** supporting `18 a §` changes the
+  clause inventory (49 clauses, 90 chunks), the address grammar, and therefore the golden labels —
+  a re-read of the document, not a patch. Fix it before any question targets Pirkanmaa 18 §, and
+  before a third authority whose amendments use letter suffixes more heavily.
+
+## 2026-08-27 (slice 4) — `extract.py`'s dot-leader requirement is a Lounais-Suomi assumption wearing an invariant's clothes
+
+- **What:** `extract` locates the table of contents by finding lines containing 4+ consecutive dots
+  and hard-fails when there are none. That is not a property of Finnish waste regulations; it is a
+  property of the one document the rule was written against.
+- **Where:** `src/fi_rag_eval/extract.py` (`_DOT_LEADER`, `extract`).
+- **Measured evidence, from running five real candidate authorities through this project's own
+  pipeline** (not judged by eye):
+
+  | Candidate | extract | parse_toc | split_clauses | chunk | Gap |
+  |---|---|---|---|---|---|
+  | Lounais-Suomi | ok | 50 cl, 11 ch | ok | 82 chunks | — |
+  | Pirkanmaa | ok | 48 cl, 0 ch | ok 48 | ok 89 | (adopted, slice 4) |
+  | HSY / Helsinki | **fails** | — | — | — | TOC has no dot leaders |
+  | Oulu | **fails** | — | — | — | TOC aligns page numbers with spaces |
+  | Savo-Pielinen / Kuopio | **fails** | — | — | — | same, + 21pp of justifications |
+
+  HSY, Oulu and Savo-Pielinen all have **clean, complete tables of contents**. They simply do not
+  use dot leaders. Three of five candidates are blocked by one line of regex.
+- **What green tests do NOT prove here:** that any authority other than these two can be ingested.
+  The failure is a loud hard error with a good message, so it is documented debt rather than a
+  lurking bug — but "the extractor is general" is not a claim this project may make.
+- **Disposition:** open, accepted for slice 4. Generalising the entry rule would make a third
+  authority nearly free and the reconnaissance is already paid for, but no golden question
+  exercises it, and building intake for authorities nobody has chosen is layer-only progress.
+  **First candidate to fix when a third authority is wanted.**
+
+## 2026-08-27 (slice 4) — Uudenmaan failed on our bug, not on their document
+
+- **What:** `parse_toc` treats "4+ dots" as the only entry terminator. In the bilingual Uudenmaan
+  regulations `pdftotext` compressed 31 §'s dot leader to a **single dot**, so 31 § swallowed 32 §
+  and the inventory came out with a hole. 32 § is present in both the TOC and the body; the
+  document is fine. Relaxing the terminator yields 46 clauses and then fails again on a wrapped
+  heading, so there are **at least two** bugs here and the tail is unmeasured.
+- **Where:** `src/fi_rag_eval/chunking.py` (`parse_toc`, `_DOT_LEADER`, `_TOC_TAIL`).
+- **What green tests do NOT prove here:** the parser's robustness to `pdftotext`'s own variability.
+  The same document extracted by a different poppler version could lose a different leader.
+- **Disposition:** open. Honest estimate of the remaining work: **unknown**, not "small" — the
+  wrapped-heading failure was reached but not diagnosed.
+
+## 2026-08-27 (slice 4) — one address now spans SIX editions of Pirkanmaa's text
+
+- **What:** Escalation of the open ADR-0004 entry below. `pirkanmaa@2021-07-01#N` is keyed on
+  Voimaantulo (`47 §`: *"tulevat voimaan 1.7.2021"*) while the front matter records amendments on
+  7.6.2023, 6.3.2024, 9.4.2025 and 22.10.2025 and the authority publishes the text as
+  **1.5.2026 alkaen**. Six editions share one address space.
+- **Where:** `corpus/manifest.yaml` (pirkanmaa `effective_date`, `edition`); ADR-0006; the existing
+  entry "the chunk address cannot distinguish two editions of one document" below.
+- **Note on the trigger:** that entry's trigger reads *"before a second **version** of the same
+  document is ingested"*. Pirkanmaa is a second **authority**, so the trigger does not technically
+  fire. Recording that plainly is more useful than pretending it did.
+- **What green tests do NOT prove here:** that two editions could coexist. They cannot — the
+  address is the primary key. What ADR-0006 *does* buy is that the misleading date never reaches a
+  human: the citation carries `1.5.2026 alkaen`, and `ingest.assert_edition` fails the run if the
+  front matter's date list moves, so the label cannot go stale silently.
+- **Disposition:** open, **partially mitigated** by ADR-0006 where it is read. The addressing fix
+  (re-key to the latest amendment date) is still owed and still costs relabelling every question.
+
+## 2026-08-27 (slice 4) — Sastamala is refused an answer the regulations do give it
+
+- **What:** Pirkanmaa's `1 § SOVELTAMISALA` claims Sastamala only "(Mouhijärven ja Suodenniemen
+  osalta)". The manifest lists 16 of the 17 municipalities and records Sastamala under
+  `partial_municipalities`, so `resolve_municipality("Sastamala")` raises.
+- **Where:** `corpus/manifest.yaml` (pirkanmaa `partial_municipalities`);
+  `manifest.resolve_municipality`; ADR-0002's amendment note;
+  `tests/test_jurisdiction.py::test_a_partially_covered_municipality_refuses_and_says_why`.
+- **What green tests do NOT prove here:** anything about sub-municipal coverage, which is not
+  modelled at all. A Mouhijärvi resident is refused an answer that exists.
+- **Cost accepted:** an honest refusal for a minority beats a confident wrong answer for the
+  majority — the same trade already made for taajama boundaries. **But this will recur:** Finnish
+  municipal mergers routinely leave former municipalities under different waste authorities, so
+  this is not a Pirkanmaa quirk.
+- **Disposition:** open, and the *model* question is **the Owner's**: whether the design needs a
+  level between Authority and Municipality. Raised in the slice-4 spec's open questions.
+
+## 2026-08-27 (slice 4) — the authority hard filter is verified at the retrieval layer only: PARTIAL, never CLOSED
+
+- **What:** With two authorities loaded, `evaluate` now asserts that every question's top-k
+  contains **zero** foreign-authority chunks, read from the stored row rather than re-parsed from
+  the address, for all 50 questions in all 12 cells. It has been **seen red** by deleting the
+  jurisdiction WHERE clause, and a second test proves foreign chunks genuinely do enter the top-5
+  without it — so the check is not decoration.
+- **Where:** `src/fi_rag_eval/evaluate.py` (`assert_one_authority`); `tests/test_jurisdiction.py`.
+- **What green tests do NOT prove here — and this is the whole entry:** `CLAUDE.md` specifies the
+  filter as *"ask a question answerable only from municipality A's rules with municipality B's
+  filter set → it must **refuse**"*. That is **not** what is verified. Refusing requires an
+  answering layer, which does not exist. What is verified is **retrieval-layer isolation**: a
+  foreign chunk is never a candidate. A future answering layer could still answer from an empty or
+  wrong context, and nothing here would catch it.
+- **Disposition:** open, **PARTIAL**. Promote to CLOSED only when a refusal case can be scored,
+  which is the answering slice. Do not let a green filter assertion be read as a verified refusal.
+
+## 2026-08-27 (slice 4) — the extractor damages text in three measured ways, and none was fixed
+
+- **What:** Three artefacts, all found by ingesting a second document and all left alone because
+  D5 fixed only the definitions carve-out:
+  1. **A genuine compound hyphen is destroyed at a line break.** `dehyphenate`'s only guard is a
+     coordinating-conjunction list, so `ruoka-` + `aineksia` joins to `ruokaaineksia` — a junk
+     lexeme inside `2 §`'s elintarvikejäte definition.
+  2. **A table header is fused into a word.** The other of Pirkanmaa's two joins is
+     `Lasi-` + `lukumäärä` → `Lasilukumäärä`, inside `15 §`'s separate-collection duty table, which
+     golden questions do target.
+  3. **37 bare page-number lines survive in Pirkanmaa's body and 0 in Lounais-Suomi's.** Page
+     numbers become indexed tokens for one authority and not the other — e.g. `paperilla`'s
+     definition chunk ends with a stray "10".
+- **Where:** `src/fi_rag_eval/extract.py` (`dehyphenate`, `_COORDINATING`, `extract`).
+- **What green tests do NOT prove here:** that the two authorities' text is normalised *comparably*.
+  Artefact 3 is an asymmetry **between** authorities, which is exactly the kind of thing that could
+  surface as an unexplained per-authority gap in the metric table and be attributed to retrieval.
+- **Disposition:** open, deliberately not fixed. A change to extraction normalisation moves the
+  numbers for both authorities and must be measured as its own change, not slipped in beside a
+  golden-set slice. Stripping bare numeric lines is a no-op for Lounais-Suomi (0 of them), so it is
+  a cheap and well-isolated first fix. **Flagged to the Owner.**
+
 ## 2026-08-27 (slice 3) — the compound reassembler is a hand-rolled morphological rule
 
 - **What:** `reassembled_parts` folds voikko's `WORDBASES` morphs back into words using a rule I
@@ -109,7 +247,13 @@ ledger is worse than none, because sessions trust it.
   twelve chosen after seeing all twelve, on 21 questions, with no held-out slice — which is the
   overfitting surface `CLAUDE.md` warns about, and the reason the choice is a decision rather than
   an automatic promotion.
-- **Disposition:** **open, and awaiting the Owner.**
+- **Update 27 Aug 2026 (slice 4):** the argument has changed from a preference into evidence. At
+  N=50 `lemma-reasm/0` beats the published `snowball/0` on the **paired** test — 9 discordant
+  questions, 8 of them in its favour, exact McNemar **p=0.039**. At N=21 no comparison in the grid
+  could reach p<0.05 at any effect size, so "0.857 vs 0.762" was never a claim the instrument could
+  support. It now is. Note the cost D6 attaches to moving: the N target for detecting a
+  half-of-misses fix rises from ~51 to ~84 if the headline sits on a lemma cell.
+- **Disposition:** **open, and awaiting the Owner** — now with a p-value attached.
 
 ## 2026-08-26 (slice 1) — the golden set leaks its own source vocabulary
 
@@ -166,7 +310,14 @@ ledger is worse than none, because sessions trust it.
 - **What green tests do NOT prove here:** the miss diagnostic now has 6 data points rather than
   1, which was enough to confirm slice 1's claim 1 — but a single question flipping still moves
   the headline by ~0.048, and no refusal behaviour is measured at all.
-- **Disposition:** open — the next tranche of questions is better written against two
+- **Disposition:** **LARGELY CLOSED 27 Aug 2026 (slice 4).** N=21 -> **N=50** (29
+  Lounais-Suomi, 21 Pirkanmaa), 53 required chunks, and the harness now prints the discordant
+  count and exact McNemar p for every pair of cells so its own power is stated rather than
+  assumed. The threshold D6 was chosen to clear is met: at least one cell beats the published cell
+  at p<0.05, which was impossible at N=21. Still open: **no held-out slice** (D8 defers it to
+  N~85, because holding out 10 of 50 leaves a tuning set that cannot reach d=6 and a held-out set
+  that never can), and refusals remain unsupported for the same structural reason.
+  Superseded detail — open — the next tranche of questions is better written against two
   authorities, so it rides with slice 3 or 4. Refusal entries land with the answering slice.
 
 ## 2026-08-26 (slice 1) — superseded: the headline was computed over N=8

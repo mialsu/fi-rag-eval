@@ -54,13 +54,27 @@ A better configuration is measured — see [What lemmatisation bought](#what-lem
 — and is **not** what this table reports. Which cell is the published headline is a recorded
 decision, not whichever one scored best today.
 
+The headline is **pooled over both authorities in the corpus** — one number over all 50
+questions, which is the only number carrying enough statistical power to detect an improvement
+(see [Can this instrument tell?](#can-this-instrument-tell)). The per-authority rows beneath it are
+diagnostics, not headlines of their own.
+
+> **This is not comparable to the 0.762 previously published.** That was **N=21**, one authority.
+> This is **N=50**, two. The population changed, so the two numbers measure different things.
+> What *is* comparable: over the original 21 questions alone, this cell still scores exactly
+> 16/21 = 0.762 — identical, not merely close. A second authority adds **zero** distractors to an
+> existing question, because the authority filter runs before ranking and `ts_rank` has no IDF.
+> The headline moved because the questions changed, and provably not because anything else did.
+
 | Metric | Value | N | Notes |
 | --- | --- | --- | --- |
-| **Complete-set recall@5** | **0.762** | 21 questions | headline: did retrieval find *every* clause the answer depends on |
-| Per-chunk recall@5 | 0.750 | 24 chunks | diagnostic — awards partial credit, so never the headline |
-| MRR | 0.517 | 21 questions | diagnostic. The right chunk is often found but rarely first |
-| **Lexical leakage of the questions** | **0.372** | 78 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise** |
-| Misses: unreachable / out-ranked | 4 / 2 | 6 chunks | zero stem overlap vs. matched but below k |
+| **Complete-set recall@5** | **0.680** | 50 questions | headline: did retrieval find *every* clause the answer depends on |
+| — Lounais-Suomi | 0.724 | 29 questions | diagnostic. Three slices of implicit fitting behind it |
+| — Pirkanmaa | 0.619 | 21 questions | diagnostic. Zero slices of fitting; questions are *less* leaky (0.323) |
+| Per-chunk recall@5 | 0.679 | 53 chunks | diagnostic — awards partial credit, so never the headline |
+| MRR | 0.501 | 50 questions | diagnostic. The right chunk is often found but rarely first |
+| **Lexical leakage of the questions** | **0.332** | 259 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise** |
+| Misses: unreachable / out-ranked | 6 / 11 | 17 chunks | zero stem overlap vs. matched but below k |
 | Answer groundedness | — | | needs the answering slice |
 | Branch coverage | — | | needs the answering slice |
 | Over-claim rate | — | | needs the answering slice |
@@ -74,7 +88,9 @@ decision, not whichever one scored best today.
 vocabulary into their own target chunks. Real questions harvested from the authority's
 resident-facing pages leak 39%. The set was rewritten to 21 questions (6 copied verbatim from
 those pages, 15 authored under the rule *name the thing with the document's noun, ask with a
-person's verb*), leakage fell to 37%, and the headline fell with it.
+person's verb*), leakage fell to 37%, and the headline fell with it. Slice 4 grew it to 50 across
+two authorities and leakage fell again, to **33.2%** — the 29 new questions are *less* leaky than
+the 21 they joined, so the set got harder, not easier.
 
 That is the point of the leakage row, and the gate proves it. Reverting a single question to its
 statute-flavoured wording:
@@ -86,8 +102,9 @@ REGRESSION — lexical leakage rose ... the golden set got easier, which
              inflates every score above it                          exit 1
 ```
 
-Also worth knowing before comparing this to anything published: the corpus is 82 chunks, so
-top-5 covers 6% of it. The number will fall as the corpus grows.
+Also worth knowing before comparing this to anything published: the corpus is 171 chunks over two
+authorities, but a query only ever sees one authority's — 82 or 89 — so top-5 covers ~6% of the
+searchable space. That share, not the total, is what makes the number generous.
 
 ## What lemmatisation bought
 
@@ -112,6 +129,10 @@ row-to-row delta attributes to that mechanism and nothing else.
 | `lemma-reasm/0` | 0.810 | 0.792 | 0.589 | 0.619 | **0** | 5 |
 | **`lemma-reasm/1`** (best) | **0.857** | 0.833 | 0.614 | 0.619 | **0** | 4 |
 | `lemma-reasm/2` | 0.429 | 0.417 | 0.286 | 0.619 | **0** | 14 |
+
+> **The table above is the N=21 run, kept because the four findings below are written against it.
+> The current grid is N=50 and one of those findings did not survive.** See
+> [What the second authority bought](#what-the-second-authority-bought).
 
 Four things worth reading off it, in order of how much they change what to do next.
 
@@ -146,6 +167,115 @@ normalisation **32** as the axis. It is documented as "divides the rank by itsel
 `rank / (rank + 1)`, strictly monotonic, so it **cannot reorder anything**. The first run scored
 all eight cells identically at 0 and 32, which is the only reason it was caught. Read the formula,
 not the flag name.
+
+## What the second authority bought
+
+Slice 4 grew the golden set from 21 questions to **50** and ingested a second authority —
+Pirkanmaa's *Alueellinen jätehuoltolautakunta*, 48 clauses → 89 chunks, 16 municipalities. Both
+were done in one slice because the reason for each was the same reason.
+
+| cell | recall@5 | Lounais-Suomi (29) | Pirkanmaa (21) | leakage | unreachable | out-ranked |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`snowball/0`** (published) | **0.680** | 0.724 | 0.619 | **0.332** | 6 | 11 |
+| `snowball/1` | 0.640 | 0.655 | 0.619 | 0.332 | 6 | 13 |
+| `snowball/2` | 0.460 | 0.414 | 0.524 | 0.332 | 6 | 22 |
+| `lemma-baseform/0` | 0.740 | 0.759 | 0.714 | 0.442 | 2 | 12 |
+| `lemma-baseform/1` | 0.780 | 0.759 | 0.810 | 0.442 | 2 | 10 |
+| `lemma-baseform/2` | 0.460 | 0.448 | 0.476 | 0.442 | 2 | 27 |
+| `lemma-safe/0` | 0.760 | 0.793 | 0.714 | 0.506 | 2 | 11 |
+| `lemma-safe/1` | 0.760 | 0.759 | 0.762 | 0.506 | 2 | 11 |
+| `lemma-safe/2` | 0.280 | 0.345 | 0.190 | 0.506 | 2 | 36 |
+| **`lemma-reasm/0`** (best) | **0.820** | 0.793 | 0.857 | 0.550 | **0** | 10 |
+| `lemma-reasm/1` | 0.820 | 0.828 | 0.810 | 0.550 | **0** | 10 |
+| `lemma-reasm/2` | 0.320 | 0.345 | 0.286 | 0.550 | **0** | 36 |
+
+### Can this instrument tell?
+
+This is the question the slice was really about, and the harness now answers it every run.
+
+Two cells are scored on the **same** questions, so comparing them is a **paired** test. Only the
+questions the two cells disagree about carry information; with `d` of them all flipping one way the
+exact McNemar test gives `2 × 0.5^d`, so **six must flip for p<0.05 — at any N.**
+
+At N=21 the best cell had three failures. Fixing *every remaining miss* would have given d=3,
+p=0.25. Not "a small effect relative to noise": **there was no result any retrieval change could
+have produced that would have registered.** The previously published "0.857 vs 0.762" was never a
+claim the instrument could support.
+
+At N=50 it can:
+
+| vs published `snowball/0` | d | favours it | favours published | exact p |
+| --- | --- | --- | --- | --- |
+| **`lemma-reasm/0`** (0.820) | 9 | 8 | 1 | **0.039** |
+| `lemma-reasm/1` (0.820) | 11 | 9 | 2 | 0.065 |
+| `lemma-baseform/1` (0.780) | 11 | 8 | 3 | 0.227 |
+
+`make eval` prints `d` and the exact p for **every** pair of cells, so nobody has to assume a
+0.048 delta means something. The regression **gate** needs none of this — it is deterministic at
+any N. Power is only about claiming an improvement is real.
+
+### Two predictions were refuted, and one earlier finding was retracted
+
+Predictions were written down before the run. Reporting the ones that failed is the point.
+
+**The two authorities really do use different words for the same things** — `jäteastia` /
+`keräysväline`, `korttelikeräys` / `lähikeräysjärjestelmä`, `aluekeräyspiste` / `aluejätepiste`.
+These share no stem, so no analyser can bridge them, and eight **paired questions** (one text
+labelled once per authority) were added to measure it. The fork is real: `"Asuinalueellamme jätteet
+kerätään kaavan mukaan yhteiseen pisteeseen. Onko siihen pakko liittyä?"` retrieves Pirkanmaa's
+11 § at rank 1 and **fails for Lounais-Suomi in 10 of 12 cells** — identical words, different
+jurisdiction, different outcome.
+
+**But the predicted mechanism was wrong.** Unreachable misses were predicted to return, 0 → 3–8.
+They stayed at **0**. A question shares plenty of *other* lexemes with its target even when the key
+noun does not match, so the fork costs recall through **ranking**, not reach. In the failing
+Lounais-Suomi case the top-5 even contains the *definition* of `korttelikeräys` while the operative
+clause ranks below it. Since the pre-registered rule for choosing the next slice keyed on that
+count, **the case for the vector layer has to be re-argued from evidence rather than from the
+plan.**
+
+**Pirkanmaa was also predicted to score below Lounais-Suomi in every cell.** It scores *higher* in
+5 of 12, including the best. The nominated explanation — "its questions are easier" — is not
+supported by the metric nominated to test it: Pirkanmaa's questions leak **less** (0.323 vs 0.341).
+
+**And a slice-3 finding did not survive the bigger set.** "Length normalisation helps only the
+split analyser" is false at N=50: normalisation 1 now *helps* `lemma-baseform`, and is *neutral*
+for both split analysers. That conclusion rested on a one-question gain at N=21 — d=3, p=0.25,
+which by the corrected statistic was never resolvable. The surviving claim is the narrow one:
+**length normalisation costs the control cell and does not clearly help any lemma cell.**
+
+This is what growing a golden set actually buys. Not a better score — a retracted conclusion.
+
+### The authority filter, verified for the first time
+
+With one authority loaded there was nothing to leak from, so the product's #1 failure mode was
+100% untested. Now every question's top-5 is asserted to contain **zero** foreign-authority chunks,
+inside the eval rather than only in a unit test, for all 50 questions in all 12 cells — so it
+cannot be skipped. It has been **seen red** by deleting the jurisdiction `WHERE` clause, and a
+companion test proves foreign chunks genuinely do enter the top-5 without it, so the check is not
+decoration.
+
+**What that does not prove, stated plainly:** this is *retrieval-layer isolation*, not refusal.
+Asking municipality A's question with municipality B's filter set must eventually be **refused**,
+and refusing needs an answering layer that does not exist. The debt entry stays **PARTIAL**.
+
+One thing the second authority did **not** do is add distractors. All 12 cells scored *identically*
+to the recorded N=21 baseline with Pirkanmaa's 89 chunks loaded and the questions untouched,
+because the filter runs before ranking and `ts_rank` has no IDF. An earlier spec predicted the
+headline would fall when the corpus grew; that claim was wrong and is corrected where it was made,
+so it cannot later excuse a drop that came from somewhere else.
+
+### One municipality is refused an answer that exists
+
+Pirkanmaa's `1 § SOVELTAMISALA` claims Sastamala **only** "(Mouhijärven ja Suodenniemen osalta)" —
+two municipalities merged into Sastamala in 2009 whose waste authority did not follow the merger.
+So the municipality→authority map is **not a function**, which contradicts a load-bearing decision
+this project had already recorded.
+
+Sastamala is therefore omitted, and asking about it raises an error naming the partial coverage
+rather than answering from rules that bind part of the kunta. A Mouhijärvi resident is refused an
+answer the regulations do give them. That is the trade: an honest refusal for a minority beats a
+confident wrong answer, with a correct-looking citation, for the majority.
 
 ## Stack
 
@@ -196,18 +326,37 @@ from a clean tree, so the recorded commit identifies the code that produced the 
 
 Kept honestly, and at more length in [REVIEW-DEBT.md](REVIEW-DEBT.md).
 
-- **N=21 against the ~50 the design asks for.** The 95% interval on 0.762 is about ±0.18.
-  Only 3 of 21 questions span multiple chunks, so complete-set and per-chunk recall have not yet
-  diverged the way ADR-0003 expects them to.
+- **N=50, and no held-out slice.** The design's ~50 target is met, and the harness now reports its
+  own power instead of leaving it assumed. But holding out 10 of 50 would leave a tuning set that
+  cannot reach the 6 discordant questions p<0.05 needs and a held-out set that never can, so the
+  carve-out is deliberately deferred to N≈85. Meanwhile the anti-fitting work is done by two things
+  that cost nothing: `harvested` phrasing, whose wording is independent of the target chunk by
+  construction, and the gated leakage metric. Only 3 of 50 questions span multiple chunks, so
+  complete-set and per-chunk recall have still not diverged the way ADR-0003 expects.
+- **Only 10 of 50 questions are `harvested`.** Neither authority nor either operator publishes a
+  resident FAQ with question-form headings on the topics slice 4 needed, so 4 of the 29 new
+  questions are harvested and the share fell from 6-of-21 to 10-of-50. No authored question was
+  relabelled to improve that number.
+- **A real Pirkanmaa clause is missing from the corpus.** `18 a § KOMPOSTOINTI-ILMOITUS` exists in
+  the document body but not in the document's own table of contents, so the body/TOC cross-check —
+  the strongest invariant here — is silent, and its text is absorbed into 18 §'s chunk. Two clauses,
+  one address. No golden question points at it.
+- **Three of five candidate authorities cannot be ingested at all**, because the table of contents
+  is located by looking for dot leaders and HSY, Oulu and Savo-Pielinen simply do not use them.
+  Their tables of contents are clean and complete. "The extractor is general" is not a claim this
+  project may make.
 - **Leakage understates itself in the published cell.** It is measured after normalisation, so a
-  word the question and the chunk share but which *stems apart* counts as clean. Now quantified:
-  the same 21 questions leak 0.372 under snowball and 0.619 under the lemmatising analyser, with
-  nothing about them changed. 0.372 is a floor, not the truth.
+  word the question and the chunk share but which *stems apart* counts as clean. Quantified: the
+  same 50 questions leak 0.332 under snowball and 0.550 under the lemmatising analyser, with
+  nothing about them changed. 0.332 is a floor, not the truth.
 - **The retriever still cannot answer from resident vocabulary — but the reason changed.**
   `taloyhtiö`, `asunto` and `keskusta` appear nowhere in the regulations. Under snowball they are
   literally unreachable; under compound splitting they *do* reach the right clauses (`taloyhtiö` →
   `talo` + `yhtiö`) and are still not retrieved, because they carry no weight there. That is a
-  sharper case for embeddings than "no shared stem", and it is the mandate for the next slice.
+  sharper case for embeddings than "no shared stem". **It is no longer a mandate for the next
+  slice:** slice 4 predicted the cross-authority synonym fork would produce unreachable chunks and
+  measured **zero**, so the pre-registered rule that would have triggered the vector layer did not
+  fire, and its case has to be re-argued from evidence.
 - **The compound reassembler is a rule I wrote, and its bugs are silent.** It folds voikko's morphs
   back into words, which is what buys `määräyksistä` → `jätehuoltomääräyksistä`. Of 2,513 distinct
   word forms, 76 produce at least one part voikko itself cannot analyse as a word. A junk lexeme
