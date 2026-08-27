@@ -311,7 +311,17 @@ ledger is worse than none, because sessions trust it.
   could reach p<0.05 at any effect size, so "0.857 vs 0.762" was never a claim the instrument could
   support. It now is. Note the cost D6 attaches to moving: the N target for detecting a
   half-of-misses fix rises from ~51 to ~84 if the headline sits on a lemma cell.
-- **Disposition:** **open, and awaiting the Owner** — now with a p-value attached.
+- **Disposition:** **CLOSED 27 Aug 2026 — the Owner moved the published cell to `lemma-reasm/0`.**
+  Recorded in ADR-0007 with four rejected alternatives, and re-baselined in its own commit. The
+  entry closes because the README now publishes the best cell this project can defend, and the
+  defence is a paired p-value rather than a preference.
+  **Two costs replaced it, both accepted before the change rather than discovered after:**
+  (1) the published leakage figure rises 0.332 -> 0.550, which is the analyser seeing overlap the
+  stemmer split apart and **not** the golden set getting easier — leakage stays gated per cell
+  against its own value, so `lemma-reasm/0` is still defended from rising above 0.550, and nobody
+  may compare the new published leakage against the old; (2) the instrument spends power — this
+  cell fails 9 of 50 rather than 16, so the N target for detecting a half-of-misses fix rises from
+  ~51 to ~84, which makes the held-out-slice trigger at N~85 do double duty.
 
 ## 2026-08-26 (slice 1) — the golden set leaks its own source vocabulary
 

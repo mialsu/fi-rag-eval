@@ -45,36 +45,49 @@ cannot resolve. Keyword search does not do this, and an unmeasured chatbot canno
 Every number here was computed by `make eval`, never typed in. A dash means the slice that
 would compute it does not exist yet.
 
-Retrieval: **lexical only** — Postgres `ts_rank`. The published cell is the `snowball/0`
-control: `to_tsvector('finnish', ...)` at default normalisation. That is deliberately the weakest
-sensible baseline, and it is **not BM25**: `ts_rank` has no inverse document frequency and, at its
-default normalisation, no document-length normalisation either.
+Retrieval: **lexical only** — Postgres `ts_rank` over a voikko-lemmatised index with compound
+splitting (`lemma-reasm/0`), at default normalisation. It is **not BM25**: `ts_rank` has no inverse
+document frequency and, at its default normalisation, no document-length normalisation either.
 
-A better configuration is measured — see [What lemmatisation bought](#what-lemmatisation-bought)
-— and is **not** what this table reports. Which cell is the published headline is a recorded
-decision, not whichever one scored best today.
+**The published cell moved from `snowball/0` to `lemma-reasm/0` on 27 Aug 2026** — the first time
+this project had evidence rather than a preference for doing so. The two cells are scored on the
+same 50 questions, so the comparison is *paired*: 9 questions separate them, 8 in favour of the new
+cell, **exact McNemar p = 0.039**. At N=21 no comparison in the grid could have reached p<0.05 at
+any effect size. [ADR-0007](docs/adr/0007-the-published-headline-moves-to-lemma-reasm-0.md) records
+the decision, the four rejected alternatives, and the two costs — see the leakage note below.
+Which cell is published is a recorded decision, never whichever one scored best today.
 
 The headline is **pooled over both authorities in the corpus** — one number over all 50
 questions, which is the only number carrying enough statistical power to detect an improvement
 (see [Can this instrument tell?](#can-this-instrument-tell)). The per-authority rows beneath it are
 diagnostics, not headlines of their own.
 
-> **This is not comparable to the 0.762 previously published.** That was **N=21**, one authority.
-> This is **N=50**, two. The population changed, so the two numbers measure different things.
-> What *is* comparable: over the original 21 questions alone, this cell still scores exactly
-> 16/21 = 0.762 — identical, not merely close. A second authority adds **zero** distractors to an
+> **This is not comparable to the 0.762 previously published, for two independent reasons.** That
+> number was **N=21, one authority, `snowball/0`**. This is **N=50, two authorities,
+> `lemma-reasm/0`** — both the population *and* the cell changed, so no document here presents the
+> two as a trend.
+>
+> What *is* comparable, and is pinned by a test: over the original 21 questions alone this cell
+> still scores exactly **18/21**, unchanged since slice 3, and the old control still scores exactly
+> 16/21. Nothing that already existed moved. A second authority adds **zero** distractors to an
 > existing question, because the authority filter runs before ranking and `ts_rank` has no IDF.
-> The headline moved because the questions changed, and provably not because anything else did.
+>
+> **The leakage figure also rose, 0.332 → 0.550, and that is not the golden set getting easier.**
+> It is the same 50 unedited questions read by a different analyser: words the stemmer splits apart
+> are one lexeme under lemmatisation, so the metric finally sees overlap a human eye always could.
+> Leakage is gated **per cell against its own recorded value** precisely so this cannot be waved
+> through — `lemma-reasm/0` is still defended from rising above 0.550. Comparing the new published
+> leakage against the old is comparing two analysers, not two golden sets.
 
 | Metric | Value | N | Notes |
 | --- | --- | --- | --- |
-| **Complete-set recall@5** | **0.680** | 50 questions | headline: did retrieval find *every* clause the answer depends on |
-| — Lounais-Suomi | 0.724 | 29 questions | diagnostic. Three slices of implicit fitting behind it |
-| — Pirkanmaa | 0.619 | 21 questions | diagnostic. Zero slices of fitting; questions are *less* leaky (0.323) |
-| Per-chunk recall@5 | 0.679 | 53 chunks | diagnostic — awards partial credit, so never the headline |
-| MRR | 0.501 | 50 questions | diagnostic. The right chunk is often found but rarely first |
-| **Lexical leakage of the questions** | **0.332** | 259 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise** |
-| Misses: unreachable / out-ranked | 6 / 11 | 17 chunks | zero stem overlap vs. matched but below k |
+| **Complete-set recall@5** | **0.820** | 50 questions | headline: did retrieval find *every* clause the answer depends on |
+| — Lounais-Suomi | 0.793 | 29 questions | diagnostic, and **below the resolution of this instrument** — see the note under the table |
+| — Pirkanmaa | 0.857 | 21 questions | same. Neither row can register a difference on its own |
+| Per-chunk recall@5 | 0.811 | 53 chunks | diagnostic — awards partial credit, so never the headline |
+| MRR | 0.569 | 50 questions | diagnostic. The right chunk is often found but rarely first |
+| **Lexical leakage of the questions** | **0.550** | 331 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise, per cell.** Read the note below before comparing this to 0.332 |
+| Misses: unreachable / out-ranked | **0** / 10 | 10 chunks | zero stem overlap vs. matched but below k. Nothing is unreachable |
 | Answer groundedness | — | | needs the answering slice |
 | Branch coverage | — | | needs the answering slice |
 | Over-claim rate | — | | needs the answering slice |
@@ -117,7 +130,7 @@ row-to-row delta attributes to that mechanism and nothing else.
 
 | cell | recall@5 | per-chunk | MRR | leakage | unreachable | out-ranked |
 | --- | --- | --- | --- | --- | --- | --- |
-| **`snowball/0`** (published) | **0.762** | 0.750 | 0.517 | **0.372** | 4 | 2 |
+| **`snowball/0`** (published *then*) | **0.762** | 0.750 | 0.517 | **0.372** | 4 | 2 |
 | `snowball/1` | 0.619 | 0.625 | 0.462 | 0.372 | 4 | 5 |
 | `snowball/2` | 0.429 | 0.458 | 0.335 | 0.372 | 4 | 9 |
 | `lemma-baseform/0` | 0.762 | 0.750 | 0.593 | 0.506 | 2 | 4 |
@@ -157,10 +170,12 @@ could — the [debt entry](REVIEW-DEBT.md) predicted exactly this and it is now 
 gated to never *rise*, so this is recorded **per cell** and each cell is compared only against
 itself. The rule is intact; it now has twelve guards instead of one.
 
-**The published headline did not move.** `snowball/0` is still what the table above reports, on
-purpose. Promoting `lemma-reasm/1` means picking one cell of twelve after seeing all twelve, on 21
-questions, with no held-out slice. That is a decision with a re-baseline attached, and the gate
-fails if the published cell moves without one.
+**The published headline did not move** — *at the time*. Promoting a lemma cell would have meant
+picking one of twelve after seeing all twelve, on 21 questions, with no held-out slice. That
+refusal was right, and slice 4 showed why in a way this slice could not: at N=21 the comparison
+could not have reached p<0.05 **at any effect size**, so "0.857 beats 0.762" was never a claim the
+instrument could support. It moved in slice 4, on a paired test at p=0.039 — see
+[ADR-0007](docs/adr/0007-the-published-headline-moves-to-lemma-reasm-0.md).
 
 One correction belongs here rather than in a footnote: the plan for this slice named `ts_rank`
 normalisation **32** as the axis. It is documented as "divides the rank by itself + 1" — that is
@@ -176,7 +191,7 @@ were done in one slice because the reason for each was the same reason.
 
 | cell | recall@5 | Lounais-Suomi (29) | Pirkanmaa (21) | leakage | unreachable | out-ranked |
 | --- | --- | --- | --- | --- | --- | --- |
-| **`snowball/0`** (published) | **0.680** | 0.724 | 0.619 | **0.332** | 6 | 11 |
+| `snowball/0` (former control) | 0.680 | 0.724 | 0.619 | 0.332 | 6 | 11 |
 | `snowball/1` | 0.640 | 0.655 | 0.619 | 0.332 | 6 | 13 |
 | `snowball/2` | 0.460 | 0.414 | 0.524 | 0.332 | 6 | 22 |
 | `lemma-baseform/0` | 0.740 | 0.759 | 0.714 | 0.442 | 2 | 12 |
@@ -185,7 +200,7 @@ were done in one slice because the reason for each was the same reason.
 | `lemma-safe/0` | 0.760 | 0.793 | 0.714 | 0.506 | 2 | 11 |
 | `lemma-safe/1` | 0.760 | 0.759 | 0.762 | 0.506 | 2 | 11 |
 | `lemma-safe/2` | 0.280 | 0.345 | 0.190 | 0.506 | 2 | 36 |
-| **`lemma-reasm/0`** (best) | **0.820** | 0.793 | 0.857 | 0.550 | **0** | 10 |
+| **`lemma-reasm/0`** (published) | **0.820** | 0.793 | 0.857 | 0.550 | **0** | 10 |
 | `lemma-reasm/1` | 0.820 | 0.828 | 0.810 | 0.550 | **0** | 10 |
 | `lemma-reasm/2` | 0.320 | 0.345 | 0.286 | 0.550 | **0** | 36 |
 
@@ -204,15 +219,22 @@ claim the instrument could support.
 
 At N=50 it can:
 
-| vs published `snowball/0` | d | favours it | favours published | exact p |
+| vs the `snowball/0` control | d | favours the challenger | favours the control | exact p |
 | --- | --- | --- | --- | --- |
-| **`lemma-reasm/0`** (0.820) | 9 | 8 | 1 | **0.039** |
+| **`lemma-reasm/0`** (0.820) — now published | 9 | 8 | 1 | **0.039** |
 | `lemma-reasm/1` (0.820) | 11 | 9 | 2 | 0.065 |
 | `lemma-baseform/1` (0.780) | 11 | 8 | 3 | 0.227 |
 
 `make eval` prints `d` and the exact p for **every** pair of cells, so nobody has to assume a
 0.048 delta means something. The regression **gate** needs none of this — it is deterministic at
 any N. Power is only about claiming an improvement is real.
+
+**The same arithmetic says what the per-authority rows cannot do.** The eight *paired* questions
+are the only statistically legitimate authority-versus-authority comparison in the set — same text,
+same cell, different jurisdiction — and they give **d=1, p=1.000**. Eight pairs can never reach
+d=6. So the gap between the per-authority rows is not a measurement, and reading either row as a
+verdict on an authority is the mistake the numbers are printed to prevent. They say where the
+pooled headline comes from; nothing more.
 
 ### Two predictions were refuted, and one earlier finding was retracted
 

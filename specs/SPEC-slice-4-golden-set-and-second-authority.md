@@ -474,9 +474,21 @@ authority adds **zero** distractors to an existing question: the filter runs bef
 
 ### Published headline
 
-**Complete-set recall@5 = 0.680 (N=50, k=5) in `snowball/0`, at lexical leakage 0.332.**
-Per authority, as a diagnostic: Lounais-Suomi 0.724 (N=29), Pirkanmaa 0.619 (N=21).
-**Not comparable to the old 0.762 (N=21)** — the population changed.
+At the time this slice landed: **0.680 (N=50, k=5) in `snowball/0`, at leakage 0.332**;
+Lounais-Suomi 0.724 (N=29), Pirkanmaa 0.619 (N=21).
+
+> **SUPERSEDED THE SAME DAY. D12 held `snowball/0`; the Owner moved the published cell to
+> `lemma-reasm/0` once this slice's power result existed.** The headline is now **0.820 (N=50, k=5)
+> at leakage 0.550** — Lounais-Suomi 0.793, Pirkanmaa 0.857. The decision, its four rejected
+> alternatives and its two accepted costs are in
+> `docs/adr/0007-the-published-headline-moves-to-lemma-reasm-0.md`. D12 is left as written: it was
+> the right call *before* this slice measured the paired p-value, and editing it afterwards would
+> hide the fact that the evidence changed the answer.
+>
+> Note what this does to the power table above: the N target for detecting a fix that closes half
+> the remaining misses rises from ~51 to ~84, exactly as that table predicted moving the cell would
+> cost. The golden set is now **underpowered by ~1.7x for its own published cell**, which is the
+> strongest argument on the table for the next question-set tranche.
 
 ### Acceptance criteria
 

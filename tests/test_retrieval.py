@@ -19,7 +19,6 @@ from fi_rag_eval.addressing import ChunkAddress
 from fi_rag_eval.analyse import Analyser, Morphology
 from fi_rag_eval.evaluate import (
     GRID,
-    PUBLISHED,
     Cell,
     EvaluationError,
     GridRun,
@@ -246,16 +245,28 @@ def test_the_same_word_stems_differently_in_query_and_corpus(corpus: Connection)
 def test_leakage_is_measured_against_the_targets_not_the_whole_corpus(
     corpus: Connection, manifest: Manifest, golden: GoldenSet
 ) -> None:
-    run = evaluate(corpus, manifest=manifest, golden=golden, k=5)
+    """Pinned to the SNOWBALL control cell, deliberately, and not to whichever cell
+    is published.
+
+    The mechanism under test -- a question's leakage is computed against its own
+    required chunks, never against the corpus -- is analyser-agnostic. Its
+    *example* is not: `taloyhtiö` leaks nothing under snowball and does leak under
+    compound splitting, because `talo` + `yhtiö` are in the clause. That is a
+    slice-3 finding, not a defect, so this test names its cell rather than
+    inheriting the published one and breaking when the Owner moves it.
+    """
+    control = Cell(Analyser.SNOWBALL, 0)
+    run = evaluate(corpus, manifest=manifest, golden=golden, k=5, cell=control)
     by_id = {r.outcome.question_id: r.outcome for r in run.runs}
 
     resident = by_id["taloyhtio-kolme-asuntoa-biojate"]
     assert resident.leaked_lexemes == ()
     assert resident.lexical_leakage == 0.0
 
-    # Every leaked stem must actually be present in that question's own targets.
+    # Every leaked stem must actually be present in that question's own targets,
+    # read through the same analyser the cell was scored with.
     for outcome in by_id.values():
-        target_lexemes = db.chunk_lexemes(corpus, outcome.required)
+        target_lexemes = db.chunk_lexemes(corpus, outcome.required, control.analyser)
         assert set(outcome.leaked_lexemes) <= target_lexemes
         assert set(outcome.leaked_lexemes) <= set(outcome.query_lexemes)
 
@@ -667,18 +678,30 @@ def test_the_instrument_can_now_resolve_a_cell_difference_at_all(grid: GridRun) 
     p<0.05 on the exact McNemar test -- the instrument has power for the first
     time.
     """
-    published = [r.outcome for r in grid.published.runs]
-    significant = []
-    for run in grid.cells:
-        if run.cell == PUBLISHED:
-            continue
-        result = discordance(published, [r.outcome for r in run.runs])
-        if result.p_value < 0.05 and run.metrics.complete_set_recall > (
-            grid.published.metrics.complete_set_recall
-        ):
-            significant.append((run.cell.name, result.discordant, result.p_value))
-    assert significant, (
-        "no cell beats the published cell at p<0.05, so this run cannot claim any "
-        "retrieval improvement is real -- which is the claim the golden set was grown "
-        "to make possible"
+    # The specific claim the published cell rests on: it beats the old snowball
+    # control on the paired test. Pinned so it cannot quietly stop being true --
+    # if this goes red, the published headline is no longer defensible and the
+    # move recorded in ADR-0007 has to be revisited, not the test relaxed.
+    control = grid.cell(Cell(Analyser.SNOWBALL, 0))
+    against_control = discordance(
+        [r.outcome for r in grid.published.runs], [r.outcome for r in control.runs]
+    )
+    assert grid.published.metrics.complete_set_recall > control.metrics.complete_set_recall
+    assert against_control.p_value < 0.05, (
+        f"the published cell beats the snowball control by "
+        f"{against_control.discordant} discordant questions at p="
+        f"{against_control.p_value:.3f}, which does not clear 0.05"
+    )
+
+    # And the general property: this instrument can resolve *some* difference in
+    # the grid. At N=21 no pair of cells could, at any effect size.
+    resolvable = [
+        (a.cell.name, b.cell.name)
+        for index, a in enumerate(grid.cells)
+        for b in grid.cells[index + 1 :]
+        if discordance([r.outcome for r in a.runs], [r.outcome for r in b.runs]).p_value < 0.05
+    ]
+    assert resolvable, (
+        "no pair of cells differs at p<0.05, so this run cannot claim any retrieval "
+        "difference is real -- which is the claim the golden set was grown to make possible"
     )

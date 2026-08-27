@@ -60,13 +60,26 @@ GRID: tuple[Cell, ...] = tuple(
 )
 """All eight cells. Fixed, because the recorded baseline names every one of them."""
 
-PUBLISHED = Cell(Analyser.SNOWBALL, 0)
+PUBLISHED = Cell(Analyser.LEMMA_REASM, 0)
 """The cell the README quotes.
 
 Deliberately **not** "whichever cell won". Moving the published headline is the
 Owner's explicit decision and comes with a deliberate re-baseline; a number that
 migrates to whichever configuration happens to score best is how a project ends
 up publishing its own tuning noise.
+
+**Moved from `snowball/0` to `lemma-reasm/0` by the Owner on 27 Aug 2026** — the
+first time this project had evidence rather than a preference. At N=21 no
+comparison in the grid could reach p<0.05 at any effect size, so "0.857 beats
+0.762" was never a claim the instrument could support. At N=50 this cell beats
+the old control on the **paired** exact McNemar test: 9 discordant questions, 8
+of them in its favour, **p=0.039**. See ADR-0007 for the decision and its costs.
+
+The costs are real and were accepted, not discovered afterwards: the published
+leakage figure rises 0.332 -> 0.550 because a lemmatising analyser sees overlap
+snowball stems apart -- **a property of the analyser, not of the questions** --
+and the instrument spends power, because this cell fails 9 of 50 rather than 16,
+so the next improvement has to fix more questions to register.
 """
 
 

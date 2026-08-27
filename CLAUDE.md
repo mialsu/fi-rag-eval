@@ -164,9 +164,11 @@ Verify that structurally:
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
 - Golden-set leakage: scores climb while real answer quality doesn't. **Measured every run and
-  gated to never rise, per cell.** It was 60% in slice 1, 37% at N=21, and is **33.2% now** in the
-  published cell at N=50 — the 29 questions slice 4 added are *less* leaky than the 21 they joined,
-  so the set got harder, not easier. The reference for real harvested questions is 39%. A rising headline with rising leakage is not an improvement.
+  gated to never rise, per cell.** In the SNOWBALL CONTROL cell it was 60% in slice 1, 37% at N=21,
+  and is **33.2% at N=50** — the 29 questions slice 4 added are *less* leaky than the 21 they
+  joined, so the set got harder, not easier. The **published** cell now reads **55.0%**, which is a
+  different analyser reading the same unedited questions and is **not** comparable to 33.2%. The
+  reference for real harvested questions is 39%. A rising headline with rising leakage is not an improvement.
   Note that a *better analyser* raises leakage on its own, with no question edited (0.372 → 0.619
   in slice 3) — which is why each cell is gated against its own recorded value and never against
   another cell's. Comparing across cells would fail the gate for a reason that has nothing to do
