@@ -19,10 +19,14 @@ chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in 
 per-question × cell pass matrix and a paired-power matrix, and exits non-zero if **any** cell
 regresses. Nothing else exists.
 
-- **Published headline: complete-set recall@5 = 0.680 (N=50, k=5) in the `snowball/0` cell.
-  Lexical leakage = 0.332.** Never quote the first without the second. **This is NOT comparable to
-  the old 0.762 (N=21)** — the population changed. Per authority, as a diagnostic: Lounais-Suomi
-  0.724 (N=29), Pirkanmaa 0.619 (N=21).
+- **Published headline: complete-set recall@5 = 0.820 (N=50, k=5) in the `lemma-reasm/0` cell.
+  Lexical leakage = 0.550.** Never quote the first without the second. Per authority, as a
+  diagnostic: Lounais-Suomi 0.793, Pirkanmaa 0.857. **Three numbers now exist for this corpus —
+  0.762 (N=21, `snowball/0`), 0.680 (N=50, `snowball/0`) and 0.820 (N=50, `lemma-reasm/0`) — and no
+  document may present them as a trend**: the population changed once and the cell changed once.
+  The control cell is still scored every run and reads 0.680 at leakage 0.332; **0.550 against
+  0.332 is two analysers reading the same 50 unedited questions, not the golden set getting
+  easier** (ADR-0007).
 - **The instrument has statistical power for the first time.** Two cells are scored on the same
   questions, so comparing them is a **paired** test: six discordant questions must flip one way for
   p<0.05, at any N. At N=21 no comparison in the grid could reach that at any effect size. At N=50
@@ -30,10 +34,13 @@ regresses. Nothing else exists.
   the exact McNemar p for every pair of cells, so nobody has to assume a 0.048 delta means
   something. **The ±0.18 absolute interval that slice 3 and this file used was the wrong
   statistic** — corrected in both specs; the correction made the argument for slice 4 *stronger*.
-- **The published cell is still `snowball/0`, and moving it is now an evidence-backed question
-  rather than a preference.** `evaluate.PUBLISHED` is the single place that decides, and the gate
-  fails if it moves without a re-record. The cost of moving is quantified: the N target for
-  detecting a half-of-misses fix rises from ~51 to ~84 on a lemma cell.
+- **The published cell MOVED to `lemma-reasm/0` on 27 Aug 2026, on the Owner's decision, once the
+  paired p-value existed** (ADR-0007, commits `d30e3ee` / `bbe8b1a`). `evaluate.PUBLISHED`
+  (`evaluate.py:63`) is the single place that decides, and the gate fails if it moves again without
+  a re-record. The move's price was quantified before it was taken and is now being paid: the
+  published cell fails 9 of 50, so the N target for detecting a half-of-misses fix rose from ~51 to
+  ~84. **The golden set is underpowered by ~1.7x for its own published cell**, and only a fix that
+  closes >=6 of the 9 remaining misses while breaking none of them can register at all.
 - **Slice 4's strongest prediction was REFUTED, and it changes slice 5.** The two authorities do
   use different words for the same things (`jäteastia`/`keräysväline`,
   `korttelikeräys`/`lähikeräysjärjestelmä`, `aluekeräyspiste`/`aluejätepiste`) and it *does* cost
@@ -113,7 +120,7 @@ Built + gates green + **exercised the way a user hits it, with evidence** (`/ver
 copy is in the user's language + every cut corner confessed to REVIEW-DEBT.md + tracked.
 Never ship: dead screens, fake zeros, raw IDs on a surface, "coming soon"/"unsupported".
 
-For this project specifically, done is `DESIGN.md:122-128`: the README opens with a filled metric
+For this project specifically, done is `DESIGN.md:149-151`: the README opens with a filled metric
 table, `make eval` reproduces it from a clean clone, and CI fails on regression.
 
 ## Verify like a user
@@ -225,18 +232,25 @@ Verify that structurally:
 
 - **Project-specific hard limits:**
   1. **Cost ceiling on eval runs.** Cheapest adequate model by default; no unattended eval loops.
-     **Resolved 27 Aug 2026: the Owner intends to use Groq's free tier, so there is no monetary
-     ceiling to set and no paid run is planned.** Still ask before introducing *any* paid provider.
-     Recall the shape of the spend it would carry: ~50 questions × the model under test × a
-     separate judge model, on every pull request.
-     **The binding constraint is now rate limits, not money, and it is a worse one for this
-     project.** A free tier throttles; a throttled eval run means some questions error. This
-     harness must never publish a table over a silently reduced N, so the answering slice needs
+     **Resolved 27 Aug 2026 as "free tier, no monetary ceiling, no paid run planned" — and REVERSED
+     the same day on measured evidence. A paid Groq Developer plan IS approved for this project**
+     (ADR-0008). The reversal was arithmetic, not preference: one full answer-layer run is ~420K
+     tokens against a free-tier allowance of 8K TPM and **200K TPD**, i.e. **~2.1x the entire daily
+     budget**. That also makes `DESIGN.md:121-122`'s CI-on-every-PR impossible on the free tier, and
+     makes a 52-minute saturated run exactly the unattended loop this limit forbids.
+     **Groq alone is approved. Still ask before introducing any other paid provider.**
+     **The ceiling is $25/month, set by the Owner at Groq on 27 Aug 2026**, against a measured
+     ~$0.067 per run (~370 runs). It has three enforcers and the one that matters is ours:
+     a **per-run token budget in code that hard-fails at ~600K tokens (~$0.15)**, the LiteLLM
+     Proxy's per-key budget, and the provider cap. A ceiling that lives only in a dashboard is a
+     standard with no enforcer — the harness would never notice a runaway, it would just collect
+     429s.
+     **Rate limits remain real even on the paid plan, and the requirement they created stands.**
+     This harness must never publish a table over a silently reduced N, so the answering slice needs
      retry-with-backoff and a **hard failure** when a question cannot be scored — never a skip.
-     That requirement is now load-bearing and belongs in the answering slice's spec.
      Two smaller consequences: Groq serves open models rather than Claude, which is *fine* and even
-     helpful for `CONTEXT.md`'s rule that the judge must be a different model than the one under
-     test; and a free tier's data-usage terms want reading once, though the corpus is public
+     helpful for `CONTEXT.md:59`'s rule that the judge must be a different model **family** than the
+     one under test; and the data-usage terms want reading once, though the corpus is public
      documents and the queries are golden-set questions, so the no-personal-data limit is not at
      risk today.
   2. **No personal data, ever.** The corpus is public documents reached through the manifest only.
