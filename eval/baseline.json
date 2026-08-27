@@ -1,10 +1,82 @@
 {
-  "commit": "ebdcb4a",
-  "complete_set_recall": 0.7619047619047619,
+  "analyser_fingerprint": "9117b2f347e4c331",
+  "cells": {
+    "lemma-baseform/0": {
+      "complete_set_recall": 0.7619047619047619,
+      "lexical_leakage": 0.5060240963855421,
+      "mean_reciprocal_rank": 0.5928571428571429,
+      "per_chunk_recall": 0.75
+    },
+    "lemma-baseform/1": {
+      "complete_set_recall": 0.7142857142857143,
+      "lexical_leakage": 0.5060240963855421,
+      "mean_reciprocal_rank": 0.5468253968253968,
+      "per_chunk_recall": 0.7083333333333334
+    },
+    "lemma-baseform/2": {
+      "complete_set_recall": 0.47619047619047616,
+      "lexical_leakage": 0.5060240963855421,
+      "mean_reciprocal_rank": 0.35873015873015873,
+      "per_chunk_recall": 0.4583333333333333
+    },
+    "lemma-reasm/0": {
+      "complete_set_recall": 0.8095238095238095,
+      "lexical_leakage": 0.6190476190476191,
+      "mean_reciprocal_rank": 0.5888888888888889,
+      "per_chunk_recall": 0.7916666666666666
+    },
+    "lemma-reasm/1": {
+      "complete_set_recall": 0.8571428571428571,
+      "lexical_leakage": 0.6190476190476191,
+      "mean_reciprocal_rank": 0.6142857142857143,
+      "per_chunk_recall": 0.8333333333333334
+    },
+    "lemma-reasm/2": {
+      "complete_set_recall": 0.42857142857142855,
+      "lexical_leakage": 0.6190476190476191,
+      "mean_reciprocal_rank": 0.2857142857142857,
+      "per_chunk_recall": 0.4166666666666667
+    },
+    "lemma-safe/0": {
+      "complete_set_recall": 0.8095238095238095,
+      "lexical_leakage": 0.5684210526315789,
+      "mean_reciprocal_rank": 0.626984126984127,
+      "per_chunk_recall": 0.7916666666666666
+    },
+    "lemma-safe/1": {
+      "complete_set_recall": 0.7619047619047619,
+      "lexical_leakage": 0.5684210526315789,
+      "mean_reciprocal_rank": 0.5888888888888889,
+      "per_chunk_recall": 0.75
+    },
+    "lemma-safe/2": {
+      "complete_set_recall": 0.42857142857142855,
+      "lexical_leakage": 0.5684210526315789,
+      "mean_reciprocal_rank": 0.3111111111111111,
+      "per_chunk_recall": 0.4166666666666667
+    },
+    "snowball/0": {
+      "complete_set_recall": 0.7619047619047619,
+      "lexical_leakage": 0.3717948717948718,
+      "mean_reciprocal_rank": 0.5174603174603175,
+      "per_chunk_recall": 0.75
+    },
+    "snowball/1": {
+      "complete_set_recall": 0.6190476190476191,
+      "lexical_leakage": 0.3717948717948718,
+      "mean_reciprocal_rank": 0.4619047619047619,
+      "per_chunk_recall": 0.625
+    },
+    "snowball/2": {
+      "complete_set_recall": 0.42857142857142855,
+      "lexical_leakage": 0.3717948717948718,
+      "mean_reciprocal_rank": 0.3349206349206349,
+      "per_chunk_recall": 0.4583333333333333
+    }
+  },
+  "commit": "7da6e90",
   "k": 5,
-  "lexical_leakage": 0.3717948717948718,
-  "mean_reciprocal_rank": 0.5174603174603175,
-  "per_chunk_recall": 0.75,
+  "published_cell": "snowball/0",
   "questions": 21,
   "required_chunks": 24
 }
