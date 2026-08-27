@@ -145,8 +145,8 @@ def write_pair(tmp_path: Path, **overrides: str) -> Path:
 
 def test_a_well_formed_pair_loads_and_is_reported(tmp_path: Path, manifest: Manifest) -> None:
     golden = load_golden_set(write_pair(tmp_path), manifest)
-    assert golden.pairs == ("yhteinen-astia",)
-    assert golden.authorities == ("lounais-suomi", "pirkanmaa")
+    assert {q.pair for q in golden.questions} == {"yhteinen-astia"}
+    assert {q.authority for q in golden.questions} == {"lounais-suomi", "pirkanmaa"}
 
 
 def test_a_lone_half_of_a_pair_is_rejected(tmp_path: Path, manifest: Manifest) -> None:
@@ -212,7 +212,7 @@ def test_a_directory_of_files_loads_as_one_pooled_set(tmp_path: Path, manifest: 
     )
     golden = load_golden_set(tmp_path, manifest)
     assert [q.id for q in golden.questions] == ["q", "p"], "filename order, so N is stable"
-    assert golden.authorities == ("lounais-suomi", "pirkanmaa")
+    assert {q.authority for q in golden.questions} == {"lounais-suomi", "pirkanmaa"}
 
 
 def test_an_id_repeated_across_two_files_is_rejected(tmp_path: Path, manifest: Manifest) -> None:

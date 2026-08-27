@@ -102,20 +102,6 @@ class GoldenSet:
     def count_by_phrasing(self, phrasing: Phrasing) -> int:
         return sum(1 for question in self.questions if question.phrasing is phrasing)
 
-    @property
-    def authorities(self) -> tuple[str, ...]:
-        """Every authority the set labels against, in first-seen order."""
-        seen: list[str] = []
-        for question in self.questions:
-            if question.authority not in seen:
-                seen.append(question.authority)
-        return tuple(seen)
-
-    @property
-    def pairs(self) -> tuple[str, ...]:
-        """The paired-question slugs, sorted. Validated on load."""
-        return tuple(sorted({q.pair for q in self.questions if q.pair is not None}))
-
 
 def _address(raw: Any, where: str) -> ChunkAddress:
     try:
