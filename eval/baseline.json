@@ -74,9 +74,9 @@
       "per_chunk_recall": 0.4716981132075472
     }
   },
-  "commit": "f76c7cc",
+  "commit": "d30e3ee",
   "k": 5,
-  "published_cell": "snowball/0",
+  "published_cell": "lemma-reasm/0",
   "questions": 50,
   "required_chunks": 53
 }
