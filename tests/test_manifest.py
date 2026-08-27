@@ -140,3 +140,18 @@ def test_a_kunta_listed_as_both_whole_and_partial_is_rejected(tmp_path: Path) ->
 def test_partial_coverage_is_optional(tmp_path: Path) -> None:
     manifest = load_manifest(write(tmp_path))
     assert manifest.authority("a").partial_municipalities == ()
+
+
+def test_the_fetcher_identifies_itself() -> None:
+    """Without a User-Agent a clean clone cannot ingest at all.
+
+    `urllib`'s default is `Python-urllib/<version>`, which **tampere.fi answers
+    with HTTP 403** while serving the same public PDF to a request that names
+    itself. A no-network unit test cannot prove the download works, but it can
+    prove the header is still being sent -- which is the part that regressed
+    silently and was only caught by running `make eval` in a real clean clone.
+    """
+    from fi_rag_eval.ingest import USER_AGENT
+
+    assert "fi-rag-eval" in USER_AGENT
+    assert "Mozilla" not in USER_AGENT, "identify the tool; do not impersonate a browser"

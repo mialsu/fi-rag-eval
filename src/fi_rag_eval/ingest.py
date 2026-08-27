@@ -28,6 +28,17 @@ _VOIMAANTULO = re.compile(r"tulevat\s+voimaan\s+(\d{1,2})\.(\d{1,2})\.(\d{4})")
 _FRONT_MATTER_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
 _DOWNLOAD_TIMEOUT_SECONDS = 60
 
+USER_AGENT = "fi-rag-eval/0.0 (evaluation harness; fetches public waste regulations)"
+"""Identify the fetcher. Not cosmetic: without it a clean clone cannot ingest.
+
+`urllib` sends `Python-urllib/<version>`, and **tampere.fi answers that with
+HTTP 403** while serving the same public PDF to a request that names itself. The
+document is public, the manifest pins its sha256, and this string says truthfully
+what is asking -- it does not pretend to be a browser. Found the only way it could
+be: by running `make eval` in a genuinely clean clone, where the PDFs are absent
+because `data/raw/` is git-ignored.
+"""
+
 
 class IngestError(RuntimeError):
     """A source did not ingest the way the manifest says it must."""
@@ -112,7 +123,8 @@ def fetch(source: Source, raw_dir: Path) -> tuple[Path, bool]:
             f"manifest source url must be https, got {source.url!r}. The corpus is "
             "public documents fetched over a verified channel, nothing else."
         )
-    with urllib.request.urlopen(source.url, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
+    request = urllib.request.Request(source.url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
         payload = response.read()
     actual = hashlib.sha256(payload).hexdigest()
     if actual != source.sha256:
