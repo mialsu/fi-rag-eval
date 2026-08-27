@@ -1,0 +1,10 @@
+{
+  "commit": "ebdcb4a",
+  "complete_set_recall": 0.7619047619047619,
+  "k": 5,
+  "lexical_leakage": 0.3717948717948718,
+  "mean_reciprocal_rank": 0.5174603174603175,
+  "per_chunk_recall": 0.75,
+  "questions": 21,
+  "required_chunks": 24
+}
