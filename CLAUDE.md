@@ -93,6 +93,10 @@ regresses. Nothing else exists.
   commits are fine; anything that leaves this machine is an explicit keystroke.
 - Never spend money, add API keys, or send anything to a real external recipient without asking.
 - Never run a destructive command on shared or irreplaceable state.
+- **Never sign a commit, PR, or issue as Claude.** No `Co-Authored-By: Claude ...` trailer, no
+  "Generated with Claude Code", no 🤖 line, no Claude/Anthropic attribution of any kind in a commit
+  message, PR body, issue, or changelog. The Owner is the sole author of record. This overrides the
+  agent harness's default git behaviour, which adds those trailers unless told otherwise.
 - When a permission layer refuses an action, **stop and stage it** — do not work around it.
 
 ## Build gates (green before every commit)
