@@ -51,10 +51,11 @@ either.
 
 | Metric | Value | N | Notes |
 | --- | --- | --- | --- |
-| **Complete-set recall@5** | **0.875** | 8 questions | headline: did retrieval find *every* clause the answer depends on |
-| Per-chunk recall@5 | 0.900 | 10 chunks | diagnostic — awards partial credit, so never the headline |
-| MRR | 0.812 | 8 questions | diagnostic |
-| Misses: unreachable / out-ranked | 0 / 1 | 1 chunk | zero stem overlap vs. matched but below k |
+| **Complete-set recall@5** | **0.762** | 21 questions | headline: did retrieval find *every* clause the answer depends on |
+| Per-chunk recall@5 | 0.750 | 24 chunks | diagnostic — awards partial credit, so never the headline |
+| MRR | 0.517 | 21 questions | diagnostic. The right chunk is often found but rarely first |
+| **Lexical leakage of the questions** | **0.372** | 78 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise** |
+| Misses: unreachable / out-ranked | 4 / 2 | 6 chunks | zero stem overlap vs. matched but below k |
 | Answer groundedness | — | | needs the answering slice |
 | Branch coverage | — | | needs the answering slice |
 | Over-claim rate | — | | needs the answering slice |
@@ -63,13 +64,25 @@ either.
 | Judge–human agreement | — | | needs the judge |
 | p95 latency / cost per query | — | | no model runs yet; this slice costs €0 |
 
-**The caveat, because the number is flattering and shouldn't be trusted:** the golden set has
-only 8 questions, and they were written with the source PDF open. Measured consequence — **60%
-of each question's stemmed content words appear verbatim in its target chunk.** The harness is
-currently easier than the task, and 0.875 will fall when the questions are rewritten in a
-resident's vocabulary. That rewrite outranks every retrieval improvement on the list. The
-prediction registered before this run was 0.25–0.50; it was refuted, and *why* is written up in
-[the slice spec](specs/SPEC-slice-1-measurement-spine.md#measured-result--26-aug-2026).
+**Read the headline together with the leakage row.** The first version of this harness scored
+**0.875** — on 8 questions written with the source PDF open, which leaked **60%** of their
+vocabulary into their own target chunks. Real questions harvested from the authority's
+resident-facing pages leak 39%. The set was rewritten to 21 questions (6 copied verbatim from
+those pages, 15 authored under the rule *name the thing with the document's noun, ask with a
+person's verb*), leakage fell to 37%, and the headline fell with it.
+
+That is the point of the leakage row, and the gate proves it. Reverting a single question to its
+statute-flavoured wording:
+
+```
+complete-set recall@5   0.762 -> 0.810     (looks like an improvement)
+lexical leakage         0.372 -> 0.397
+REGRESSION — lexical leakage rose ... the golden set got easier, which
+             inflates every score above it                          exit 1
+```
+
+Also worth knowing before comparing this to anything published: the corpus is 82 chunks, so
+top-5 covers 6% of it. The number will fall as the corpus grows.
 
 ## Stack
 
@@ -101,12 +114,17 @@ from a clean tree, so the recorded commit identifies the code that produced the 
 
 Kept honestly, and at more length in [REVIEW-DEBT.md](REVIEW-DEBT.md).
 
-- **The golden set leaks its source vocabulary** (60%, measured). The top item above; it makes
-  the headline optimistic and, worse, blinds the harness to the vocabulary gap it exists to
-  measure.
-- **N=8.** The 95% interval on 0.875 is about ±0.23, and one question flipping moves it by
-  0.125. Only 2 of 8 questions span multiple chunks, so complete-set and per-chunk recall have
-  not yet diverged the way ADR-0003 expects them to.
+- **N=21 against the ~50 the design asks for.** The 95% interval on 0.762 is about ±0.18.
+  Only 3 of 21 questions span multiple chunks, so complete-set and per-chunk recall have not yet
+  diverged the way ADR-0003 expects them to.
+- **Leakage understates itself.** It is measured after stemming, so a word the question and the
+  chunk share but stem *apart* — `biojäteastia` vs `biojäteastiaan` — counts as clean. Leakage
+  will rise when lemmatisation lands, with no change to the questions.
+- **The retriever cannot reach resident vocabulary at all.** `taloyhtiö`, `asunto`, `keskusta`
+  appear nowhere in the regulations, and no stemmer connects them to `kiinteistö`, `huoneisto`,
+  `taajama`. That is measured, and it is the case for embeddings.
+- **Finnish snowball disagrees with itself.** The same word stems differently depending on its
+  inflection, so a question containing the document's own word can still fail to match it.
 - **The ranker's defaults are wrong for this corpus, on purpose.** `ts_rank` at normalisation 0
   does not divide by document length, so short chunks lose: definition chunks are 39% of the
   corpus and 0% of every top-5. Left in as the baseline; fixing it is a slice-3 candidate.
@@ -114,7 +132,8 @@ Kept honestly, and at more length in [REVIEW-DEBT.md](REVIEW-DEBT.md).
   failure mode in the design — answering from the wrong jurisdiction — has nothing to leak
   from yet.
 - **Finnish compounds are not split.** `biojäte` does not match `biojäteastia` under snowball
-  stemming (4 of 4 term-pair tests failed). It did not bind on these eight questions; it will.
+  stemming (4 of 4 term-pair tests failed), and `kesällä` does not reach `kesäaikana`. This now
+  binds on real questions: 4 of 6 misses are unreachable rather than out-ranked.
 - **No CI.** The regression gate has been proven red by hand on this machine, which is not the
   same as proven in CI.
 

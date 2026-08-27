@@ -104,6 +104,11 @@ def evaluate(
         )
         retrieved = tuple(hit.address for hit in hits)
         required = set(question.required_addresses)
+        # Leakage: how much of the question's vocabulary its own targets already
+        # hand it. Computed before anything about retrieval is considered, because
+        # it is a property of the golden set, not of the retriever.
+        target_lexemes = db.chunk_lexemes(conn, question.required_addresses)
+        leaked = tuple(lexeme for lexeme in lexemes if lexeme in target_lexemes)
         missed = sorted(required - set(retrieved))
         reachable = db.addresses_matching(conn, addresses=missed, tsquery=tsquery)
         misses = tuple(
@@ -125,6 +130,8 @@ def evaluate(
                     required=question.required_addresses,
                     retrieved=retrieved,
                     misses=misses,
+                    query_lexemes=tuple(lexemes),
+                    leaked_lexemes=leaked,
                 ),
             )
         )

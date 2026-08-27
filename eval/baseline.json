@@ -1,9 +1,0 @@
-{
-  "commit": "cbc0f8a",
-  "complete_set_recall": 0.875,
-  "k": 5,
-  "mean_reciprocal_rank": 0.8125,
-  "per_chunk_recall": 0.9,
-  "questions": 8,
-  "required_chunks": 10
-}

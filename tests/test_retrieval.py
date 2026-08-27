@@ -192,3 +192,53 @@ def test_short_chunks_are_under_retrieved_at_default_normalisation(
         )
         target = int(str(cur.fetchone()[0]))  # type: ignore[index]
     assert min(lengths) > target, "every retrieved chunk is longer than the missed target"
+
+
+def test_resident_vocabulary_is_unreachable_by_stemming_alone(corpus: Connection) -> None:
+    """The finding the golden-set rewrite bought, pinned so it cannot regress quietly.
+
+    Nothing a Finnish stemmer does connects "taloyhtiö", "asunto" or "keskusta"
+    to the words the regulations use (`kiinteistö`, `huoneisto`, `taajama`). This
+    is a genuine vocabulary gap, not a morphology one, and it is the evidence for
+    the vector layer -- previously an assumption in the design.
+
+    If this ever passes, something semantic was added. Update the test and say so.
+    """
+    question = "Meillä on taloyhtiössä kolme asuntoa keskustassa. Tarvitaanko biojäteastia?"
+    lexemes = db.query_lexemes(corpus, question)
+    assert {"taloyhtiö", "asunto", "keskust"} <= set(lexemes)
+    targets = [f"lounais-suomi@{EFFECTIVE}#13", f"lounais-suomi@{EFFECTIVE}#15"]
+    assert db.chunk_lexemes(corpus, targets) & set(lexemes) == set()
+    assert db.addresses_matching(corpus, addresses=targets, tsquery=db.or_tsquery(lexemes)) == set()
+
+
+def test_the_same_word_stems_differently_in_query_and_corpus(corpus: Connection) -> None:
+    """Why a question containing the document's own word can still miss it.
+
+    Snowball gives ``biojäteastia`` the stem ``biojäteast`` but ``biojäteastiaan``
+    the stem ``biojäteastia``. The query and the index therefore disagree about a
+    word both of them contain, which no amount of ranking can repair. This is the
+    measured case for lemmatisation.
+    """
+    assert db.query_lexemes(corpus, "biojäteastia") == ["biojäteast"]
+    assert db.query_lexemes(corpus, "biojäteastiaan") == ["biojäteastia"]
+    assert db.query_lexemes(corpus, "kesällä") != db.query_lexemes(corpus, "kesäaikana")
+
+
+def test_leakage_is_measured_against_the_targets_not_the_whole_corpus(
+    corpus: Connection, manifest: Manifest, golden: GoldenSet
+) -> None:
+    run = evaluate(corpus, manifest=manifest, golden=golden, k=5)
+    by_id = {r.outcome.question_id: r.outcome for r in run.runs}
+
+    resident = by_id["taloyhtio-kolme-asuntoa-biojate"]
+    assert resident.leaked_lexemes == ()
+    assert resident.lexical_leakage == 0.0
+
+    # Every leaked stem must actually be present in that question's own targets.
+    for outcome in by_id.values():
+        target_lexemes = db.chunk_lexemes(corpus, outcome.required)
+        assert set(outcome.leaked_lexemes) <= target_lexemes
+        assert set(outcome.leaked_lexemes) <= set(outcome.query_lexemes)
+
+    assert 0.0 < run.metrics.lexical_leakage < 1.0

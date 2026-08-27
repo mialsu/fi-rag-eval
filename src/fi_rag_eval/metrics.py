@@ -47,6 +47,10 @@ class QuestionOutcome:
     retrieved: tuple[str, ...]
     """Top-k addresses, in rank order."""
     misses: tuple[Miss, ...]
+    query_lexemes: tuple[str, ...] = ()
+    """The question's stemmed content words, as the index would see them."""
+    leaked_lexemes: tuple[str, ...] = ()
+    """The subset of those already present in the question's own target chunks."""
 
     def __post_init__(self) -> None:
         if not self.required:
@@ -54,6 +58,11 @@ class QuestionOutcome:
                 f"{self.question_id}: no required chunks. A question with nothing to "
                 "retrieve would score a vacuous 1.0 and inflate the headline; refusal "
                 "cases arrive with the answering slice, where they can be scored."
+            )
+        if not set(self.leaked_lexemes) <= set(self.query_lexemes):
+            raise MetricsError(
+                f"{self.question_id}: leaked lexemes must be a subset of the query's; "
+                f"{sorted(set(self.leaked_lexemes) - set(self.query_lexemes))} is not."
             )
         missed = {miss.address for miss in self.misses}
         found = set(self.required) & set(self.retrieved)
@@ -73,6 +82,17 @@ class QuestionOutcome:
         return set(self.required) <= set(self.retrieved)
 
     @property
+    def lexical_leakage(self) -> float | None:
+        """Share of this question's stemmed words that its target chunks contain.
+
+        ``None`` when the question stemmed to nothing measurable, so a missing
+        value is never silently averaged in as a zero.
+        """
+        if not self.query_lexemes:
+            return None
+        return len(self.leaked_lexemes) / len(self.query_lexemes)
+
+    @property
     def reciprocal_rank(self) -> float:
         for position, address in enumerate(self.retrieved, start=1):
             if address in set(self.required):
@@ -90,6 +110,20 @@ class Metrics:
     mean_reciprocal_rank: float
     misses_zero_overlap: int
     misses_ranked_out: int
+    lexical_leakage: float
+    """How much of the golden set's own vocabulary is handed to it by its targets.
+
+    Not a retrieval metric -- a metric *of the golden set*, reported beside the
+    others because the headline is uninterpretable without it. High leakage means
+    the questions were written from the source text, so the harness is easier
+    than the task and cannot see the vocabulary gap it exists to measure. It is
+    a diagnostic, not a target to drive to zero: a resident asking about
+    bio-waste will say "biojäte" because that is what it is called. The reference
+    point is the leakage of real questions harvested from the authority's own
+    resident-facing pages.
+    """
+    leakage_lexemes: int
+    """Denominator for the above: total stemmed question words considered."""
 
     @property
     def misses(self) -> int:
@@ -117,6 +151,9 @@ def compute(outcomes: Sequence[QuestionOutcome], *, k: int) -> Metrics:
     complete = sum(1 for outcome in outcomes if outcome.complete)
     misses = [miss for outcome in outcomes for miss in outcome.misses]
 
+    lexemes_total = sum(len(outcome.query_lexemes) for outcome in outcomes)
+    leaked_total = sum(len(outcome.leaked_lexemes) for outcome in outcomes)
+
     return Metrics(
         k=k,
         questions=len(outcomes),
@@ -126,4 +163,6 @@ def compute(outcomes: Sequence[QuestionOutcome], *, k: int) -> Metrics:
         mean_reciprocal_rank=sum(o.reciprocal_rank for o in outcomes) / len(outcomes),
         misses_zero_overlap=sum(1 for m in misses if m.kind is MissKind.ZERO_OVERLAP),
         misses_ranked_out=sum(1 for m in misses if m.kind is MissKind.RANKED_OUT),
+        lexical_leakage=leaked_total / lexemes_total if lexemes_total else 0.0,
+        leakage_lexemes=lexemes_total,
     )

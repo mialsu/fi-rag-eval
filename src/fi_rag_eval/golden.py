@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,23 @@ class GoldenSetError(ValueError):
     """The golden set is malformed, or disagrees with the manifest."""
 
 
+class Phrasing(StrEnum):
+    """Where a question's *wording* came from. The anti-circularity audit trail.
+
+    Only the wording is at stake here -- every label is hand-written from the
+    source either way. But a question phrased from the regulation text inherits
+    its vocabulary, which inflates recall without improving retrieval, so the
+    provenance of the wording is worth recording per question rather than
+    asserting once in a comment.
+    """
+
+    HARVESTED = "harvested"
+    """Copied verbatim from a public resident-facing page. Cannot be circular."""
+
+    AUTHORED = "authored"
+    """Written for this set. Held to the leakage of the harvested sample."""
+
+
 @dataclass(frozen=True, slots=True)
 class Branch:
     """One conditional branch a correct answer must state. Scored from slice 4."""
@@ -45,6 +63,8 @@ class Branch:
 class Question:
     id: str
     question: str
+    phrasing: Phrasing
+    phrasing_source: str | None
     municipality: str
     required_chunks: tuple[ChunkAddress, ...]
     required_branches: tuple[Branch, ...]
@@ -63,6 +83,9 @@ class GoldenSet:
     def __len__(self) -> int:
         return len(self.questions)
 
+    def count_by_phrasing(self, phrasing: Phrasing) -> int:
+        return sum(1 for question in self.questions if question.phrasing is phrasing)
+
 
 def _address(raw: Any, where: str) -> ChunkAddress:
     try:
@@ -72,7 +95,7 @@ def _address(raw: Any, where: str) -> ChunkAddress:
 
 
 def _parse_question(raw: Mapping[str, Any], manifest: Manifest, where: str) -> Question:
-    for key in ("id", "question", "municipality", "required_chunks", "label_source"):
+    for key in ("id", "question", "phrasing", "municipality", "required_chunks", "label_source"):
         if key not in raw:
             raise GoldenSetError(f"{where}: missing required key {key!r}")
     question_id = str(raw["id"])
@@ -87,6 +110,24 @@ def _parse_question(raw: Mapping[str, Any], manifest: Manifest, where: str) -> Q
     required = tuple(_address(item, where) for item in raw_required)
     if len({str(a) for a in required}) != len(required):
         raise GoldenSetError(f"{where}: required_chunks lists the same address twice")
+
+    try:
+        phrasing = Phrasing(str(raw["phrasing"]))
+    except ValueError as exc:
+        allowed = ", ".join(sorted(p.value for p in Phrasing))
+        raise GoldenSetError(f"{where}: phrasing must be one of {allowed}") from exc
+    phrasing_source = raw.get("phrasing_source")
+    if phrasing is Phrasing.HARVESTED and not phrasing_source:
+        raise GoldenSetError(
+            f"{where}: phrasing 'harvested' claims the wording came from a public "
+            "resident-facing page, so phrasing_source must name that page. An unsourced "
+            "claim of independence is worth nothing."
+        )
+    if phrasing is Phrasing.AUTHORED and phrasing_source:
+        raise GoldenSetError(
+            f"{where}: phrasing 'authored' means the wording is ours, so phrasing_source "
+            "must be absent -- otherwise the provenance of the two is indistinguishable."
+        )
 
     municipality = str(raw["municipality"])
     authority = manifest.resolve_municipality(municipality)
@@ -114,6 +155,8 @@ def _parse_question(raw: Mapping[str, Any], manifest: Manifest, where: str) -> Q
     return Question(
         id=question_id,
         question=str(raw["question"]),
+        phrasing=phrasing,
+        phrasing_source=None if phrasing_source is None else str(phrasing_source),
         municipality=municipality,
         required_chunks=required,
         required_branches=tuple(branches),

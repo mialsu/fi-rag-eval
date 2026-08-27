@@ -18,6 +18,7 @@ from typing import Any
 
 from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import EvaluationRun
+from fi_rag_eval.golden import Phrasing
 from fi_rag_eval.ingest import IngestReport
 from fi_rag_eval.metrics import Metrics
 
@@ -43,6 +44,7 @@ class Baseline:
     complete_set_recall: float
     per_chunk_recall: float
     mean_reciprocal_rank: float
+    lexical_leakage: float
 
     @classmethod
     def from_metrics(cls, metrics: Metrics, commit: str) -> Baseline:
@@ -54,6 +56,7 @@ class Baseline:
             complete_set_recall=metrics.complete_set_recall,
             per_chunk_recall=metrics.per_chunk_recall,
             mean_reciprocal_rank=metrics.mean_reciprocal_rank,
+            lexical_leakage=metrics.lexical_leakage,
         )
 
     @classmethod
@@ -71,6 +74,7 @@ class Baseline:
                 complete_set_recall=float(payload["complete_set_recall"]),
                 per_chunk_recall=float(payload["per_chunk_recall"]),
                 mean_reciprocal_rank=float(payload["mean_reciprocal_rank"]),
+                lexical_leakage=float(payload["lexical_leakage"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise BaselineError(f"{path} is not a usable baseline: {exc}") from exc
@@ -138,6 +142,19 @@ def compare(baseline: Baseline, metrics: Metrics) -> list[str]:
     ):
         if now < was:
             problems.append(f"{label} fell from {was:.3f} to {now:.3f}")
+
+    # Guarded in the opposite direction, deliberately. Every metric above is a
+    # score to defend from falling; leakage is a *handicap* to defend from
+    # rising. A question edited to look more like its target chunk raises the
+    # headline while making the harness weaker, and that is the one "improvement"
+    # this project must never accept silently. Falling leakage is progress and
+    # passes.
+    if metrics.lexical_leakage > baseline.lexical_leakage:
+        problems.append(
+            f"lexical leakage rose from {baseline.lexical_leakage:.3f} to "
+            f"{metrics.lexical_leakage:.3f} — the golden set got easier, which "
+            "inflates every score above it"
+        )
     return problems
 
 
@@ -159,6 +176,7 @@ def format_ingest(report: IngestReport) -> str:
 
 def format_run(run: EvaluationRun, *, commit: str) -> str:
     metrics = run.metrics
+    harvested = sum(1 for r in run.runs if r.question.phrasing is Phrasing.HARVESTED)
     lines = [
         "fi-rag-eval — lexical retrieval baseline",
         f"commit {commit}   k={metrics.k}",
@@ -167,6 +185,8 @@ def format_run(run: EvaluationRun, *, commit: str) -> str:
         f"golden set: {metrics.questions} questions, {metrics.required_chunks} required "
         f"chunks, {sum(1 for r in run.runs if len(r.question.required_chunks) > 1)} "
         "spanning more than one chunk",
+        f"            phrasing: {harvested} harvested verbatim from resident-facing pages, "
+        f"{metrics.questions - harvested} authored",
         "",
         f"{'metric':<34}{'value':>8}   N",
         "-" * 62,
@@ -176,6 +196,12 @@ def format_run(run: EvaluationRun, *, commit: str) -> str:
         f"{metrics.per_chunk_recall:>8.3f}   {metrics.required_chunks} chunks",
         f"{'MRR (diagnostic)':<34}{metrics.mean_reciprocal_rank:>8.3f}   "
         f"{metrics.questions} questions",
+        f"{'lexical leakage (of the QUESTIONS)':<34}{metrics.lexical_leakage:>8.3f}   "
+        f"{metrics.leakage_lexemes} stems",
+        "",
+        "  leakage is how much of each question's own vocabulary its target chunk already",
+        "  contains. It is not a retrieval score — it says how easy the questions are, and",
+        "  the headline above cannot be read without it. Gated to never rise.",
         "",
         f"miss breakdown ({metrics.misses} of {metrics.required_chunks} required chunks "
         "not retrieved)",
@@ -197,9 +223,11 @@ def format_run(run: EvaluationRun, *, commit: str) -> str:
             ),
             "-",
         )
+        leakage = outcome.lexical_leakage
         lines.append(
             f"  {mark}  {outcome.question_id:<48} "
-            f"{len(outcome.found)}/{len(outcome.required)} required, first at {first}"
+            f"{len(outcome.found)}/{len(outcome.required)} required, first at {first}, "
+            f"leakage {'n/a' if leakage is None else format(leakage, '.0%')}"
         )
         for miss in outcome.misses:
             lines.append(f"          missed {miss.address}  [{miss.kind}]")

@@ -1,124 +1,221 @@
 # Golden set -- Lounais-Suomen jätehuoltolautakunta, in force 1.8.2024.
 #
-# HAND-WRITTEN FROM THE SOURCE PDF, BEFORE ANY RETRIEVAL WAS RUN. Every entry's
-# `label_source` names the clause and the sentence the label was read from. No
-# label was taken from, checked against, or adjusted after seeing what the
-# retriever returned -- if any had been, recall@k would be measuring the
-# retriever against itself and every number downstream would inherit that.
+# ==============================================================================
+# HOW THESE QUESTIONS WERE WRITTEN, AND WHY IT IS THE MOST IMPORTANT THING HERE
+# ==============================================================================
 #
-# `required_chunks` is the set the answer cannot be correct without. It is
-# deliberately not "every chunk that mentions the topic": requiring the
-# definition of every term would make most questions require half the corpus.
+# The first version of this file was written with the source PDF open. Measured
+# consequence: 60% of each question's stemmed content words appeared verbatim in
+# its own target chunk, against 39% for real questions harvested from the
+# authority's resident-facing pages. The harness was ~1.5x easier than the task,
+# and blind to the vocabulary gap it exists to measure.
 #
-# `required_branches` and `forbidden` follow ADR-0003 and are validated but not
-# scored until the answering slice. They are written now so that slice does not
-# force a relabelling pass.
+# This version is built two ways, recorded per question in `phrasing`:
+#
+#   harvested -- the wording is copied VERBATIM from a public resident-facing
+#                page, written by the authority for residents and entirely
+#                independent of my reading of the regulations. `phrasing_source`
+#                names the page. These questions cannot be circular: nobody
+#                consulted the target chunk to write them.
+#
+#   authored  -- I wrote it, under one rule taken from the harvested sample:
+#                *name the thing with the document's noun, ask with a person's
+#                verb.* Real questions leak the topic noun (`biojät`,
+#                `kompostor`) because that is what the thing is called; they do
+#                not leak the statutory register (`tyhjennettäv`, `ilmoitettav`,
+#                `enin`). Several are phrased in words the document never uses
+#                at all -- "taloyhtiö", "asunto", "mökki", "keskusta" -- because
+#                that is what residents say.
+#
+# `make eval` reports lexical leakage every run and the gate fails if it RISES.
+# ~40% is the floor, not 0%: driving it to zero would mean questions that avoid
+# naming their own subject.
+#
+# LABELS ARE STILL HAND-WRITTEN FROM THE SOURCE. `label_source` names the clause
+# and sentence each was read from. No label was taken from, checked against, or
+# adjusted after seeing retriever output. Question text was frozen before the
+# target clause was looked up, so the phrasing cannot have been fitted to it.
+#
+# `required_chunks` is the set the answer cannot be correct without -- not every
+# chunk that mentions the topic. `required_branches` and `forbidden` follow
+# ADR-0003 and are validated but not scored until the answering slice.
 version: 1
 questions:
-  - id: biojateastian-tyhjennysvali-kesalla
-    question: Kuinka usein biojäteastia on tyhjennettävä kesäaikana?
-    municipality: Turku
-    required_chunks:
-      - lounais-suomi@2024-08-01#26
-    required_branches:
-      - claim: >-
-          Kesäaikana (viikot 18-40) biojäteastia on tyhjennettävä vähintään
-          kahden viikon välein.
-        chunk: lounais-suomi@2024-08-01#26
-      - claim: >-
-          Jos biojäte kerätään tuulettuvaan biojäteastiaan, syväkeräysastiaan tai
-          jäähdytettyyn jätehuoneeseen sijoitettuun jäteastiaan, pisin
-          tyhjennysväli on neljä viikkoa.
-        chunk: lounais-suomi@2024-08-01#26
-    forbidden:
-      - Yhden tyhjennysvälin ilmoittaminen mainitsematta astiatyypin poikkeusta.
-      - Talviajan poikkeuksen (4 viikkoa taajaman ulkopuolella) esittäminen kesäaikaa koskevana.
-    label_source: >-
-      26 § Jäteastioiden tyhjennysvälit, tyhjennysvälitaulukko: rivi "Biojäte"
-      sarake "Pisin tyhjennysväli kesäaikana (viikot 18-40)" = 2 viikkoa; rivi
-      "Biojäte, joka kerätään tuulettuvaan biojäteastiaan, syväkeräysastiaan, tai
-      jäähdytettyyn jätehuoneeseen sijoitettuihin jäteastioihin" = 4 viikkoa.
-
-  - id: biojatteen-erilliskerays-huoneistomaara
-    question: >-
-      Kuinka monta huoneistoa kiinteistöllä pitää olla, jotta biojätteelle on
-      järjestettävä erilliskeräys?
+  # ---------------------------------------------------------------- harvested
+  - id: biojatteen-kerays-jarjestaminen
+    question: Miten biojätteen keräys tulee järjestää?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/lajittelu-ja-neuvonta/biojatteen-erilliskerays/
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#15
     required_branches:
       - claim: >-
-          Biojätteen erilliskeräys on järjestettävä, kun kiinteistöllä on yksi tai
+          Biojätteelle on järjestettävä erillinen jäteastia, kun kiinteistöllä on yksi tai
           useampi huoneisto ja kiinteistö sijaitsee yli 10 000 asukkaan taajamassa.
         chunk: lounais-suomi@2024-08-01#15
       - claim: >-
-          Se, sijaitseeko kiinteistö yli 10 000 asukkaan taajamassa, ei ratkea näistä
-          määräyksistä: rajaus on Lounaistiedon karttapalvelussa, ja siitä poiketaan
-          yksittäisten kiinteistöjen kohdalla.
+          Velvoite ei koske kiinteistöä, jonka biojätteet kompostoidaan 17 §:n mukaisesti.
+        chunk: lounais-suomi@2024-08-01#15
+      - claim: >-
+          Kiinteistö, jota velvoite ei koske, voi liittyä erilliskeräykseen vapaaehtoisesti
+          sopimalla siitä LSJH:n kanssa.
         chunk: lounais-suomi@2024-08-01#15
     forbidden:
-      - Väite, että biojätteen erilliskeräys koskee jokaista kiinteistöä, jolla on vähintään yksi huoneisto.
-      - Viiden huoneiston rajan esittäminen biojätettä koskevana.
+      - Väite, että biojätteen erilliskeräys koskee jokaista kiinteistöä.
       - Kiinteistön taajamasijainnin ratkaiseminen kysyjän puolesta.
     label_source: >-
-      15 § Asumisessa syntyvien jätteiden lajittelu- ja erilliskeräysvelvoitteet,
-      velvoitetaulukko: rivi "1 tai enemmän / yli 10 000 asukkaan taajamassa"
-      merkitty sarakkeeseen "Biojäte"; viiden huoneiston rivi koskee
-      pakkausjätteitä. Taajamarajauksen ulkoisuus samasta pykälästä:
-      "Karttaa taajamista ... ylläpidetään ... Lounaistiedossa."
+      15 § velvoitetaulukko, rivi "1 tai enemmän / yli 10 000 asukkaan taajamassa"
+      sarakkeessa "Biojäte"; sama pykälä: "Biojätteiden erilliskeräysvelvoite ei koske
+      kiinteistöjä, joiden biojätteet kompostoidaan näiden määräysten 17 §:n mukaisesti."
 
-  - id: kompostointi-vapauttaa-erilliskeraysvelvoitteesta
-    question: >-
-      Vapauttaako biojätteen kompostointi kiinteistön biojätteen
-      erilliskeräysvelvoitteesta, ja millä ehdoilla?
+  - id: kerata-vai-kompostoida
+    question: Kerätä vai kompostoida?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/lajittelu-ja-neuvonta/biojatteen-erilliskerays/
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#15
       - lounais-suomi@2024-08-01#17
     required_branches:
       - claim: >-
-          Biojätteiden erilliskeräysvelvoite ei koske kiinteistöjä, joiden biojätteet
-          kompostoidaan näiden määräysten 17 §:n mukaisesti.
+          Kompostointi on vaihtoehto erilliskeräykselle: erilliskeräysvelvoite ei koske
+          kiinteistöä, jonka biojätteet kompostoidaan 17 §:n mukaisesti.
         chunk: lounais-suomi@2024-08-01#15
       - claim: >-
-          Vapautus edellyttää 17 §:n mukaista kompostointia: biojätteitä saa kompostoida
-          vain niitä varten suunnitellussa suljetussa ja ilmastoidussa kompostorissa,
-          johon eläimet eivät pääse.
+          Kompostoinnin on tapahduttava niitä varten suunnitellussa suljetussa ja
+          ilmastoidussa kompostorissa, johon eläimet eivät pääse.
         chunk: lounais-suomi@2024-08-01#17
     forbidden:
-      - Väite, että mikä tahansa kompostointi riittää vapautukseen.
-      - Vapautuksen esittäminen ilman 17 §:n asettamia ehtoja.
+      - Väite, että mikä tahansa kompostointi korvaa erilliskeräyksen.
     label_source: >-
-      15 §: "Biojätteiden erilliskeräysvelvoite ei koske kiinteistöjä, joiden
-      biojätteet kompostoidaan näiden määräysten 17 §:n mukaisesti." 17 §:
-      "Biojätteitä saa kompostoida vain niitä varten suunnitellussa suljetussa ja
-      ilmastoidussa kompostorissa, johon eläimet eivät pääse." Kaksi pykälää,
-      koska 15 § yksin ei kerro mitä "17 §:n mukaisesti" vaatii.
+      15 §:n vapautuslause yhdessä 17 §:n kanssa: "Biojätteitä saa kompostoida vain niitä
+      varten suunnitellussa suljetussa ja ilmastoidussa kompostorissa, johon eläimet eivät
+      pääse." Kaksi pykälää, koska 15 § ei kerro mitä "17 §:n mukaisesti" tarkoittaa.
 
-  - id: kompostoinnista-ilmoittaminen-maaraaika
-    question: Missä ajassa biojätteen kompostoinnin aloittamisesta on ilmoitettava?
+  - id: miksi-biojatteet-pakataan
+    question: Miksi biojätteet pitää pakata?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/lajittelu-ja-neuvonta/biojatteen-erilliskerays/
     municipality: Turku
     required_chunks:
+      - lounais-suomi@2024-08-01#25
+    required_branches:
+      - claim: >-
+          Biojäte on pakattava biohajoavaan pussiin, kuten paperipussiin, ennen sen
+          sijoittamista biojäteastiaan.
+        chunk: lounais-suomi@2024-08-01#25
+      - claim: Biojäteastiaan ei saa laittaa nestemäistä biojätettä.
+        chunk: lounais-suomi@2024-08-01#25
+    forbidden:
+      - Muovipussin esittäminen sallittuna biojätteen pakkauksena.
+    label_source: >-
+      25 § Jäteastioiden täyttäminen: "Biojäte on pakattava biohajoavaan pussiin kuten
+      esimerkiksi paperipussiin ennen sen sijoittamista biojäteastiaan.";
+      "Biojäteastiaan ei saa laittaa nestemäistä biojätettä."
+
+  - id: kompostoinnin-aloittaminen
+    question: Miten aloittaa kompostointi?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/mita-haluat-lajitella/kompostointi/
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#17
       - lounais-suomi@2024-08-01#18
     required_branches:
       - claim: >-
-          Jätteen haltijan on ilmoitettava jätehuoltoviranomaiselle kahden kuukauden
-          sisällä biojätteiden kompostoinnin aloittamisesta.
-        chunk: lounais-suomi@2024-08-01#18
+          Biojätteitä saa kompostoida vain niitä varten suunnitellussa suljetussa ja
+          ilmastoidussa kompostorissa, johon eläimet eivät pääse.
+        chunk: lounais-suomi@2024-08-01#17
       - claim: >-
-          Tiedot on päivitettävä vähintään viiden vuoden välein, ja lopettamisesta on
-          ilmoitettava kahden kuukauden kuluessa.
+          Aloittamisesta on ilmoitettava jätehuoltoviranomaiselle kahden kuukauden sisällä.
         chunk: lounais-suomi@2024-08-01#18
     forbidden:
-      - Ilmoitusvelvollisuuden esittäminen jätteenkuljetusyritykselle kuuluvana.
+      - Ilmoitusvelvollisuuden jättäminen mainitsematta.
     label_source: >-
-      18 § Biojätteen kompostoinnista ilmoittaminen: "Jätteen haltijan on
-      ilmoitettava jätehuoltoviranomaiselle vähintään kahden kuukauden sisällä
-      biojätteiden kompostoinnin aloittamisesta"; "Tieto kompostoinnin
-      jatkumisesta ... on päivitettävä vähintään viiden vuoden välein."
+      17 §:n kompostorivaatimukset yhdessä 18 §:n ilmoitusvelvollisuuden kanssa: "Jätteen
+      haltijan on ilmoitettava jätehuoltoviranomaiselle vähintään kahden kuukauden sisällä
+      biojätteiden kompostoinnin aloittamisesta." Kaksi pykälää, koska aloittaminen on sekä
+      tekninen että hallinnollinen toimi.
 
-  - id: biojateastian-pesutiheys
-    question: Kuinka monta kertaa vuodessa biojäteastia on pestävä?
+  - id: mita-kompostoriin-laitetaan
+    question: Mitä kompostoriin laitetaan?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/mita-haluat-lajitella/kompostointi/
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#17
+    required_branches:
+      - claim: >-
+          Kompostoriin saa laittaa ainoastaan kompostoituvia jätteitä, jotka eivät haittaa
+          valmiin kompostituotteen käyttöä kiinteistöllä.
+        chunk: lounais-suomi@2024-08-01#17
+      - claim: >-
+          Kiinteistöllä saa kompostoida siellä syntyviä biojätteitä, kuivakäymäläjätteitä ja
+          puutarhajätteitä; kuivakäymäläjäte ja lemmikkien ulosteet vaativat suljetun ja
+          hyvin ilmastoidun kompostorin, jonka valumavesien pääsy maahan on estetty.
+        chunk: lounais-suomi@2024-08-01#17
+    forbidden:
+      - Haitallisten vieraslajien lisääntymiskykyisten kasvinosien esittäminen sallittuna.
+    label_source: >-
+      17 § Kompostointi: "Kompostoriin ja puutarhajätteen kompostiin saa laittaa ainoastaan
+      kompostoituvia jätteitä, jotka eivät haittaa valmiin kompostituotteen käyttöä
+      kiinteistöllä."; "Kuivakäymäläjätteitä, lemmikkieläinten ulosteita ... saa kompostoida
+      vain niitä varten suunnitellussa suljetussa ja hyvin ilmastoidussa kompostorissa."
+
+  - id: kompostorin-valinta
+    question: Miten kompostori valitaan?
+    phrasing: harvested
+    phrasing_source: https://lsjh.fi/mita-haluat-lajitella/kompostointi/
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#17
+    required_branches:
+      - claim: >-
+          Kompostorin on oltava biojätteille suunniteltu, suljettu ja ilmastoitu, eivätkä
+          eläimet saa päästä siihen.
+        chunk: lounais-suomi@2024-08-01#17
+      - claim: >-
+          Tilavuuden tulee riittää kaikkien kompostoria käyttävien biojätteille, kylmien
+          vuodenaikojen hidastuminen huomioiden.
+        chunk: lounais-suomi@2024-08-01#17
+      - claim: >-
+          Kompostori voi olla enintään viiden asuinhuoneiston tai vapaa-ajan asunnon
+          yhteinen, ja käyttäjien asunnot enintään kilometrin etäisyydellä siitä.
+        chunk: lounais-suomi@2024-08-01#17
+    forbidden:
+      - Avonaisen kompostorin esittäminen biojätteelle sallittuna.
+    label_source: >-
+      17 §: "Biojätteitä saa kompostoida vain niitä varten suunnitellussa suljetussa ja
+      ilmastoidussa kompostorissa, johon eläimet eivät pääse. Kompostorin tilavuuden tulee
+      riittää ..."; "Biojätteen kompostori voi olla enintään viiden asuinhuoneiston tai
+      vapaa-ajan asunnon yhteinen." Avonainen kompostori on sallittu vain puutarhajätteelle.
+
+  # ----------------------------------------------------------------- authored
+  - id: biojateastian-tyhjennys-kesalla
+    question: Kuinka usein biojäteastia tyhjennetään kesällä?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#26
+    required_branches:
+      - claim: Kesäaikana (viikot 18-40) biojäteastia on tyhjennettävä vähintään kahden viikon välein.
+        chunk: lounais-suomi@2024-08-01#26
+      - claim: >-
+          Tuulettuvaan biojäteastiaan, syväkeräysastiaan tai jäähdytettyyn jätehuoneeseen
+          sijoitettuun astiaan kerättävällä biojätteellä pisin tyhjennysväli on neljä viikkoa.
+        chunk: lounais-suomi@2024-08-01#26
+    forbidden:
+      - Yhden tyhjennysvälin ilmoittaminen mainitsematta astiatyypin poikkeusta.
+      - Talviajan poikkeuksen esittäminen kesäaikaa koskevana.
+    label_source: >-
+      26 § tyhjennysvälitaulukko: rivi "Biojäte" sarake kesäaika = 2 viikkoa; rivi "Biojäte,
+      joka kerätään tuulettuvaan biojäteastiaan, syväkeräysastiaan, tai jäähdytettyyn
+      jätehuoneeseen sijoitettuihin jäteastioihin" = 4 viikkoa.
+
+  - id: biojateastian-pesu
+    question: Montako kertaa vuodessa biojäteastia pestään?
+    phrasing: authored
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#27
@@ -126,69 +223,160 @@ questions:
       - claim: Biojäteastia on puhdistettava vähintään kaksi kertaa vuodessa.
         chunk: lounais-suomi@2024-08-01#27
       - claim: >-
-          Kiinteistöittäisessä jätteenkuljetuksessa jäteastioiden kunnosta ja
-          puhdistuksesta huolehtii kiinteistön haltija.
+          Kiinteistöittäisessä jätteenkuljetuksessa jäteastioiden kunnosta ja puhdistuksesta
+          huolehtii kiinteistön haltija.
         chunk: lounais-suomi@2024-08-01#27
     forbidden:
       - Tyhjennysvälin (26 §) esittäminen pesutiheytenä.
     label_source: >-
-      27 § Jäteastioiden kunnossapito ja pesu: "Sekajäteastia on kuitenkin
-      puhdistettava vähintään kerran vuodessa ja biojäteastia vähintään kaksi
-      kertaa vuodessa." Tarkoituksellinen avainsana-ansa: sana "biojäteastia"
-      esiintyy myös 25 §:ssä ja 26 §:ssä, ja "pesu" myös 23 §:ssä.
+      27 § Jäteastioiden kunnossapito ja pesu: "Sekajäteastia on kuitenkin puhdistettava
+      vähintään kerran vuodessa ja biojäteastia vähintään kaksi kertaa vuodessa."
+      Tarkoituksellinen avainsana-ansa: "biojäteastia" esiintyy myös 25 §:ssä ja 26 §:ssä,
+      ja "pesu" myös 23 §:ssä.
 
-  - id: biojatteen-maaritelma
-    question: Mitä biojätteellä tarkoitetaan näissä jätehuoltomääräyksissä?
+  - id: biojate-mita-tarkoittaa
+    question: Mitä biojäte tarkoittaa?
+    phrasing: authored
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#2.biojatteella
     required_branches:
       - claim: >-
-          Biojätteellä tarkoitetaan biologisesti hajoavaa elintarvike- ja
-          keittiöjätettä ja elintarviketuotannossa syntyvää vastaavaa jätettä.
+          Biojätteellä tarkoitetaan biologisesti hajoavaa elintarvike- ja keittiöjätettä ja
+          elintarviketuotannossa syntyvää vastaavaa jätettä.
+        chunk: lounais-suomi@2024-08-01#2.biojatteella
+      - claim: >-
+          Määräysten määritelmä poikkeaa jätelaista siten, ettei se sisällä puutarha- ja
+          puistojätettä.
         chunk: lounais-suomi@2024-08-01#2.biojatteella
     forbidden:
-      - Puutarha- ja puistojätteen esittäminen biojätteen määritelmään kuuluvana.
+      - Puutarhajätteen esittäminen biojätteen määritelmään kuuluvana.
     label_source: >-
       2 § Määritelmät, kappale "Biojätteellä biologisesti hajoavaa elintarvike- ja
-      keittiöjätettä ...". Testaa ADR-0004:n ensimmäistä poikkeusta: määritelmät
-      pilkotaan yhdeksi chunkiksi per termi, ja osoite on paragrafin oma etuliite.
+      keittiöjätettä ... (Määritelmä poikkeaa jätelain mukaisesta biojätteen määritelmästä
+      siten, että se ei sisällä puutarha- ja puistojätettä.)"
 
-  - id: biojatteen-lajittelu-kolme-huoneistoa
+  - id: mika-on-taajama
+    question: Mikä on taajama?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#2.taajamalla
+    required_branches:
+      - claim: >-
+          Taajamalla tarkoitetaan rakennusryhmää, jossa on vähintään 200 asukasta ja jossa
+          rakennusten välinen etäisyys on yleensä enintään 200 metriä.
+        chunk: lounais-suomi@2024-08-01#2.taajamalla
+    forbidden:
+      - Yksittäisen kiinteistön taajamasijainnin ratkaiseminen määritelmän perusteella.
+    label_source: >-
+      2 § Määritelmät: "Taajamalla rakennusryhmää, jossa on vähintään 200 asukasta ja jossa
+      rakennusten välinen etäisyys on yleensä enintään 200 metriä." Lyhyt määritelmächunk,
+      jonka 26 §:n kaltaiset pitkät pykälät voittavat ts_rankissa.
+
+  - id: taloyhtio-kolme-asuntoa-biojate
     question: >-
-      Kiinteistöllä on kolme huoneistoa ja se sijaitsee taajamassa. Onko biojäte
-      lajiteltava erikseen?
+      Meillä on taloyhtiössä kolme asuntoa keskustassa. Tarvitaanko biojäteastia?
+    phrasing: authored
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#13
       - lounais-suomi@2024-08-01#15
     required_branches:
       - claim: >-
-          Biojätteet on lajiteltava erikseen kiinteistöillä, jotka kuuluvat 15 tai 16 §:n
-          mukaan biojätteiden erilliskeräyksen piiriin tai jotka kompostoivat biojätteet
-          omatoimisesti 17 §:n mukaisesti.
+          Biojäte on lajiteltava erikseen kiinteistöillä, jotka kuuluvat 15 tai 16 §:n mukaan
+          erilliskeräyksen piiriin tai jotka kompostoivat biojätteet 17 §:n mukaisesti.
         chunk: lounais-suomi@2024-08-01#13
       - claim: >-
-          Kolme huoneistoa ei sinänsä tuo kiinteistöä biojätteen erilliskeräyksen piiriin:
-          ratkaisevaa on yli 10 000 asukkaan taajama, jossa raja on yksi huoneisto.
+          Ratkaisevaa ei ole asuntojen määrä vaan taajama: yli 10 000 asukkaan taajamassa
+          raja on yksi huoneisto, joten kolmen asunnon kiinteistö kuuluu velvoitteen piiriin
+          siellä ja jää sen ulkopuolelle muualla.
         chunk: lounais-suomi@2024-08-01#15
       - claim: >-
-          Jos biojätettä ei kompostoida 17 §:n mukaisesti eikä kerätä omaan astiaan
-          vapaaehtoisessa kuljetuksessa, biojätteet laitetaan sekajätteen jäteastiaan.
+          Jos kiinteistö ei kuulu erilliskeräyksen piiriin eikä kompostoi, biojätteet
+          laitetaan sekajäteastiaan.
         chunk: lounais-suomi@2024-08-01#13
     forbidden:
       - Viiden huoneiston rajan esittäminen biojätettä koskevana.
       - Vastaaminen kertakaikkisella kyllä tai ei ilman taajamaehtoa.
+      - Sanan "keskusta" tulkitseminen yli 10 000 asukkaan taajamaksi ilman karttatietoa.
     label_source: >-
-      13 § Kiinteistöllä lajiteltavat jätelajit: "Biojätteet on lajiteltava erikseen
-      kiinteistöillä, jotka kuuluvat näiden jätehuoltomääräysten 15 tai 16 §:n mukaan
-      ... tai jotka kompostoivat ..."; "Jos biojätettä ei kompostoida ... tulee
-      biojätteet laittaa sekajätteen jäteastiaan." 15 §: velvoitetaulukon
-      huoneistorajat. Kaksi pykälää, koska 13 § määrää lajitteluvelvoitteen mutta
-      delegoi soveltamisalan 15 §:lle.
+      13 §: "Biojätteet on lajiteltava erikseen kiinteistöillä, jotka kuuluvat näiden
+      jätehuoltomääräysten 15 tai 16 §:n mukaan ... tai jotka kompostoivat ...";
+      "Jos biojätettä ei kompostoida ... tulee biojätteet laittaa sekajätteen jäteastiaan."
+      15 §: velvoitetaulukon huoneistorajat. Kysymys on tarkoituksella asukkaan sanoilla:
+      "taloyhtiö", "asunto" ja "keskusta" eivät esiinny määräyksissä lainkaan.
 
-  - id: kasin-siirrettavan-jateastian-enimmaispaino
-    question: Kuinka paljon jätettä käsin siirrettävään jäteastiaan saa enintään laittaa?
+  - id: sekajateastia-pakollinen
+    question: Pitääkö joka kiinteistöllä olla sekajäteastia?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#6
+    required_branches:
+      - claim: >-
+          Kaikilla kiinteistöittäisen jätteenkuljetuksen piiriin kuuluvilla kiinteistöillä
+          tulee olla käytössään vähintään sekajätteelle tarkoitettu jäteastia.
+        chunk: lounais-suomi@2024-08-01#6
+      - claim: >-
+          Lisäksi kiinteistöillä tulee olla jäteastiat erilliskerättäville jätteille 15 ja
+          16 §:n mukaisesti.
+        chunk: lounais-suomi@2024-08-01#6
+    forbidden:
+      - Velvoitteen esittäminen kaikkia kiinteistöjä koskevana kuljetusmuodosta riippumatta.
+    label_source: >-
+      6 § Kiinteistökohtaiset jäteastiat: "Kaikilla kiinteistöittäisen jätteenkuljetuksen
+      piiriin kuuluvilla kiinteistöillä tulee olla käytössään vähintään sekajätteelle
+      tarkoitettu jäteastia." Ehto on kuljetuksen piiriin kuuluminen, ei kiinteistö sinänsä.
+
+  - id: kuka-hankkii-jateastiat
+    question: Kuka hankkii jäteastiat?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#6
+    required_branches:
+      - claim: >-
+          Kunnan järjestämässä jätteenkuljetuksessa LSJH toimittaa jäteastiat niille
+          kiinteistöille, joilla käytetään käsin siirrettäviä 140-660 litran jäteastioita.
+        chunk: lounais-suomi@2024-08-01#6
+      - claim: >-
+          Muiden kuin käsin siirrettävien pinta-astioiden hankinnasta vastaa kiinteistön
+          haltija, samoin kaikista astioista kiinteistön haltijan järjestämässä
+          jätteenkuljetuksessa.
+        chunk: lounais-suomi@2024-08-01#6
+    forbidden:
+      - Yhden vastuutahon ilmoittaminen erittelemättä kuljetusmuotoa ja astiatyyppiä.
+    label_source: >-
+      6 §: "Kunnan järjestämässä jätteenkuljetuksessa LSJH toimittaa jäteastiat niille
+      kiinteistöille, joilla käytetään käsin siirrettäviä 140-660 litran jäteastioita.";
+      "Kunnan järjestämässä jätteenkuljetuksessa muiden kuin käsin siirrettävien
+      pinta-astioiden hankinnasta kiinteistölle vastaa kiinteistön haltija."
+
+  - id: pelkka-jatesakki
+    question: Riittääkö pelkkä jätesäkki?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#23
+    required_branches:
+      - claim: >-
+          Kiinteistöittäisessä jätteenkuljetuksessa ei saa käyttää jätesäkeille tarkoitettuja
+          jätesäkkitelineitä eikä pelkkää jätesäkkiä.
+        chunk: lounais-suomi@2024-08-01#23
+      - claim: >-
+          Hyväksyttyjä ovat esimerkiksi käsin siirrettävät kannelliset, pyörin varustetut
+          jäteastiat, kannelliset jätesäiliöt, vaihtolavasäiliöt ja maahan upotetut säiliöt.
+        chunk: lounais-suomi@2024-08-01#23
+    forbidden:
+      - Jätesäkin esittäminen sallittuna jäteastiana.
+    label_source: >-
+      23 § Jäteastiatyypit: "Kiinteistöittäisessä jätteenkuljetuksessa ei saa käyttää:
+      Jätesäkeille tarkoitettuja jätesäkkitelineitä tai pelkkää jätesäkkiä."
+
+  - id: jateastian-paino
+    question: Kuinka painava jäteastia saa olla?
+    phrasing: authored
     municipality: Turku
     required_chunks:
       - lounais-suomi@2024-08-01#25
@@ -200,7 +388,151 @@ questions:
     forbidden:
       - Enimmäispainon esittäminen suosituksena eikä rajana.
     label_source: >-
-      25 § Jäteastioiden täyttäminen: "Käsin siirrettäväksi tarkoitettuihin
-      jäteastioihin saa työturvallisuussyistä laittaa jätettä enintään 60 kg."
-      26 § viittaa samaan lukuun ("25 §:ssä määritellyn 60 kg:n ... ylitys"), joten
-      oikea luku on löydettävissä väärästä pykälästä -- vaadittu chunk on 25 §.
+      25 § Jäteastioiden täyttäminen: "Käsin siirrettäväksi tarkoitettuihin jäteastioihin saa
+      työturvallisuussyistä laittaa jätettä enintään 60 kg." 26 § viittaa samaan lukuun, joten
+      oikea luku löytyy myös väärästä pykälästä; vaadittu chunk on 25 §.
+
+  - id: risujen-poltto-pihalla
+    question: Saako pihalla polttaa risuja?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#20
+    required_branches:
+      - claim: >-
+          Taajaman ulkopuolella saa polttaa avopolttona vähäisiä määriä kuivia risuja,
+          järviruokoa, kuivia lehtiä ja oksia.
+        chunk: lounais-suomi@2024-08-01#20
+      - claim: >-
+          Kiinteistön tulipesissä saa polttaa käsittelemätöntä puujätettä, risuja ja oksia.
+        chunk: lounais-suomi@2024-08-01#20
+      - claim: Jätteiden hävittäminen polttamalla on muutoin kielletty.
+        chunk: lounais-suomi@2024-08-01#20
+    forbidden:
+      - Avopolton esittäminen sallittuna taajamassa.
+      - Yksiselitteinen kyllä tai ei ilman taajamaehtoa.
+    label_source: >-
+      20 § Jätteen polttaminen: "Jätteiden hävittäminen polttamalla on kielletty.";
+      "Taajaman ulkopuolella saa polttaa avopolttona vähäisiä määriä kuivia risuja,
+      järviruokoa, kuivia lehtiä ja oksia."; "Kiinteistön tulipesissä saa polttaa
+      käsittelemätöntä puujätettä, risuja ja oksia."
+
+  - id: naapurin-kanssa-yhteinen-astia
+    question: Voimmeko käyttää naapurin kanssa samaa jäteastiaa?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#7
+    required_branches:
+      - claim: >-
+          Lähekkäin sijaitsevien kiinteistöjen haltijat voivat sopia yhteisen jäteastian
+          käyttämisestä (kimppa).
+        chunk: lounais-suomi@2024-08-01#7
+      - claim: >-
+          Kimpalla on oltava vastuuhenkilö, ja aloittamisesta on ilmoitettava kirjallisesti
+          vähintään kaksi viikkoa etukäteen.
+        chunk: lounais-suomi@2024-08-01#7
+    forbidden:
+      - Ilmoitusvelvollisuuden ja vastuuhenkilön jättäminen mainitsematta.
+    label_source: >-
+      7 § Kiinteistöjen yhteinen jäteastia: "Lähekkäin sijaitsevien kiinteistöjen haltijat
+      voivat sopia yhteisen jäteastian käyttämisestä (nk. kimppa)."; "Kimpalla on oltava
+      vastuuhenkilö ..."; "Ilmoitukset kimpan aloittamisesta ja lopettamisesta on tehtävä
+      kirjallisesti vähintään kaksi viikkoa etukäteen." Kysymyksessä ei esiinny sanaa
+      "kimppa", jota määräykset käyttävät.
+
+  - id: yhteisen-astian-etaisyys
+    question: Kuinka kauas yhteinen jäteastia saa olla asunnosta?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#7
+    required_branches:
+      - claim: >-
+          Kimpan osakkaina olevien asuinhuoneistojen tai vapaa-ajan asuntojen etäisyys kimpan
+          keräyspaikasta saa olla korkeintaan yksi kilometri.
+        chunk: lounais-suomi@2024-08-01#7
+      - claim: >-
+          Etäisyysrajoitusta ei sovelleta, jos asunto ja sen käytössä oleva keräyspaikka
+          sijaitsevat saman yksityistien tai -tiestön varrella.
+        chunk: lounais-suomi@2024-08-01#7
+    forbidden:
+      - Kilometrirajan esittäminen poikkeuksettomana.
+    label_source: >-
+      7 §: "Kimpan osakkaina olevien asuinhuoneistojen tai vapaa-ajan asuntojen etäisyys
+      kimpan keräyspaikasta saa olla korkeintaan yksi kilometri. Tätä etäisyysrajoitusta ei
+      sovelleta, mikäli asuinhuoneisto tai vapaa-ajan asunto ja sen käytössä oleva
+      keräyspaikka sijaitsevat saman yksityistien tai -tiestön varrella."
+
+  - id: kuljetuksen-keskeytys-mokilta
+    question: Voiko jätteenkuljetuksen keskeyttää, kun mökki on talvella tyhjillään?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#9
+    required_branches:
+      - claim: >-
+          Kiinteistöittäinen jätteenkuljetus voidaan keskeyttää määräajaksi kiinteistön
+          ollessa asumattomana ja käyttämättömänä, ja jäteastioiden on oltava tyhjiä
+          keskeytyksen alkaessa.
+        chunk: lounais-suomi@2024-08-01#9
+      - claim: >-
+          Keskeytyksestä on ilmoitettava vähintään kaksi viikkoa ennen sen alkamista.
+        chunk: lounais-suomi@2024-08-01#9
+      - claim: >-
+          Vapaa-ajanasunnon keskeytyksen kestäessä yli vuoden on siitä ilmoitettava lisäksi
+          kirjallisesti jätehuoltoviranomaiselle.
+        chunk: lounais-suomi@2024-08-01#9
+    forbidden:
+      - Keskeytyksen esittäminen mahdollisena myös käytössä olevalle kiinteistölle.
+    label_source: >-
+      9 § Kiinteistöittäisen jätteenkuljetuksen keskeyttäminen määräajaksi:
+      "Kiinteistöittäinen jätteenkuljetus voidaan keskeyttää määräajaksi kiinteistön ollessa
+      asumattomana ja käyttämättömänä."; "Määräaikaisesta keskeytyksestä on ilmoitettava
+      vähintään kaksi viikkoa ennen keskeytyksen alkamista."; "vapaa-ajanasunnon kuljetuksen
+      keskeytyksen kestäessä yli yhden vuoden on keskeytyksestä ilmoitettava lisäksi
+      kirjallisesti jätehuoltoviranomaiselle." Sana "mökki" ei esiinny määräyksissä.
+
+  - id: poikkeus-maarayksista
+    question: Voiko määräyksistä hakea poikkeusta?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#48
+    required_branches:
+      - claim: >-
+          Jätehuoltoviranomainen voi yksittäistapauksissa perustelluista erityisistä syistä
+          myöntää luvan poiketa jätehuoltomääräyksistä.
+        chunk: lounais-suomi@2024-08-01#48
+      - claim: >-
+          Poikkeaminen ei saa vaarantaa asianmukaista jätehuollon järjestämistä, aiheuttaa
+          vaaraa tai haittaa ympäristölle tai terveydelle tai aiheuttaa roskaantumista.
+        chunk: lounais-suomi@2024-08-01#48
+    forbidden:
+      - Poikkeuksen esittäminen ehdottomana oikeutena.
+    label_source: >-
+      48 § Poikkeaminen jätehuoltomääräyksistä: "Jätehuoltoviranomainen voi
+      yksittäistapauksissa perustelluista erityisistä syistä myöntää luvan poiketa näistä
+      jätehuoltomääräyksistä."
+
+  - id: kompostointi-ilmoitus-milloin
+    question: Milloin kompostoinnista pitää ilmoittaa?
+    phrasing: authored
+    municipality: Turku
+    required_chunks:
+      - lounais-suomi@2024-08-01#18
+    required_branches:
+      - claim: >-
+          Aloittamisesta on ilmoitettava jätehuoltoviranomaiselle kahden kuukauden sisällä.
+        chunk: lounais-suomi@2024-08-01#18
+      - claim: >-
+          Lopettamisesta on ilmoitettava kahden kuukauden kuluessa, ja tiedot on päivitettävä
+          vähintään viiden vuoden välein.
+        chunk: lounais-suomi@2024-08-01#18
+    forbidden:
+      - Ilmoituksen esittäminen LSJH:lle kuuluvana jätehuoltoviranomaisen sijaan.
+    label_source: >-
+      18 § Biojätteen kompostoinnista ilmoittaminen: "Jätteen haltijan on ilmoitettava
+      jätehuoltoviranomaiselle vähintään kahden kuukauden sisällä biojätteiden kompostoinnin
+      aloittamisesta"; "Kompostoinnin lopettamisesta on ilmoitettava ... kahden kuukauden
+      kuluessa."; "on päivitettävä vähintään viiden vuoden välein."

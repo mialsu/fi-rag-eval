@@ -305,6 +305,25 @@ def resolve_addresses(
         return {str(row[0]) for row in cur.fetchall()}
 
 
+def chunk_lexemes(
+    conn: psycopg.Connection[tuple[object, ...]], addresses: Sequence[str]
+) -> set[str]:
+    """The union of stemmed tokens in these chunks, as the index sees them.
+
+    Used to measure how much of a question's own vocabulary is already sitting in
+    the chunk it is supposed to retrieve -- see `metrics.lexical_leakage`.
+    """
+    if not addresses:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT entry.lexeme FROM chunk, unnest(chunk.tsv) AS entry "
+            "WHERE chunk.address = ANY(%s)",
+            (list(addresses),),
+        )
+        return {str(row[0]) for row in cur.fetchall()}
+
+
 def addresses_matching(
     conn: psycopg.Connection[tuple[object, ...]],
     *,

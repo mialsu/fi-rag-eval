@@ -119,10 +119,15 @@ whose grounds change silently is worth nothing.
 
 1. **Slice 1 — the measurement spine** (this spec). Demoable alone: `make eval` prints a real
    metric table from a clean clone, at €0.
-2. **Slice 2 — second authority and the filter's proof** (blocked by 1). Adds Savo-Pielinen, then
-   the adversarial case: a Kuopio-only question asked with `authority=lounais-suomi` must refuse.
+2. ~~**Slice 2 — second authority and the filter's proof**~~ **REORDERED 27 Aug 2026.** The
+   Owner's own non-goal in `CLAUDE.md` gates corpus breadth behind trustworthy metrics, and
+   slice 1's were not (60% leakage). The second authority moved behind the golden-set rewrite,
+   which became slice 2 — see `SPEC-slice-2-golden-set-rewrite.md`. The filter proof is deferred,
+   not dropped.
 3. **Slice 3 — retrieval improvement** (blocked by 1). Scope is *decided by slice 1's number*:
    lemmatisation (voikko/omorfi), trigram matching, or the vector layer. Not chosen in advance.
+   **Decided 27 Aug 2026 by slice 2's measurement: lemmatisation.** 4 of 6 misses are
+   zero-overlap, which is what the pre-registered decision rule points at.
 4. **Slice 4 — answering** (blocked by 2 and 3). Conditional answers with per-branch citations,
    refusal, branch coverage, over-claim rate, and a judge whose agreement with hand labels is
    reported.

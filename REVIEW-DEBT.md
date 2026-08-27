@@ -28,23 +28,49 @@ ledger is worse than none, because sessions trust it.
   instrument easier than the task. Worse, the harness cannot currently *detect* a retrieval
   improvement or regression in the vocabulary gap that matters, because its questions do not
   contain that gap. This is `CLAUDE.md`'s golden-set-leakage failure mode, arrived on day one.
-- **Disposition:** open — **the highest-priority item in the project.** Rewriting the
-  questions in a resident's vocabulary comes before any retrieval change (measurement wins
-  ties). Blocks trusting slice 3's numbers.
+- **Disposition:** **LARGELY CLOSED 27 Aug 2026 (slice 2).** Leakage is now computed on every
+  run, published beside the headline, and **gated to never rise**. The set was rewritten to 21
+  questions — 6 copied verbatim from the authority's own resident-facing pages, 15 authored under
+  the rule *name the thing with the document's noun, ask with a person's verb* — and leakage fell
+  60% → 37%, below the 39% measured for real harvested questions. The headline fell 0.875 → 0.762
+  with it. What stays open is the two entries below: leakage understates itself, and 21 is not 50.
 
-## 2026-08-26 (slice 1) — the headline is computed over N=8
+## 2026-08-27 (slice 2) — lexical leakage understates itself, and will rise on its own
 
-- **What:** The golden set has 8 questions and 10 required chunks against `DESIGN.md`'s ~50.
-  The 95% interval on 0.875 is roughly ±0.23. Only 2 of 8 questions span more than one chunk,
-  so complete-set recall and per-chunk recall nearly coincide — the very distinction ADR-0003
-  exists to draw is not yet visible. The miss diagnostic has 1 data point, so its
-  slice-3 decision rule cannot fire.
-- **Where:** `corpus/golden/lounais-suomi.yaml`, `eval/baseline.json`.
-- **What green tests do NOT prove here:** the regression gate compares exact values and will
-  fire correctly, but a single question flipping moves the headline by 0.125. Any change
-  smaller than that is invisible, and any conclusion drawn from a difference this size is
-  noise.
-- **Disposition:** open — grows with the golden set. Every published number carries its N.
+- **What:** Leakage is measured *after* stemming, so a word the question and its target chunk
+  both contain but which stems **apart** counts as clean. `biojäteastia` → `biojäteast` in a
+  query while `biojäteastiaan` → `biojäteastia` in the corpus; a human eye sees one shared word,
+  the metric sees none. Consequence: **leakage will rise when lemmatisation lands in slice 3,
+  through no change whatsoever to the questions**, and the gate will fire.
+- **Where:** `src/fi_rag_eval/metrics.py` (`lexical_leakage`), pinned in
+  `tests/test_retrieval.py::test_the_same_word_stems_differently_in_query_and_corpus`.
+- **What green tests do NOT prove here:** that 0.372 is the true overlap between these questions
+  and their targets. It is the overlap *the current analyser can see*, which is a floor.
+- **Disposition:** open — accepted, and expected. When slice 3 trips the gate for this reason,
+  the baseline is re-recorded deliberately with the reason stated, never waved through.
+
+## 2026-08-27 (slice 2) — the headline is computed over N=21, and refusals are still unsupported
+
+- **What:** 21 questions and 24 required chunks against `DESIGN.md`'s ~50; the 95% interval on
+  0.762 is roughly ±0.18. Only 3 of 21 span more than one chunk, so complete-set and per-chunk
+  recall still nearly coincide and the distinction ADR-0003 exists to draw is not yet visible.
+  Separately, the harness **rejects** a golden entry with empty `required_chunks`, so genuine
+  refusal cases cannot be represented — one real candidate is already in hand, LSJH's own
+  *"Miten kompostorin saa toimimaan?"*, which the regulations do not answer.
+- **Where:** `corpus/golden/lounais-suomi.yaml`; the rejection is deliberate in
+  `src/fi_rag_eval/golden.py` and `metrics.py` (an empty required set scores a vacuous 1.0).
+- **What green tests do NOT prove here:** the miss diagnostic now has 6 data points rather than
+  1, which was enough to confirm slice 1's claim 1 — but a single question flipping still moves
+  the headline by ~0.048, and no refusal behaviour is measured at all.
+- **Disposition:** open — the next tranche of questions is better written against two
+  authorities, so it rides with slice 3 or 4. Refusal entries land with the answering slice.
+
+## 2026-08-26 (slice 1) — superseded: the headline was computed over N=8
+
+- **What:** 8 questions, 10 required chunks, 1 miss — the diagnostic had no power and its
+  slice-3 decision rule could not fire.
+- **Disposition:** **CLOSED 27 Aug 2026 (slice 2).** Superseded by the N=21 entry above. The
+  diagnostic now has 6 misses and did fire: 4 of 6 are zero-overlap, so slice 3 is lemmatisation.
 
 ## 2026-08-26 (slice 1) — definition sub-keys are a paragraph prefix, not the defined term
 

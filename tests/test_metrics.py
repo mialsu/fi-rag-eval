@@ -91,3 +91,49 @@ def test_refuses_to_compute_over_zero_questions() -> None:
 def test_refuses_duplicate_question_ids() -> None:
     with pytest.raises(MetricsError, match="duplicate question ids"):
         compute([outcome("q", ("a",), ("a",)), outcome("q", ("b",), ("b",))], k=5)
+
+
+def test_lexical_leakage_is_micro_averaged_over_stems() -> None:
+    outcomes = [
+        QuestionOutcome(
+            question_id="leaky",
+            required=("a",),
+            retrieved=("a",),
+            misses=(),
+            query_lexemes=("biojät", "tyhjennettäv", "kesäaik", "kuink"),
+            leaked_lexemes=("biojät", "tyhjennettäv", "kesäaik"),
+        ),
+        QuestionOutcome(
+            question_id="clean",
+            required=("b",),
+            retrieved=("b",),
+            misses=(),
+            query_lexemes=("taloyhtiö", "asunto", "keskust", "kolm"),
+            leaked_lexemes=(),
+        ),
+    ]
+    metrics = compute(outcomes, k=5)
+    assert metrics.leakage_lexemes == 8
+    assert metrics.lexical_leakage == pytest.approx(3 / 8)
+    assert outcomes[0].lexical_leakage == pytest.approx(0.75)
+    assert outcomes[1].lexical_leakage == 0.0
+
+
+def test_a_question_with_no_stems_reports_no_leakage_rather_than_zero() -> None:
+    """A missing value must not be averaged in as if it were measured."""
+    only = QuestionOutcome(question_id="q", required=("a",), retrieved=("a",), misses=())
+    assert only.lexical_leakage is None
+    assert compute([only], k=5).lexical_leakage == 0.0
+    assert compute([only], k=5).leakage_lexemes == 0
+
+
+def test_leaked_lexemes_must_come_from_the_query() -> None:
+    with pytest.raises(MetricsError, match="subset of the query"):
+        QuestionOutcome(
+            question_id="q",
+            required=("a",),
+            retrieved=("a",),
+            misses=(),
+            query_lexemes=("biojät",),
+            leaked_lexemes=("kompostor",),
+        )

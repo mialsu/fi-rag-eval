@@ -9,23 +9,30 @@ Domain profile: **cli-tools**, with a `/ship`-only deploy check grafted from `we
 project-specific eval-integrity layer. The choice and its rejected alternatives are recorded in
 `docs/adr/0001-domain-profile-cli-tools-hybrid.md` — read it before assuming a stock profile.
 
-## Where this stands (26 Aug 2026)
+## Where this stands (27 Aug 2026)
 
-**Slice 1 — the measurement spine — is built and has produced a real number.** One authority
+**Slices 1 and 2 are built: the measurement spine, and an honest golden set.** One authority
 (Lounais-Suomi, 50 clauses → 82 chunks) is ingested into Postgres and retrieved with `ts_rank`
-over the `finnish` configuration. `make eval` scores 8 hand-labelled questions and prints a
-metric table; it exits 0 green and non-zero on regression. Nothing else exists.
+over the `finnish` configuration. `make eval` scores 21 hand-labelled questions, prints a metric
+table, and exits non-zero on regression. Nothing else exists.
 
-- **The headline: complete-set recall@5 = 0.875 (N=8, k=5).** Real, reproducible, and
-  **not a quality estimate.** The golden set leaks 60% of its stemmed content words into its own
-  target chunks — the questions were written with the source PDF open. Read
-  `specs/SPEC-slice-1-measurement-spine.md` (Measured result) before quoting the number, and
-  `REVIEW-DEBT.md` before believing it. Fixing the golden set outranks every retrieval change.
-- **`make eval` and the gate have been seen red** on all five failure paths: degraded chunk,
-  deleted chunk, shrunk golden set, changed `k`, empty corpus.
-- **Not built:** embeddings, pgvector, reranking, any LLM call, a judge, answer generation,
-  citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build` still
-  exits non-zero on purpose — do not "fix" it.
+- **Headline: complete-set recall@5 = 0.762 (N=21, k=5). Lexical leakage = 0.372.**
+  Never quote the first without the second. Slice 1 scored 0.875 on 8 questions that leaked 60%
+  of their vocabulary into their own targets; the set was rewritten (6 questions copied verbatim
+  from the authority's resident-facing pages, 15 authored) and both numbers fell.
+- **Leakage is a metric, gated in the opposite direction** — the gate fails if it *rises*,
+  because a question edited to resemble its target inflates every score above it. Proven red:
+  reverting one question to statute wording raised recall to 0.810 and failed the gate.
+- **Slice 3 is decided by measurement: lemmatisation.** 4 of 6 misses are zero-overlap, which is
+  what slice 1's pre-registered decision rule points at. The retriever cannot reach resident
+  vocabulary (`taloyhtiö`, `asunto`, `keskusta`) at all, and Finnish snowball stems the same word
+  differently depending on inflection. Both pinned by tests.
+- **Not built:** embeddings, pgvector, lemmatisation, reranking, any LLM call, a judge, answer
+  generation, citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build`
+  still exits non-zero on purpose — do not "fix" it.
+- **The authority hard filter is still unverified** — one authority means nothing to leak from.
+  That was slice 2 in the original plan; the Owner's corpus-breadth non-goal moved it behind the
+  golden set. Read `specs/SPEC-slice-2-golden-set-rewrite.md` for why.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
   doc, an old note, or a past session says already works.
 
@@ -109,8 +116,9 @@ Verify that structurally:
 - A metric that is green because the harness is circular (labels derived from retriever output).
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
-- Golden-set leakage: scores climb while real answer quality doesn't. **This is no longer
-  hypothetical — it is measured at 60% and is the project's top open item.**
+- Golden-set leakage: scores climb while real answer quality doesn't. **Measured every run and
+  gated to never rise.** It was 60% in slice 1 and is 37% now; the reference for real questions
+  is 39%. A rising headline with rising leakage is not an improvement.
 - The authority filter applied *after* rerank, or skipped when the field is absent.
 - Finnish compound words and inflection sinking lexical recall — it will look like a model problem
   and it isn't (`DESIGN.md:118`).
