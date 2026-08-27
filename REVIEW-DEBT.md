@@ -14,6 +14,103 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-27 (slice 3) — the compound reassembler is a hand-rolled morphological rule
+
+- **What:** `reassembled_parts` folds voikko's `WORDBASES` morphs back into words using a rule I
+  wrote, not one voikko supplies. It is the component that buys the `määräyksistä` /
+  `jätehuoltomääräyksistä` match — and its first draft emitted the lexeme `'tyhjentää)tävä'` and
+  left bound prefixes standing alone as junk. Measured on this corpus: of 2,513 distinct word
+  forms, **76 produce at least one part that voikko itself cannot analyse as a word**
+  (`peräinen`, `pisteinen`, `määräyksinen`, `kiinteis`). Most come from voikko's own `-inen`
+  over-analysis, which arrives as a second reading and is kept under D9.
+- **Where:** `src/fi_rag_eval/analyse.py` (`parse_wordbases`, `reassembled_parts`); pinned by 12
+  recorded-`WORDBASES` fixtures in `tests/test_analyse.py`.
+- **What green tests do NOT prove here:** that the rule is right for Finnish. It is right for the
+  12 shapes in the fixture set and it does not crash on the other 2,501. A junk lexeme's damage is
+  **silent and displaced**: it lowers precision on questions *other* than the one it was built
+  for, which shows up as an unrelated cell regressing. Two mitigations, both structural rather
+  than linguistic: the baseform is always emitted first, so a bad split can only add noise and
+  never remove signal; and the conservative split is measured alongside, so the reassembler has to
+  out-score it or be deleted.
+- **Disposition:** open — **the reassembler earned its place this slice** (best reasm cell 0.857
+  vs best safe cell 0.810, exactly one question). Kept. The fixture set is the thing to grow, and
+  it grows from real misses, never from invented words.
+
+## 2026-08-27 (slice 3) — lemmatisation costs precision, and the cost is now visible
+
+- **What:** Lemmatisation is not free. `kerata-vai-kompostoida` passes in `snowball/0` and fails
+  in **every one of the eight lemma cells**; `kuka-hankkii-jateastiat` passes at `snowball/0` and
+  fails in the best cell. The net is positive (16/21 → 18/21) but it is a net, not a gain: the
+  aggregate hides one question won and one lost in the baseform cell, which is why "cause 1 alone
+  flips no whole question" was right about the number and wrong about the mechanism.
+- **Where:** the per-question × cell matrix printed by `make eval`; `lemma-reasm/1` detail.
+- **What green tests do NOT prove here:** which of the two effects dominates on questions this
+  golden set does not contain. With N=21 a one-question regression is 0.048 of the headline and
+  well inside the ±0.18 interval, so "lemmatisation helps" is a claim about 21 questions.
+- **Disposition:** open — accepted. The regressed questions are not repaired by editing them;
+  that would be the leakage failure mode with extra steps.
+
+## 2026-08-27 (slice 3) — the lemma indexes are written by the application, not by Postgres
+
+- **What:** The morphology lives in Python (ADR-0005), so `lemma_base_tsv`, `lemma_safe_tsv` and
+  `lemma_reasm_tsv` cannot be `GENERATED` columns the way `tsv` is. A row inserted by anything
+  other than this ingest gets an empty index in three of the four cells. The
+  database-enforced invariant "the index always agrees with the body" is given up for those three.
+- **Where:** `src/fi_rag_eval/db.py` (`SCHEMA`, `set_lemma_vectors`,
+  `assert_lemma_vectors_populated`); `src/fi_rag_eval/ingest.py` (`index_lemmas`).
+- **What green tests do NOT prove here:** that the columns *agree with the body*. They prove only
+  that every column is non-empty for every chunk — checked at ingest and again at the start of
+  every eval — and that the harness refuses to score a corpus where one is not. A body edited in
+  place without re-running the ingest would leave a stale lemma index and a correct `tsv`, and
+  nothing would notice. The mitigation that exists is the same one the corpus has: ingestion is a
+  full reload, never incremental.
+- **Disposition:** open — accepted, and cheaper than the rejected alternative (a custom Postgres
+  image with a voikko dictionary built from source, which would put a build step in front of
+  `docker compose up` and make the image ours to maintain). `tsv` deliberately **stays** generated
+  rather than being demoted for symmetry, so the published cell keeps its invariant.
+
+## 2026-08-27 (slice 3) — the stopword decision is borrowed from snowball, not chosen
+
+- **What:** The lemma analysers drop a word when Postgres's `finnish` configuration drops it,
+  asked of Postgres per token rather than answered from a vendored list. Not in the spec — decided
+  during implementation, because without it the lemma cells would index and query `olla`, `ja` and
+  `mitä` while the control cell does not, and every cell-to-cell delta would be
+  lemmatisation *plus* the absence of stopping. Two variables, one number.
+- **Where:** `src/fi_rag_eval/db.py` (`snowball_stopwords`), `analyse.Morphology.positioned`.
+- **What green tests do NOT prove here:** that snowball's Finnish stop list is the right one for a
+  lemmatised index. It is a *surface-form* list, so an inflected function word that snowball keeps
+  is kept here too. It was chosen to hold the variable still, not because it is optimal — and it
+  silently sets the denominator of the leakage metric, which is the least visible thing about it.
+- **Disposition:** open — accepted for this slice. Revisit only with a lemma-level stop list
+  measured as its own grid axis, never tuned by hand on these 21 questions.
+
+## 2026-08-27 (slice 3) — the raw-token fallback keeps a word findable only in one inflection
+
+- **What:** 55 of 2,513 forms (2.2%) get no analysis at all and fall back to their lowercased
+  surface token: `bokashilla`, `fermentoidaan`, `esim`, `840-1`, URLs. So the corpus indexes
+  `bokashilla` and a resident asking about `bokashi` still misses it. The fallback prevents the
+  word vanishing from the index; it does not make it reachable.
+- **Where:** `analyse.word_lexemes`; `tests/test_analyse.py::test_an_unanalysable_word_falls_back_to_its_raw_token`.
+- **What green tests do NOT prove here:** any coverage of loanwords and neologisms, which is
+  exactly where a waste-composting vocabulary keeps its jargon. No golden question currently
+  depends on one, so the gap is invisible in the metrics.
+- **Disposition:** open — accepted. A question about `bokashi` would surface it honestly, and is
+  a better fix than a hand-written synonym list.
+
+## 2026-08-27 (slice 3) — a better cell is measured than the one the README publishes
+
+- **What:** `lemma-reasm/1` scores 0.857 against the published `snowball/0`'s 0.762. The README
+  still publishes `snowball/0`, deliberately: which cell is the headline is the Owner's decision
+  and comes with a re-baseline, not something the winning number does by itself. Until that
+  decision, the published table understates what the retriever can do — and the gate enforces the
+  gap by failing if `PUBLISHED` moves without a re-record.
+- **Where:** `src/fi_rag_eval/evaluate.py` (`PUBLISHED`), `report.compare`.
+- **What green tests do NOT prove here:** that 0.857 would survive publication. It is one cell of
+  twelve chosen after seeing all twelve, on 21 questions, with no held-out slice — which is the
+  overfitting surface `CLAUDE.md` warns about, and the reason the choice is a decision rather than
+  an automatic promotion.
+- **Disposition:** **open, and awaiting the Owner.**
+
 ## 2026-08-26 (slice 1) — the golden set leaks its own source vocabulary
 
 - **What:** The eight questions were written with the source PDF open, so they reuse the
@@ -46,8 +143,15 @@ ledger is worse than none, because sessions trust it.
   `tests/test_retrieval.py::test_the_same_word_stems_differently_in_query_and_corpus`.
 - **What green tests do NOT prove here:** that 0.372 is the true overlap between these questions
   and their targets. It is the overlap *the current analyser can see*, which is a floor.
-- **Disposition:** open — accepted, and expected. When slice 3 trips the gate for this reason,
-  the baseline is re-recorded deliberately with the reason stated, never waved through.
+- **Disposition:** **CLOSED 27 Aug 2026 (slice 3) — by construction, not by waiver.** Measured:
+  leakage is 0.372 under snowball, **0.506** under baseform lemmatisation, **0.568** with the
+  conservative split and **0.619** with the reassembled one — a 0.247 rise with not one question
+  edited, and well above the 0.42–0.48 the slice-3 spec predicted. The gate did not have to be
+  waved through, because the baseline now records leakage **per cell** and each cell is compared
+  only against itself: a lemma cell's leakage is measured against the lemma cell's own reference,
+  which compares like with like. The rule "leakage must never rise" is intact and now has twelve
+  independent guards instead of one. What the entry got right and is worth keeping: 0.372 was
+  never the true overlap, only the overlap the old analyser could see.
 
 ## 2026-08-27 (slice 2) — the headline is computed over N=21, and refusals are still unsupported
 
@@ -97,8 +201,17 @@ ledger is worse than none, because sessions trust it.
 - **What green tests do NOT prove here:** the baseline is green *including* this defect, so a
   green gate is not a claim that retrieval is adequate. It is a claim that retrieval has not
   got worse.
-- **Disposition:** open — this is slice 3's first and cheapest candidate
-  (`ts_rank(tsv, q, 32)`), to be measured only after the golden set is fixed.
+- **Disposition:** open — **measured in slice 3, and the cheap candidate was the wrong one.**
+  `ts_rank(tsv, q, 32)` is documented as "divides the rank by itself + 1" — that is
+  `rank / (rank + 1)`, a strictly monotonic rescale that **cannot reorder a single result**. The
+  first run of the slice-3 grid scored all eight cells identically at 0 and 32, which is what sent
+  us back to the manual. The settings that do divide by document length are 1 and 2, and they are
+  now the grid's second axis. The finding itself holds — both put the missed definition chunk into
+  the top 5 — but the fix is **not** a free win: normalisation 1 *costs* the control cell 0.143 of
+  its headline and normalisation 2 costs it 0.333, because most golden targets are full clauses
+  rather than definitions. It gains recall only in the compound-splitting cell. Pinned by
+  `test_normalisation_32_cannot_reorder_anything` and
+  `test_length_normalisation_helps_only_the_split_analyser`.
 
 ## 2026-08-26 (slice 1) — the end-to-end tests skip when Postgres is down
 
@@ -110,7 +223,11 @@ ledger is worse than none, because sessions trust it.
 - **What green tests do NOT prove here:** exactly what the skip says. Verified by pointing
   `FI_RAG_EVAL_DATABASE_URL` at a dead port: 10 tests skip, `make gate` still passes.
 - **Disposition:** open — closes when CI exists (M3) and runs the gate with a service
-  container, making the skip impossible there.
+  container, making the skip impossible there. **Widened in slice 3:** the analyser tests skip on
+  the same terms when `voikko-fi` is absent, because the dictionary is a system package `uv sync`
+  cannot supply. The reassembly rule itself is pinned by *pure* tests over recorded `WORDBASES`
+  strings, which run regardless — what skips is the proof that those recordings still match
+  today's dictionary. CI must install `libvoikko1` and `voikko-fi` or it inherits the same hole.
 
 ## 2026-08-26 (slice 1) — one chunk address covers two editions of the document
 

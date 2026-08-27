@@ -19,6 +19,7 @@ from pathlib import Path
 import psycopg
 
 from fi_rag_eval import db
+from fi_rag_eval.analyse import LEMMA_ANALYSERS, Analyser, Morphology
 from fi_rag_eval.chunking import Chunk, Clause, chunk_clauses, parse_toc, split_clauses
 from fi_rag_eval.extract import Extraction, extract
 from fi_rag_eval.manifest import Authority, Manifest, Source
@@ -45,8 +46,31 @@ class SourceReport:
 
 
 @dataclass(frozen=True, slots=True)
+class LemmaIndexReport:
+    """What the Python-side analyser did, and enough of it to be checked by eye.
+
+    The fingerprint is the load-bearing field: `libvoikko` reports the *library*
+    version but not the *dictionary* version, and it is the dictionary that
+    decides the numbers.
+    """
+
+    library_version: str
+    fingerprint: str
+    word_tokens: int
+    unique_words: int
+    stopped_tokens: int
+    unanalysable_words: int
+    lexemes: tuple[tuple[Analyser, int], ...]
+
+    @property
+    def unanalysable_share(self) -> float:
+        return self.unanalysable_words / self.unique_words if self.unique_words else 0.0
+
+
+@dataclass(frozen=True, slots=True)
 class IngestReport:
     sources: tuple[SourceReport, ...]
+    lemmas: LemmaIndexReport
 
     @property
     def chunks(self) -> int:
@@ -155,6 +179,7 @@ def ingest(
     conn: psycopg.Connection[tuple[object, ...]],
     manifest: Manifest,
     raw_dir: Path,
+    morphology: Morphology | None = None,
 ) -> IngestReport:
     """Reload the whole corpus. Ingestion is never incremental, by design."""
     db.assert_finnish_config(conn)
@@ -165,8 +190,62 @@ def ingest(
         db.insert_authority(conn, authority)
         for source in authority.sources:
             reports.append(_ingest_source(conn, authority, source, raw_dir))
+    lemmas = index_lemmas(conn, morphology or Morphology.open())
     conn.commit()
-    return IngestReport(sources=tuple(reports))
+    return IngestReport(sources=tuple(reports), lemmas=lemmas)
+
+
+def index_lemmas(
+    conn: psycopg.Connection[tuple[object, ...]], morphology: Morphology
+) -> LemmaIndexReport:
+    """Build the three lemma `tsvector` columns for every chunk already loaded.
+
+    Runs once over the whole corpus rather than per source, because the stopword
+    decision is asked of Postgres in a single round trip and the analyser cache
+    then pays for itself: this corpus has 6.4k word tokens over 2.5k distinct
+    forms, so three quarters of the analysis calls are repeats.
+    """
+    bodies = db.chunk_bodies(conn)
+    if not bodies:
+        raise IngestError(
+            "no chunks to index. A lemma index built over an empty corpus would "
+            "make every question a miss and blame the analyser for it."
+        )
+    if LEMMA_ANALYSERS != (
+        Analyser.LEMMA_BASEFORM,
+        Analyser.LEMMA_SAFE,
+        Analyser.LEMMA_REASM,
+    ):  # pragma: no cover - a guard against a silent column/argument mismatch
+        raise IngestError(
+            f"lemma analyser order changed to {LEMMA_ANALYSERS}; "
+            "db.set_lemma_vectors takes (base, safe, reasm) positionally"
+        )
+
+    tokens = [word for _, body in bodies for word in morphology.words(body)]
+    stopwords = db.snowball_stopwords(conn, tokens)
+    unique = sorted(set(tokens))
+
+    rows: list[tuple[str, str, str, str]] = []
+    for address, body in bodies:
+        literals = [
+            db.tsvector_literal(morphology.positioned(body, analyser, stopwords=stopwords))
+            for analyser in LEMMA_ANALYSERS
+        ]
+        rows.append((address, literals[0], literals[1], literals[2]))
+    written = db.set_lemma_vectors(conn, rows)
+    if written != len(bodies):  # pragma: no cover - executemany is all-or-nothing
+        raise IngestError(f"indexed {written} of {len(bodies)} chunks")
+    db.assert_lemma_vectors_populated(conn)
+
+    return LemmaIndexReport(
+        library_version=morphology.library_version,
+        fingerprint=morphology.fingerprint(),
+        word_tokens=len(tokens),
+        unique_words=len(unique),
+        stopped_tokens=sum(1 for token in tokens if token.lower() in stopwords),
+        unanalysable_words=sum(1 for word in unique if not morphology.readings(word)),
+        lexemes=tuple(db.lexeme_counts(conn).items()),
+    )
 
 
 def _ingest_source(

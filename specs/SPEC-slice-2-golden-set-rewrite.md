@@ -116,7 +116,7 @@ The four zero-overlap misses decompose into four distinct, separately-fixable ca
 | Cause | Evidence | What fixes it |
 |---|---|---|
 | The stemmer disagrees with itself about one word | query `biojäteastia` → `biojäteast`; corpus `biojäteastiaan` → `biojäteastia` | lemmatisation |
-| Compound first element unreachable | `kesällä` → `kesä` vs `kesäaikana` → `kesäaik`; `määräyksistä` vs `jätehuoltomääräyksistä` | compound splitting (`dict_voikko`) |
+| Compound first element unreachable | `kesällä` → `kesä` vs `kesäaikana` → `kesäaik`; `määräyksistä` vs `jätehuoltomääräyksistä` | compound splitting (written as `dict_voikko`; **corrected 27 Aug 2026** — voikko in Python, ADR-0005. Measured in slice 3: `kesä` needs the conservative split, `määräys` needs the reassembling one) |
 | Verb forms stem apart | `tyhjennetään` → `tyhjen` vs `tyhjennettävä` → `tyhjennettäv` vs `tyhjennysväli` → `tyhjennysväl` | lemmatisation |
 | Genuine vocabulary gap | `taloyhtiö`, `asunto`, `keskusta` appear nowhere in the corpus | **embeddings** — no stemmer reaches these |
 

@@ -88,7 +88,7 @@ A wide range is hard to be wrong about. These are the real claims:
 
 Claim 1 is what decides slice 3, and the diagnostic below is what tests it:
 
-- mostly zero-overlap → slice 3 is **lemmatisation** (`dict_voikko`, which splits compounds)
+- mostly zero-overlap → slice 3 is **lemmatisation** (written as `dict_voikko`; **corrected 27 Aug 2026** — no such Postgres dictionary exists here, so slice 3 lemmatises with voikko in Python, ADR-0005)
 - mostly ranked-out → slice 3 is **a BM25 extension**, because the missing signal is IDF
 
 **If any of this is wrong, the reason must be understood before touching retrieval.** A pleasant
@@ -231,7 +231,7 @@ a candidate that was not on the list, and a cheaper one:
    in a resident's vocabulary is now the highest-value work in the project, and it comes
    before any retrieval change — measurement wins ties (`CLAUDE.md`).
 
-Lemmatisation (`dict_voikko`) and a BM25 extension stay on the list, unranked, because this
+Lemmatisation (written here as `dict_voikko`; **corrected 27 Aug 2026** to voikko in Python, ADR-0005) and a BM25 extension stay on the list, unranked, because this
 run produced no evidence for either. Compound splitting remains a demonstrated corpus-level
 gap (4 of 4 term-pair tests) that simply did not bind on these eight questions.
 

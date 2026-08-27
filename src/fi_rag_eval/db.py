@@ -1,12 +1,22 @@
 """Postgres: schema, ingestion, and the lexical retrieval under measurement.
 
-Slice 1 measures **`ts_rank` over a `finnish` text-search configuration, and
-nothing else** -- no embeddings, no pgvector, no reranker, no BM25 extension.
+Everything measured here is **`ts_rank` over a `tsvector`** -- no embeddings, no
+pgvector, no reranker, no BM25 extension. Slice 3 widens that to a grid of eight
+cells: four analysers (`analyse.Analyser`) crossed with two `ts_rank`
+normalisation settings.
 
 `ts_rank` is not BM25. It has no inverse document frequency, so it cannot
 down-weight a term that appears in most of the corpus, and at its default
-normalisation (0) it does not normalise for document length either. Every number
-this module produces is a `ts_rank` number and is labelled as such.
+normalisation (0) it does not normalise for document length either -- which is
+why normalisation is the grid's second axis rather than a fixed choice. Every
+number this module produces is a `ts_rank` number and is labelled as such.
+
+**One column per analyser, and the application writes three of them.** The
+snowball `tsv` stays a generated column, so Postgres itself guarantees it can
+never disagree with the body. The three lemma columns cannot be generated -- the
+morphology lives in Python (ADR-0005) -- so they are written by the ingest and
+then *asserted* to be populated for every chunk, because a silently empty index
+would score zero and blame retrieval for it.
 """
 
 from __future__ import annotations
@@ -22,12 +32,34 @@ from psycopg import sql
 from psycopg.rows import class_row
 
 from fi_rag_eval.addressing import ChunkAddress
+from fi_rag_eval.analyse import Analyser
 from fi_rag_eval.chunking import Chunk
 from fi_rag_eval.manifest import Authority, Source
 
 DEFAULT_URL = "postgresql://fi_rag_eval:fi_rag_eval@localhost:5434/fi_rag_eval"
 URL_ENV = "FI_RAG_EVAL_DATABASE_URL"
 TEXT_SEARCH_CONFIG = "finnish"
+
+NORMALISATIONS: tuple[int, ...] = (0, 1, 2)
+"""The `ts_rank` normalisation settings under measurement -- the grid's second axis.
+
+The axis exists to test slice 1's measured finding: `ts_rank` at its default
+normalisation does not divide by document length, so a long clause accumulates
+more matched-term weight than a short one, and definition chunks were 39% of this
+corpus and 0% of every top-5.
+
+* `0` -- the default. Divides by nothing. The control, and what slice 1 measured.
+* `1` -- divides by ``1 + log(document length)``. The soft, BM25-shaped version.
+* `2` -- divides by the document length. The blunt version.
+
+**`32` is deliberately absent, and its absence is a correction.** The slice-3
+spec named it as the second axis. It is documented as "divides the rank by itself
++ 1" -- that is ``rank / (rank + 1)``, a strictly monotonic rescale of the score
+into `[0, 1)`, so it **cannot reorder a single result**. Measured: every one of
+the eight cells scored identically at 0 and at 32, to three decimals, with an
+identical per-question pass matrix. It never tested the hypothesis. Pinned by
+`test_normalisation_32_cannot_reorder_anything` so it is not reintroduced.
+"""
 
 SCHEMA = """
 DROP TABLE IF EXISTS chunk;
@@ -60,11 +92,20 @@ CREATE TABLE chunk (
     content_sha256 text NOT NULL,
     tsv            tsvector GENERATED ALWAYS AS
                        (to_tsvector('finnish', body)) STORED,
+    -- Written by the ingest, not generated: see the module docstring. The empty
+    -- default plus `assert_lemma_vectors_populated` turns "the ingest forgot" from
+    -- a silent zero into a hard error.
+    lemma_base_tsv  tsvector NOT NULL DEFAULT ''::tsvector,
+    lemma_safe_tsv  tsvector NOT NULL DEFAULT ''::tsvector,
+    lemma_reasm_tsv tsvector NOT NULL DEFAULT ''::tsvector,
     FOREIGN KEY (authority_key, effective_date)
         REFERENCES source (authority_key, effective_date) ON DELETE CASCADE
 );
 
 CREATE INDEX chunk_tsv ON chunk USING gin (tsv);
+CREATE INDEX chunk_lemma_base_tsv ON chunk USING gin (lemma_base_tsv);
+CREATE INDEX chunk_lemma_safe_tsv ON chunk USING gin (lemma_safe_tsv);
+CREATE INDEX chunk_lemma_reasm_tsv ON chunk USING gin (lemma_reasm_tsv);
 CREATE INDEX chunk_jurisdiction ON chunk (authority_key, effective_date);
 """
 
@@ -212,11 +253,13 @@ def corpus_summary(
 
 
 def query_lexemes(conn: psycopg.Connection[tuple[object, ...]], text: str) -> list[str]:
-    """Stem a question with the same configuration the index uses.
+    """Stem a question with the same configuration the snowball index uses.
 
     Going through the database rather than reimplementing the stemmer is the
     point: the query and the corpus must be normalised identically, or the
-    measurement is of two different analysers.
+    measurement is of two different analysers. The lemma analysers keep the same
+    discipline by a different route -- one Python function normalises both sides
+    (`analyse.Morphology.positioned`).
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -265,6 +308,8 @@ def search(
     authority_key: str,
     effective_date: date,
     limit: int,
+    analyser: Analyser = Analyser.SNOWBALL,
+    normalisation: int = 0,
 ) -> list[Hit]:
     """Top-``limit`` chunks by ``ts_rank``, inside one jurisdiction.
 
@@ -274,14 +319,22 @@ def search(
 
     Ties break on address so the ranking is fully deterministic; the regression
     gate depends on the same corpus and question producing the same result.
+
+    ``analyser`` selects which `tsvector` column is queried and ``normalisation``
+    which `ts_rank` normalisation flag is passed -- together, one cell of the
+    grid. The column name comes from the `Analyser` enum, never from caller
+    input, so it is composed as an identifier rather than interpolated.
     """
+    _assert_normalisation(normalisation)
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT address, citation, ts_rank(tsv, query) AS rank "
-            "FROM chunk, CAST(%s AS tsquery) AS query "
-            "WHERE authority_key = %s AND effective_date = %s AND tsv @@ query "
-            "ORDER BY rank DESC, address ASC LIMIT %s",
-            (tsquery, authority_key, effective_date, limit),
+            sql.SQL(
+                "SELECT address, citation, ts_rank({column}, query, %s) AS rank "
+                "FROM chunk, CAST(%s AS tsquery) AS query "
+                "WHERE authority_key = %s AND effective_date = %s AND {column} @@ query "
+                "ORDER BY rank DESC, address ASC LIMIT %s"
+            ).format(column=sql.Identifier(analyser.column)),
+            (normalisation, tsquery, authority_key, effective_date, limit),
         )
         return [
             Hit(
@@ -306,19 +359,27 @@ def resolve_addresses(
 
 
 def chunk_lexemes(
-    conn: psycopg.Connection[tuple[object, ...]], addresses: Sequence[str]
+    conn: psycopg.Connection[tuple[object, ...]],
+    addresses: Sequence[str],
+    analyser: Analyser = Analyser.SNOWBALL,
 ) -> set[str]:
-    """The union of stemmed tokens in these chunks, as the index sees them.
+    """The union of normalised tokens in these chunks, as this analyser sees them.
 
     Used to measure how much of a question's own vocabulary is already sitting in
-    the chunk it is supposed to retrieve -- see `metrics.lexical_leakage`.
+    the chunk it is supposed to retrieve -- see `metrics.lexical_leakage`. Read
+    per analyser, because leakage is a property of the question *under an
+    analyser*: words that snowball stems apart, lemmatisation may join, so the
+    same golden set leaks differently in different cells. That is why each cell
+    is gated against its own recorded leakage and never against another cell's.
     """
     if not addresses:
         return set()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT DISTINCT entry.lexeme FROM chunk, unnest(chunk.tsv) AS entry "
-            "WHERE chunk.address = ANY(%s)",
+            sql.SQL(
+                "SELECT DISTINCT entry.lexeme FROM chunk, unnest(chunk.{column}) AS entry "
+                "WHERE chunk.address = ANY(%s)"
+            ).format(column=sql.Identifier(analyser.column)),
             (list(addresses),),
         )
         return {str(row[0]) for row in cur.fetchall()}
@@ -329,21 +390,170 @@ def addresses_matching(
     *,
     addresses: Sequence[str],
     tsquery: str,
+    analyser: Analyser = Analyser.SNOWBALL,
 ) -> set[str]:
-    """Which of these chunks share *any* stemmed token with the query.
+    """Which of these chunks share *any* normalised token with the query.
 
-    This is the miss diagnostic. A required chunk that was not retrieved is
-    either unreachable (no shared stem at all -- a morphology failure, which
-    lemmatisation would fix) or reachable but out-ranked (a ranking failure,
-    which is where the missing IDF would have helped). Pure arithmetic, no
-    model, no cost.
+    This is the miss diagnostic, and it is what chose this slice. A required
+    chunk that was not retrieved is either unreachable (no shared token at all --
+    a morphology failure, which lemmatisation is meant to fix) or reachable but
+    out-ranked (a ranking failure, which is where the missing IDF would have
+    helped). Pure arithmetic, no model, no cost.
+
+    Run per cell, it also says whether lemmatisation did what it claimed: a
+    zero-overlap miss that becomes ranked-out was reached by morphology and lost
+    by ranking, which is a different fix from the one that was applied.
     """
     if not addresses:
         return set()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT address FROM chunk, CAST(%s AS tsquery) AS query "
-            "WHERE address = ANY(%s) AND tsv @@ query",
+            sql.SQL(
+                "SELECT address FROM chunk, CAST(%s AS tsquery) AS query "
+                "WHERE address = ANY(%s) AND {column} @@ query"
+            ).format(column=sql.Identifier(analyser.column)),
             (tsquery, list(addresses)),
         )
         return {str(row[0]) for row in cur.fetchall()}
+
+
+def _assert_normalisation(normalisation: int) -> None:
+    if normalisation not in NORMALISATIONS:
+        raise DatabaseError(
+            f"ts_rank normalisation {normalisation} is not one of the settings under "
+            f"measurement {NORMALISATIONS}. Adding one is a deliberate change to the "
+            "grid, and every cell in the baseline is recorded against a fixed set."
+        )
+
+
+def snowball_stopwords(
+    conn: psycopg.Connection[tuple[object, ...]], tokens: Iterable[str]
+) -> frozenset[str]:
+    """Which of these surface tokens the `finnish` configuration throws away.
+
+    Asked of Postgres rather than answered from a vendored word list, so the
+    lemma analysers stop on **exactly the decision snowball makes** -- `mitä`,
+    `on`, `ja`, `olla` out; `kuinka`, `usein`, `monta` in. That keeps the grid
+    honest: the only difference between the control cell and a lemma cell is how
+    a kept word is normalised, not which words are kept.
+
+    Without this the lemma cells would index and query `olla` -- a word in nearly
+    every clause -- and the grid would be measuring
+    lemmatisation-plus-no-stopping against snowball-plus-stopping. Two variables,
+    one number.
+
+    A token that yields no lexeme at all (punctuation, `§`) also lands here, which
+    is the same thing snowball does with it.
+    """
+    wanted = sorted({token.lower() for token in tokens})
+    if not wanted:
+        return frozenset()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT token FROM unnest(%s::text[]) AS token "
+            "WHERE to_tsvector(%s::regconfig, token) = ''::tsvector",
+            (wanted, TEXT_SEARCH_CONFIG),
+        )
+        return frozenset(str(row[0]) for row in cur.fetchall())
+
+
+def tsvector_literal(entries: Sequence[tuple[str, Sequence[int]]]) -> str:
+    """Serialise (lexeme, positions) pairs into a `tsvector` literal.
+
+    Built by hand rather than by round-tripping the lemmas through
+    `to_tsvector('simple', ...)`, which would re-tokenise text that voikko has
+    already tokenised and analysed -- a second tokeniser silently disagreeing
+    with the first is exactly the class of bug this harness exists to catch.
+
+    Positions are kept because `ts_rank` reads them as term frequencies. Dropping
+    them would flatten every repeated term to a single occurrence and change the
+    ranking under measurement.
+    """
+    if not entries:
+        raise DatabaseError(
+            "refusing to build an empty tsvector: a chunk that indexes to nothing "
+            "is unretrievable, and would be scored as a retrieval failure"
+        )
+    parts: list[str] = []
+    for lexeme, positions in entries:
+        if not lexeme:
+            raise DatabaseError("a tsvector lexeme cannot be empty")
+        if not positions:
+            raise DatabaseError(f"lexeme {lexeme!r} has no positions")
+        joined = ",".join(str(position) for position in positions)
+        parts.append(f"'{escape_lexeme(lexeme)}':{joined}")
+    return " ".join(parts)
+
+
+def chunk_bodies(conn: psycopg.Connection[tuple[object, ...]]) -> list[tuple[str, str]]:
+    """Every chunk's address and body, in address order. The lemma indexer's input."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT address, body FROM chunk ORDER BY address")
+        return [(str(row[0]), str(row[1])) for row in cur.fetchall()]
+
+
+def set_lemma_vectors(
+    conn: psycopg.Connection[tuple[object, ...]],
+    rows: Sequence[tuple[str, str, str, str]],
+) -> int:
+    """Write the three application-maintained `tsvector` columns.
+
+    Takes `(address, base, safe, reasm)` literals. All three columns are written
+    in one statement per chunk so a chunk can never end up with one analyser's
+    index populated and another's empty -- a state that would look like a
+    retrieval failure in exactly one cell.
+    """
+    with conn.cursor() as cur:
+        cur.executemany(
+            "UPDATE chunk SET lemma_base_tsv = CAST(%s AS tsvector), "
+            "lemma_safe_tsv = CAST(%s AS tsvector), "
+            "lemma_reasm_tsv = CAST(%s AS tsvector) WHERE address = %s",
+            [(base, safe, reasm, address) for address, base, safe, reasm in rows],
+        )
+    return len(rows)
+
+
+def assert_lemma_vectors_populated(conn: psycopg.Connection[tuple[object, ...]]) -> None:
+    """Every chunk has a non-empty index in every analyser's column.
+
+    The invariant the generated `tsv` column gets from Postgres for free, and the
+    three written columns have to earn. An empty lemma vector is not a small bug:
+    the chunk becomes unretrievable in that cell, the question scores as a miss,
+    and the miss is attributed to the analyser rather than to the ingest.
+    """
+    for analyser in Analyser:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("SELECT count(*) FROM chunk WHERE {column} = ''::tsvector").format(
+                    column=sql.Identifier(analyser.column)
+                )
+            )
+            row = cur.fetchone()
+        empty = 0 if row is None else int(str(row[0]))
+        if empty:
+            raise DatabaseError(
+                f"{empty} chunk(s) have an empty {analyser.column} index, so they are "
+                f"unretrievable in the {analyser} cells and would be scored as "
+                "retrieval misses. The ingest did not populate them."
+            )
+
+
+def lexeme_counts(conn: psycopg.Connection[tuple[object, ...]]) -> dict[Analyser, int]:
+    """Total distinct lexemes indexed per analyser, over the whole corpus.
+
+    Reported because it is the evidence for the grid's second axis. Compound
+    splitting inflates the number of lexemes in a chunk, and `ts_rank` at
+    normalisation 0 rewards accumulated term weight -- so the analyser change and
+    the normalisation change interact, and measuring them in sequence would
+    confound exactly the interaction worth seeing.
+    """
+    columns = sql.SQL(", ").join(
+        sql.SQL("sum(length({column}))").format(column=sql.Identifier(analyser.column))
+        for analyser in Analyser
+    )
+    with conn.cursor() as cur:
+        cur.execute(sql.SQL("SELECT {columns} FROM chunk").format(columns=columns))
+        row = cur.fetchone()
+    if row is None or row[0] is None:
+        raise DatabaseError("the corpus is empty, so it has no lexeme counts")
+    return {analyser: int(str(row[index])) for index, analyser in enumerate(Analyser)}

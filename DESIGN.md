@@ -134,7 +134,7 @@ comment and fails on a drop beyond a set threshold.
 | Risk | Mitigation |
 | --- | --- |
 | The golden set is the project; a lazy one makes every number meaningless | Hand-write it first, before any tuning, and include adversarial cases |
-| Finnish compound words break lexical search | Test the lexical arm alone early — and note `ts_rank` is not BM25. Add lemmatisation (`dict_voikko` splits compounds) if recall is poor |
+| Finnish compound words break lexical search | Test the lexical arm alone early — and note `ts_rank` is not BM25. Add lemmatisation if recall is poor. **Corrected 27 Aug 2026:** this said `dict_voikko`, a Postgres text-search dictionary that does not exist in `postgres:17-alpine` and is not packaged for it. Slice 3 lemmatises with voikko in Python instead — ADR-0005 |
 | LLM judge disagrees with human judgement | Report judge–human agreement on a fixed sample every run |
 | Scope creep into a chat product | Non-goals above are binding; the UI stays minimal |
 

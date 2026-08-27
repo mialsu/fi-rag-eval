@@ -11,28 +11,43 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (27 Aug 2026)
 
-**Slices 1 and 2 are built: the measurement spine, and an honest golden set.** One authority
-(Lounais-Suomi, 50 clauses → 82 chunks) is ingested into Postgres and retrieved with `ts_rank`
-over the `finnish` configuration. `make eval` scores 21 hand-labelled questions, prints a metric
-table, and exits non-zero on regression. Nothing else exists.
+**Slices 1–3 are built: the measurement spine, an honest golden set, and a lemmatising analyser
+measured as a grid.** One authority (Lounais-Suomi, 50 clauses → 82 chunks) is ingested into
+Postgres and retrieved lexically. `make eval` scores 21 hand-labelled questions in **12 cells**
+— 4 analysers × 3 `ts_rank` normalisations — prints a table plus a per-question × cell pass
+matrix, and exits non-zero if **any** cell regresses. Nothing else exists.
 
-- **Headline: complete-set recall@5 = 0.762 (N=21, k=5). Lexical leakage = 0.372.**
-  Never quote the first without the second. Slice 1 scored 0.875 on 8 questions that leaked 60%
-  of their vocabulary into their own targets; the set was rewritten (6 questions copied verbatim
-  from the authority's resident-facing pages, 15 authored) and both numbers fell.
-- **Leakage is a metric, gated in the opposite direction** — the gate fails if it *rises*,
-  because a question edited to resemble its target inflates every score above it. Proven red:
-  reverting one question to statute wording raised recall to 0.810 and failed the gate.
-- **Slice 3 is decided by measurement: lemmatisation.** 4 of 6 misses are zero-overlap, which is
-  what slice 1's pre-registered decision rule points at. The retriever cannot reach resident
-  vocabulary (`taloyhtiö`, `asunto`, `keskusta`) at all, and Finnish snowball stems the same word
-  differently depending on inflection. Both pinned by tests.
-- **Not built:** embeddings, pgvector, lemmatisation, reranking, any LLM call, a judge, answer
-  generation, citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build`
-  still exits non-zero on purpose — do not "fix" it.
+- **Published headline: complete-set recall@5 = 0.762 (N=21, k=5) in the `snowball/0` cell.
+  Lexical leakage = 0.372.** Never quote the first without the second. The published cell is
+  deliberately still the snowball control: **`lemma-reasm/1` measures 0.857**, and moving the
+  published headline is the Owner's decision with a deliberate re-baseline, not something the
+  winning number does by itself. `evaluate.PUBLISHED` is the single place that decides, and the
+  gate fails if it moves without a re-record.
+- **Lemmatisation is voikko, in Python — not `dict_voikko`.** Every doc written before 27 Aug
+  named a Postgres text-search dictionary that **does not exist**: `postgres:17-alpine` ships only
+  `dict_snowball`/`dict_int`/`dict_xsyn`, and neither libvoikko nor a Finnish hunspell dictionary
+  is in the Alpine repositories. See `docs/adr/0005-lemmatisation-in-python-as-a-measured-grid.md`.
+  Requires the **system packages** `libvoikko1` and `voikko-fi`; `uv sync` cannot supply them.
+- **`ts_rank` normalisation 32 was the wrong flag, and that is a slice-3 correction.** It is
+  `rank / (rank + 1)` — strictly monotonic, so it cannot reorder anything. The settings that
+  divide by document length are 1 and 2. Slice 1's length finding holds, but correcting it is
+  **not** a free win: normalisation 1 costs the control cell 0.143 of its headline and only *gains*
+  recall in the compound-splitting cell. That sign flip is the interaction the grid existed to find.
+- **Zero-overlap misses are gone: 4 → 0** under the reassembling analyser. Every remaining miss is
+  reachable and lost in the *ranking*, which is a different failure with a different fix. That
+  includes `taloyhtiö`/`asunto`/`keskusta` (#13/#15), so slice 2's "unreachable" finding is now
+  sharper: the resident's words do reach those clauses and carry no weight in them.
+- **Leakage rose 0.372 → 0.619 across the lemma cells with no question edited**, exactly as the
+  debt entry predicted. The gate survived it **by construction**: leakage is recorded and compared
+  per cell, so each is measured against its own reference. Do not "fix" a leakage rise by editing a
+  question — that is the failure mode the metric exists to catch.
+- **Not built:** embeddings, pgvector, reranking, any LLM call, a judge, answer generation,
+  citations, refusal, a second authority, CI, Docker, Cloud Run. `make docker-build` still exits
+  non-zero on purpose — do not "fix" it.
 - **The authority hard filter is still unverified** — one authority means nothing to leak from.
-  That was slice 2 in the original plan; the Owner's corpus-breadth non-goal moved it behind the
-  golden set. Read `specs/SPEC-slice-2-golden-set-rewrite.md` for why.
+  Read `specs/SPEC-slice-2-golden-set-rewrite.md` for why the corpus-breadth non-goal moved it.
+- **Slice 4 is the vector layer for #13/#15**, per the slice-3 spec's pre-registered decision rule.
+  It needs a cost-ceiling number from the Owner first — see the hard limits below.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
   doc, an old note, or a past session says already works.
 
@@ -57,7 +72,9 @@ Run them all with `make gate`. Every one below has been run, and has been proven
 - Live exercise: `make eval` (which runs `make db-up` then `make ingest` first). See
   **Verify like a user** below. `make gate` does *not* run it, and the end-to-end tests inside
   `make test` **skip** when Postgres is down — so a green `make gate` with the database
-  stopped proves the pure functions and nothing else. Requires Docker and `poppler-utils`.
+  stopped proves the pure functions and nothing else. The analyser tests skip on the same terms
+  when `voikko-fi` is absent; the reassembly rule itself is pinned by pure tests that always run.
+  Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`.
 
 A gate you haven't run is not a gate. Green tests gate; they do not prove.
 
@@ -117,8 +134,12 @@ Verify that structurally:
 - A judge that agrees by default, making groundedness look perfect.
 - A metric averaged over a silently reduced N after questions errored out.
 - Golden-set leakage: scores climb while real answer quality doesn't. **Measured every run and
-  gated to never rise.** It was 60% in slice 1 and is 37% now; the reference for real questions
-  is 39%. A rising headline with rising leakage is not an improvement.
+  gated to never rise, per cell.** It was 60% in slice 1 and is 37% now in the published cell; the
+  reference for real questions is 39%. A rising headline with rising leakage is not an improvement.
+  Note that a *better analyser* raises leakage on its own, with no question edited (0.372 → 0.619
+  in slice 3) — which is why each cell is gated against its own recorded value and never against
+  another cell's. Comparing across cells would fail the gate for a reason that has nothing to do
+  with the golden set getting easier.
 - The authority filter applied *after* rerank, or skipped when the field is absent.
 - Finnish compound words and inflection sinking lexical recall — it will look like a model problem
   and it isn't (`DESIGN.md:118`).
@@ -126,6 +147,16 @@ Verify that structurally:
 - A ranker whose defaults are wrong for the corpus: `ts_rank`'s default normalisation (0) does
   not divide by document length, so short chunks lose systematically. Measured: definition
   chunks are 39% of the corpus and were 0% of every top-5.
+- **A knob that looks like a fix and is a no-op.** `ts_rank(..., 32)` is `rank / (rank + 1)`:
+  monotonic, so it reorders nothing. It scored identically to the default in all eight cells of
+  the first slice-3 run, which is the only reason it was caught. Read the flag's *formula*, not
+  its name — and be suspicious of an axis whose cells agree to three decimals.
+- **A junk lexeme from a hand-rolled morphological rule.** Its damage is displaced: it lowers
+  precision on questions *other* than the one it was built for, so it surfaces as an unrelated
+  cell regressing rather than as a bug in the rule.
+- **A lemma index that is silently empty.** Three of the four `tsvector` columns are written by
+  the application, not generated by Postgres, so an empty one makes a chunk unretrievable in that
+  cell and the miss is attributed to the analyser. Asserted at ingest and again at every eval.
 - A query stemmed a different number of times than the index. `to_tsquery` re-stems lexemes
   that came out of `to_tsvector`; that bug shipped in the first run of this harness and made
   the number look *worse*, not better, which is why nothing looked wrong.

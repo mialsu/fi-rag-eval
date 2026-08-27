@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 dependencies = [
+  # The Python binding for libvoikko. It is a ctypes wrapper: the shared library
+  # (`libvoikko1`) and the Finnish dictionary (`voikko-fi`) are SYSTEM packages
+  # that `uv sync` cannot supply. See the README's system dependencies.
+  "libvoikko>=4.3",
   "psycopg[binary]>=3.2",
   "PyYAML>=6.0",
 ]
@@ -35,7 +39,16 @@ python_version = "3.12"
 strict = true
 files = ["src", "tests"]
 
+# libvoikko ships no type information. It is confined to `analyse.Morphology`,
+# which is the only place in the codebase that touches it untyped.
+[[tool.mypy.overrides]]
+module = ["libvoikko.*", "libvoikko"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers --strict-config"
-markers = ["requires_db: needs a live Postgres (see make db-up)"]
+markers = [
+  "requires_db: needs a live Postgres (see make db-up)",
+  "requires_voikko: needs libvoikko1 + voikko-fi installed on the host",
+]
