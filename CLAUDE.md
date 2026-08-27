@@ -46,8 +46,18 @@ matrix, and exits non-zero if **any** cell regresses. Nothing else exists.
   non-zero on purpose — do not "fix" it.
 - **The authority hard filter is still unverified** — one authority means nothing to leak from.
   Read `specs/SPEC-slice-2-golden-set-rewrite.md` for why the corpus-breadth non-goal moved it.
-- **Slice 4 is the vector layer for #13/#15**, per the slice-3 spec's pre-registered decision rule.
-  It needs a cost-ceiling number from the Owner first — see the hard limits below.
+- **Slice 4 is the golden set and a second authority — the Owner overrode the pre-registered
+  rule, deliberately, on 27 Aug 2026.** The slice-3 spec pre-registered slice 4 as the vector
+  layer. That rule was written before slice 3 measured that **every remaining miss is a *ranking*
+  failure, not a reach failure**, and before it was clear that a 2-question gain at N=21 sits
+  inside the ±0.18 interval — i.e. the instrument cannot currently resolve what the vector layer
+  would buy. So: grow the question set toward ~50, ingest a second authority, and verify the
+  authority hard filter. The vector layer moves to slice 5. The override is recorded in the
+  slice-3 spec beside the rule it supersedes, never silently.
+  **⚠️ This is in tension with the Owner's own corpus-breadth non-goal below.** Read both before
+  shaping: the non-goal's condition is *"until the existing ones' metrics are trustworthy"*, and
+  the argument is that slice 3 largely met it — but the tension is real and was flagged, not
+  glossed.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
   doc, an old note, or a past session says already works.
 
@@ -191,11 +201,21 @@ Verify that structurally:
   this one destroys it, because the numbers are the only reason to trust anything else.
 
 - **Project-specific hard limits:**
-  1. **Cost ceiling on eval runs.** Cheapest adequate model by default; no unattended eval loops;
-     the CI eval carries a hard cap. Ask before any run projected to exceed the ceiling.
-     ⚠️ *The ceiling has no number yet — until the Owner sets one, ask before **any** paid run.*
-     Recall the shape of the spend: ~50 questions × the model under test × a separate judge model,
-     on every pull request.
+  1. **Cost ceiling on eval runs.** Cheapest adequate model by default; no unattended eval loops.
+     **Resolved 27 Aug 2026: the Owner intends to use Groq's free tier, so there is no monetary
+     ceiling to set and no paid run is planned.** Still ask before introducing *any* paid provider.
+     Recall the shape of the spend it would carry: ~50 questions × the model under test × a
+     separate judge model, on every pull request.
+     **The binding constraint is now rate limits, not money, and it is a worse one for this
+     project.** A free tier throttles; a throttled eval run means some questions error. This
+     harness must never publish a table over a silently reduced N, so the answering slice needs
+     retry-with-backoff and a **hard failure** when a question cannot be scored — never a skip.
+     That requirement is now load-bearing and belongs in the answering slice's spec.
+     Two smaller consequences: Groq serves open models rather than Claude, which is *fine* and even
+     helpful for `CONTEXT.md`'s rule that the judge must be a different model than the one under
+     test; and a free tier's data-usage terms want reading once, though the corpus is public
+     documents and the queries are golden-set questions, so the no-personal-data limit is not at
+     risk today.
   2. **No personal data, ever.** The corpus is public documents reached through the manifest only.
      Never log raw end-user queries or anything identifying. Note the unresolved tension:
      `DESIGN.md:74` says no personal data, while `DESIGN.md:35` specifies structured per-query

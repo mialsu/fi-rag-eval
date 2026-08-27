@@ -126,6 +126,12 @@ comment and fails on a drop beyond a set threshold.
 | # | Deliverable | Target |
 | --- | --- | --- |
 | M1 | Ingestion, chunking, hybrid retrieval working; retrieval metrics computable | 6 Sep 2026 |
+
+> **M1 status, 27 Aug 2026: retrieval metrics are computable; hybrid retrieval will not be.**
+> Ingestion, chunking and *lexical* retrieval are done and measured across 12 configurations.
+> "Hybrid" means lexical ∪ vector, and the vector arm was deliberately deferred past slice 4 —
+> the instrument cannot currently resolve what it would buy (N=21, ±0.18). Slice 4 fixes the
+> instrument instead. So M1 lands **partial** on 6 Sep, and saying so is the point of the tracker.
 | M2 | Answering with citations and refusal; answer metrics computable | 13 Sep 2026 |
 | M3 | Golden set complete, CI gate green, deployed to Cloud Run, README table filled | 20 Sep 2026 |
 

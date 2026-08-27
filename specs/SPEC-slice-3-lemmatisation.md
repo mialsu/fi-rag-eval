@@ -303,9 +303,17 @@ instead of two slices, and it held.
   is also more expensive than slice 1 implied, costing the control cell recall overall. A
   pre-registered rule protects against reinterpreting a *result*; it cannot protect against a
   mis-specified test, and pretending otherwise would be worse than admitting the flag was wrong.
-- **Slice 4 is the vector layer for `#13`/`#15`.** Unchanged, and now better argued: those clauses
-  are no longer lexically unreachable, they are lexically *weightless*. Still needs a cost-ceiling
-  number from the Owner before any paid run.
+- **Slice 4 is the vector layer for `#13`/`#15`.** **OVERRIDDEN BY THE OWNER, 27 Aug 2026.** The
+  argument for the vector layer got *better* — those clauses are no longer lexically unreachable,
+  they are lexically *weightless* — but the argument for doing it **next** got worse, and the rule
+  did not anticipate that. Two facts this slice produced and the rule was written before:
+  every remaining miss is now a ranking failure rather than a reach failure, and at N=21 the
+  2-question gain the vector layer is predicted to buy (0.095) sits **inside** the ±0.18 interval.
+  A slice whose success cannot be measured is not a slice this project should run. Slice 4 is
+  therefore the golden set plus a second authority — which also closes the authority hard filter,
+  the design's #1 failure mode and still 100% unverified — and the vector layer becomes slice 5.
+  Recorded here rather than only in `CLAUDE.md` so the rule and its override sit together: a
+  pre-registered rule that gets quietly ignored is worse than one that was never written.
 
 ### Also measured
 
