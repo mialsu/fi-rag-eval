@@ -14,6 +14,64 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-27 (slice 4) — the harness had never actually been run from a clean clone
+
+- **What:** `make eval` from a fresh `git clone` failed with **HTTP 403** on the Pirkanmaa source.
+  `urllib` sends `Python-urllib/<version>` and tampere.fi rejects it, while serving the same public
+  PDF to a request that names itself. It worked in my tree only because the PDF was already on disk.
+- **Where:** `src/fi_rag_eval/ingest.py` (`fetch`, `USER_AGENT`). Fixed in 12c328d.
+- **What green tests do NOT prove here — and this is the point of the entry:** `make gate` was green
+  and every one of 190 tests passed while the project's headline reproducibility claim was false.
+  No unit test can catch this, because the fixture corpus is whatever is already in `data/raw/`.
+  The **only** thing that caught it was the profile's own recipe: *run it from a clean clone into a
+  fresh environment, not your dev checkout.* That recipe earned its place this slice.
+- **Still open after the fix:** nothing verifies it *stays* fixed. A unit test asserts the header is
+  still sent, but the download path itself is exercised only by a human running a clean clone. When
+  CI exists, the clean-clone ingest belongs in it.
+- **Disposition:** fixed; the gap in the *gate* is open.
+
+## 2026-08-27 (slice 4) — this project has no CODING_STANDARDS.md, so the review's Standards axis has nothing to read
+
+- **What:** `/code-review`'s Standards axis reads `CODING_STANDARDS.md` by exact filename, and the
+  devkit's `/harness` is meant to install it at bootstrap. It does not exist here, nor does a
+  boundary gate or a drift gate (`scripts/` is absent entirely). The rules this project actually
+  runs on live in prose in `CLAUDE.md` and `CONTEXT.md`.
+- **Where:** repository root; `Makefile` (`gate` runs lint/format/typecheck/test/build and no
+  standards harness).
+- **What green tests do NOT prove here:** that the conventions the code follows are *enforced*
+  rather than merely habitual. `CONTEXT.md`'s `_Avoid_` table -- "say `ts_rank`, not BM25", "say
+  Authority, not Turku's regulations" -- is exactly what a drift gate would make executable, and
+  today nothing checks it. `ANTI-PATTERNS.md` calls this "a standard with no enforcer".
+- **Disposition:** open, and **not** slice 4's to fix. Pre-existing since bootstrap; recorded here
+  because a review axis that silently has no input is worse than one that is absent.
+
+## 2026-08-27 (slice 4) — new evidence for an old entry: the lemma indexes really can disagree with the body
+
+- **What:** Proving the regression gate red (AC10) produced an unplanned demonstration. Corrupting
+  one chunk's `body` directly in Postgres dropped **only the six snowball cells**; all six lemma
+  cells scored unchanged, because `tsv` is a generated column and the three lemma columns are
+  written by the ingest. The corpus was internally inconsistent and `assert_lemma_vectors_populated`
+  was perfectly happy, because it checks that they are non-empty and not that they match the text.
+- **Where:** `src/fi_rag_eval/db.py` (`SCHEMA`, `set_lemma_vectors`,
+  `assert_lemma_vectors_populated`); the existing slice-3 entry on application-written indexes.
+- **What green tests do NOT prove here:** exactly what that entry already said — and it is no longer
+  hypothetical. A cheap closure exists: store a hash of the body alongside each lemma vector and
+  assert it at eval time, the same way `content_sha256` guards the chunk text.
+- **Disposition:** open, promoted from "theoretical" to "demonstrated".
+
+## 2026-08-27 (slice 4) — the per-authority breakdown is a diagnostic and is NOT gated
+
+- **What:** `make eval` prints complete-set recall, per-chunk recall, MRR and leakage per authority,
+  but `report.compare` gates only the **pooled** row of each cell. One authority could regress while
+  the other improved by the same amount and the gate would stay green.
+- **Where:** `src/fi_rag_eval/report.py` (`compare`, `format_by_authority`);
+  `src/fi_rag_eval/evaluate.py` (`EvaluationRun.by_authority`).
+- **What green tests do NOT prove here:** that a per-authority regression is caught. Deliberate per
+  D11 — a per-authority row over ~25 questions cannot register an improvement on its own, so gating
+  it would add a tripwire that fires on noise. But "deliberate" is not "safe", and the asymmetry is
+  worth stating rather than leaving a reader to infer it from the word "diagnostic".
+- **Disposition:** open, accepted. Revisit when either authority alone reaches N~50.
+
 ## 2026-08-27 (slice 4) — a real clause is missing from the corpus, and both halves of the document agree it is not there
 
 - **What:** Pirkanmaa's body contains `18 a § KOMPOSTOINTI-ILMOITUS`, a clause added by amendment.
