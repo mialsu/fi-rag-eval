@@ -2,81 +2,81 @@
   "analyser_fingerprint": "9117b2f347e4c331",
   "cells": {
     "lemma-baseform/0": {
-      "complete_set_recall": 0.7619047619047619,
-      "lexical_leakage": 0.5060240963855421,
-      "mean_reciprocal_rank": 0.5928571428571429,
-      "per_chunk_recall": 0.75
+      "complete_set_recall": 0.74,
+      "lexical_leakage": 0.4416961130742049,
+      "mean_reciprocal_rank": 0.539,
+      "per_chunk_recall": 0.7358490566037735
     },
     "lemma-baseform/1": {
-      "complete_set_recall": 0.7142857142857143,
-      "lexical_leakage": 0.5060240963855421,
-      "mean_reciprocal_rank": 0.5468253968253968,
-      "per_chunk_recall": 0.7083333333333334
+      "complete_set_recall": 0.78,
+      "lexical_leakage": 0.4416961130742049,
+      "mean_reciprocal_rank": 0.5603333333333333,
+      "per_chunk_recall": 0.7735849056603774
     },
     "lemma-baseform/2": {
-      "complete_set_recall": 0.47619047619047616,
-      "lexical_leakage": 0.5060240963855421,
-      "mean_reciprocal_rank": 0.35873015873015873,
-      "per_chunk_recall": 0.4583333333333333
+      "complete_set_recall": 0.46,
+      "lexical_leakage": 0.4416961130742049,
+      "mean_reciprocal_rank": 0.26533333333333337,
+      "per_chunk_recall": 0.4528301886792453
     },
     "lemma-reasm/0": {
-      "complete_set_recall": 0.8095238095238095,
-      "lexical_leakage": 0.6190476190476191,
-      "mean_reciprocal_rank": 0.5888888888888889,
-      "per_chunk_recall": 0.7916666666666666
+      "complete_set_recall": 0.82,
+      "lexical_leakage": 0.5497237569060773,
+      "mean_reciprocal_rank": 0.569,
+      "per_chunk_recall": 0.8113207547169812
     },
     "lemma-reasm/1": {
-      "complete_set_recall": 0.8571428571428571,
-      "lexical_leakage": 0.6190476190476191,
-      "mean_reciprocal_rank": 0.6142857142857143,
-      "per_chunk_recall": 0.8333333333333334
+      "complete_set_recall": 0.82,
+      "lexical_leakage": 0.5497237569060773,
+      "mean_reciprocal_rank": 0.5953333333333333,
+      "per_chunk_recall": 0.8113207547169812
     },
     "lemma-reasm/2": {
-      "complete_set_recall": 0.42857142857142855,
-      "lexical_leakage": 0.6190476190476191,
-      "mean_reciprocal_rank": 0.2857142857142857,
-      "per_chunk_recall": 0.4166666666666667
+      "complete_set_recall": 0.32,
+      "lexical_leakage": 0.5497237569060773,
+      "mean_reciprocal_rank": 0.16466666666666666,
+      "per_chunk_recall": 0.32075471698113206
     },
     "lemma-safe/0": {
-      "complete_set_recall": 0.8095238095238095,
-      "lexical_leakage": 0.5684210526315789,
-      "mean_reciprocal_rank": 0.626984126984127,
-      "per_chunk_recall": 0.7916666666666666
+      "complete_set_recall": 0.76,
+      "lexical_leakage": 0.5058823529411764,
+      "mean_reciprocal_rank": 0.5516666666666666,
+      "per_chunk_recall": 0.7547169811320755
     },
     "lemma-safe/1": {
-      "complete_set_recall": 0.7619047619047619,
-      "lexical_leakage": 0.5684210526315789,
-      "mean_reciprocal_rank": 0.5888888888888889,
-      "per_chunk_recall": 0.75
+      "complete_set_recall": 0.76,
+      "lexical_leakage": 0.5058823529411764,
+      "mean_reciprocal_rank": 0.5613333333333334,
+      "per_chunk_recall": 0.7547169811320755
     },
     "lemma-safe/2": {
-      "complete_set_recall": 0.42857142857142855,
-      "lexical_leakage": 0.5684210526315789,
-      "mean_reciprocal_rank": 0.3111111111111111,
-      "per_chunk_recall": 0.4166666666666667
+      "complete_set_recall": 0.28,
+      "lexical_leakage": 0.5058823529411764,
+      "mean_reciprocal_rank": 0.16566666666666666,
+      "per_chunk_recall": 0.2830188679245283
     },
     "snowball/0": {
-      "complete_set_recall": 0.7619047619047619,
-      "lexical_leakage": 0.3717948717948718,
-      "mean_reciprocal_rank": 0.5174603174603175,
-      "per_chunk_recall": 0.75
+      "complete_set_recall": 0.68,
+      "lexical_leakage": 0.33204633204633205,
+      "mean_reciprocal_rank": 0.5006666666666667,
+      "per_chunk_recall": 0.6792452830188679
     },
     "snowball/1": {
-      "complete_set_recall": 0.6190476190476191,
-      "lexical_leakage": 0.3717948717948718,
-      "mean_reciprocal_rank": 0.4619047619047619,
-      "per_chunk_recall": 0.625
+      "complete_set_recall": 0.64,
+      "lexical_leakage": 0.33204633204633205,
+      "mean_reciprocal_rank": 0.494,
+      "per_chunk_recall": 0.6415094339622641
     },
     "snowball/2": {
-      "complete_set_recall": 0.42857142857142855,
-      "lexical_leakage": 0.3717948717948718,
-      "mean_reciprocal_rank": 0.3349206349206349,
-      "per_chunk_recall": 0.4583333333333333
+      "complete_set_recall": 0.46,
+      "lexical_leakage": 0.33204633204633205,
+      "mean_reciprocal_rank": 0.258,
+      "per_chunk_recall": 0.4716981132075472
     }
   },
-  "commit": "7da6e90",
+  "commit": "f76c7cc",
   "k": 5,
   "published_cell": "snowball/0",
-  "questions": 21,
-  "required_chunks": 24
+  "questions": 50,
+  "required_chunks": 53
 }
