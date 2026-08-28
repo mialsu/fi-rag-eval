@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
-        ingest db-up db-down services-up services-down docker-build clean
+        ingest label agreement db-up db-down services-up services-down docker-build clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
@@ -54,6 +54,18 @@ eval: ingest ## THE product: compute the metric table and gate against the basel
 
 eval-baseline: ingest ## Record this run as the baseline the gate compares against
 	uv run fi-rag-eval eval --write-baseline
+
+label: ingest ## Hand-label the frozen sample's claims (168 units, blind, resumable)
+	@echo "168 units, ~1.5-2h. Stop any time with q -- every label is written as you make it."
+	uv run fi-rag-eval label
+
+agreement: ## Judge-human agreement over the hand labels. VERDICTS=<judge --out file>
+	@test -n "$(VERDICTS)" || { \
+	  echo "agreement: set VERDICTS to a judge verdict file, e.g." >&2; \
+	  echo "  make agreement VERDICTS=eval/runs/verdicts-A.json" >&2; \
+	  echo "Produce one with: uv run fi-rag-eval judge <run.json> --out <file>" >&2; \
+	  exit 1; }
+	uv run fi-rag-eval agreement $(VERDICTS)
 
 docker-build: ## Container image (a /ship-time gate, not a per-commit one)
 	@echo "docker-build: NOT IMPLEMENTED -- no Dockerfile until the service exists (M3)." >&2

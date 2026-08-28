@@ -348,7 +348,9 @@ change. `make eval` hashes the lemmas the analyser produces for a committed prob
 records that hash in the baseline; `fi-rag-eval eval --probe` prints the whole probe table so a
 mismatch can be diagnosed rather than merely detected.
 
-Other targets: `make gate` (lint, format, types, tests, build — the commit gate), `make ingest`,
+Other targets: `make gate` (lint, format, types, tests, build — the commit gate), `make label`
+(hand-label the frozen sample, 168 units, blind and resumable), `make agreement VERDICTS=<file>`,
+`make ingest`,
 `make db-up` / `make db-down`, `make eval-baseline` to re-record the baseline deliberately (run it
 from a clean tree, so the recorded commit identifies the code that produced the numbers).
 
