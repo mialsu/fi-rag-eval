@@ -28,3 +28,80 @@ services:
       # The corpus is rebuilt from the manifest on every ingest, so there is
       # nothing here worth persisting -- and nothing here that can go stale.
       - /var/lib/postgresql/data
+
+  # ---------------------------------------------------------------------------
+  # The LLM boundary (slice 5, D10). Everything the harness sends to Groq goes
+  # through this gateway, so the cost ceiling has an enforcer that is not our
+  # own code and not a billing dashboard.
+  # ---------------------------------------------------------------------------
+
+  litellm-postgres:
+    # A SECOND Postgres, deliberately, rather than a second database inside the
+    # corpus one. The two have opposite persistence requirements and one
+    # container can only have one policy: the corpus must NOT survive (it is
+    # dropped and rebuilt by `create_schema` on every ingest, and tmpfs makes
+    # that visible), while the proxy's spend ledger must survive, or the budget
+    # resets to zero every `make db-down` and stops being a monthly cap.
+    image: postgres:17-alpine
+    # No published port. Nothing outside this compose project has any business
+    # reading the spend ledger, and an unpublished port is one fewer collision
+    # on a machine already running four other projects' databases.
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - litellm-spend:/var/lib/postgresql/data
+
+  litellm:
+    # Pinned by digest, not by a moving tag. `main-stable` today is litellm
+    # 1.98.0; the project's reproducibility claim is "clone it and run
+    # `make eval`", and a floating tag would silently change the gateway --
+    # including its provider price table, which the measured cost figure and
+    # the token ceiling both depend on.
+    image: ghcr.io/berriai/litellm@sha256:20b5044b619055374061a6d5b7b08754cad75aeabbf82ddf4f69cc0cf80ddaf4
+    depends_on:
+      litellm-postgres:
+        condition: service_healthy
+    # Port 4010 deliberately: 4000 is LiteLLM's own default, so it is the port
+    # any *other* project's gateway on this machine would also take. Same
+    # reasoning as the corpus database's 5434.
+    ports:
+      - "4010:4000"
+    environment:
+      # `:?` rather than a default: a missing key must fail `docker compose up`
+      # loudly. An empty string here would produce a gateway that starts fine
+      # and 401s on the first real call, mid-run.
+      GROQ_API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env -- see .env.example}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env -- see .env.example}
+      DATABASE_URL: postgresql://litellm:litellm@litellm-postgres:5432/litellm
+      # STORE_MODEL_IN_DB is deliberately unset. With it on, the model list can
+      # be edited through the gateway's UI and the running configuration drifts
+      # away from the file in this repository -- which is exactly the drift the
+      # published numbers must not have. litellm.config.yaml is the only source
+      # of truth for which models exist.
+    volumes:
+      - ./litellm.config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    healthcheck:
+      # The image ships neither curl nor wget, so the check goes through its own
+      # Python. The first start runs database migrations, hence the long retry
+      # budget rather than a long interval.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness').read()"
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+volumes:
+  litellm-spend:
+    # The spend ledger the budget enforcer reads. Survives `make db-down` on
+    # purpose: a monthly cap that forgets on restart is not a monthly cap.

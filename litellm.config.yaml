@@ -1,0 +1,49 @@
+# The LLM boundary. Everything this project sends to Groq goes through the proxy
+# this file configures -- see docs/adr/0009 and SPEC-slice-5 D10.
+#
+# The proxy is not a demo. The cost ceiling's second enforcer (SPEC-slice-5 D8)
+# lives here -- but NOT in this file's `max_budget`, and the difference was found
+# by trying to watch it fail. Two things had to be true and only one of them was:
+#
+#   1. Budgets need a database. LiteLLM reads the running spend total from
+#      DATABASE_URL, and with no database client the check is skipped silently
+#      and requests keep being served. compose.yaml gives it one.
+#   2. Budgets do not apply to the MASTER key. Measured: $0.074910 of spend
+#      against a $0.001 budget was served HTTP 200 on the master key, while a
+#      virtual key was refused HTTP 429 at $0.000029 against $0.00001.
+#
+# So the harness spends through a budgeted **virtual key** (src/fi_rag_eval/
+# gateway.py), which is what D8 said all along -- "the Proxy's per-key budget".
+# The setting below is kept as the proxy-wide backstop for any other caller.
+
+model_list:
+  # Named by their real provider model ids rather than by role aliases
+  # ("answerer"/"judge"). This project publishes numbers that must be traceable
+  # to the model that produced them, so the name on the wire is the name in the
+  # report -- an alias would let the pair change under a stable label.
+  - model_name: qwen/qwen3.6-27b
+    litellm_params:
+      model: groq/qwen/qwen3.6-27b
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: openai/gpt-oss-120b
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+
+litellm_settings:
+  # Mirrors the $25/month cap the Owner set at Groq on 27 Aug 2026, so the
+  # gateway refuses at the same line the provider would -- but locally, in a
+  # response the harness can read, rather than as a billing surprise.
+  max_budget: 25.0
+  budget_duration: 30d
+
+  # Deliberately NOT dropping unsupported parameters. Tracer slice 1 measured
+  # that the two models disagree about `reasoning_effort` (gpt-oss takes
+  # low|medium|high, qwen only none|default, and qwen returns HTTP 400 for the
+  # others). Dropping silently would mean the model ran with settings other than
+  # the ones the harness recorded, and the measurement would be of something
+  # nobody chose. Loud failure is the correct behaviour for an instrument.
+  drop_params: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

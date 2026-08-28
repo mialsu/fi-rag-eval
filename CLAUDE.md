@@ -9,7 +9,7 @@ Domain profile: **cli-tools**, with a `/ship`-only deploy check grafted from `we
 project-specific eval-integrity layer. The choice and its rejected alternatives are recorded in
 `docs/adr/0001-domain-profile-cli-tools-hybrid.md` — read it before assuming a stock profile.
 
-## Where this stands (27 Aug 2026)
+## Where this stands (28 Aug 2026)
 
 **Slices 1–4 are built: the measurement spine, an honest golden set, a lemmatising analyser
 measured as a grid, and a second authority.** Two authorities are ingested into Postgres and
@@ -80,9 +80,21 @@ regresses. Nothing else exists.
   absent from the document's own table of contents, so the body/TOC cross-check is silent and its
   text is absorbed into 18 §'s chunk. Two clauses, one address. No golden question points at
   Pirkanmaa 18 § — do not add one before this is fixed.
-- **Not built:** embeddings, pgvector, reranking, any LLM call, a judge, answer generation,
-  citations, refusal, a third authority, CI, Docker, Cloud Run. `make docker-build` still exits
-  non-zero on purpose — do not "fix" it.
+- **The answering boundary exists as of 28 Aug 2026 (slice 5, tracer 2); the answer *metrics* do
+  not.** `fi-rag-eval answer <question-id>` takes the published cell's top-5, calls
+  `qwen/qwen3.6-27b` through a LiteLLM gateway in `compose.yaml`, and prints a Conditional answer
+  with citations by address and the **measured** cost. That is one question, run by a human. There
+  is no judge, no refusal population, no answer metric, and nothing in `make eval` calls a model.
+  Requires `make services-up`, not `make db-up`. See ADR-0009.
+- **Reasoning is not a performance knob here, it is a correctness one.** Measured on one question:
+  with reasoning off, the answerer produced the *same inversion of `17 §`* that disqualified
+  `gpt-oss-20b` in tracer 1; with it on, it stated all three required branches and named the
+  determining variables it could not resolve. It costs ~5.3x the dollars ($0.0210 vs $0.0040 per
+  answer). Pre-registered as prediction 7; do not turn reasoning off to save money without
+  scoring it.
+- **Not built:** embeddings, pgvector, reranking, a judge, answer metrics, refusal scoring,
+  a third authority, CI, Docker, Cloud Run. `make docker-build` still exits non-zero on purpose —
+  do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
@@ -115,7 +127,11 @@ Run them all with `make gate`. Every one below has been run, and has been proven
   `make test` **skip** when Postgres is down — so a green `make gate` with the database
   stopped proves the pure functions and nothing else. The analyser tests skip on the same terms
   when `voikko-fi` is absent; the reassembly rule itself is pinned by pure tests that always run.
-  Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`.
+  The boundary tests skip on the same terms when the LiteLLM gateway is down, and **no test in
+  `make gate` makes a live model call** — a green gate is compatible with an answering path that
+  401s on its first real request (confessed in `REVIEW-DEBT.md`).
+  Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`. Anything that answers additionally
+  needs `make services-up` and a filled `.env`.
 
 A gate you haven't run is not a gate. Green tests gate; they do not prove.
 

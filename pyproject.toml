@@ -10,6 +10,19 @@ dependencies = [
   # (`libvoikko1`) and the Finnish dictionary (`voikko-fi`) are SYSTEM packages
   # that `uv sync` cannot supply. See the README's system dependencies.
   "libvoikko>=4.3",
+  # The LLM boundary (ADR-0009). Used as a library here AND run as the gateway
+  # in compose.yaml: `completion_cost()` and the provider price table are what
+  # make the cost ceiling a measured number rather than a hand-maintained one.
+  "litellm>=1.98",
+  # Declared explicitly although litellm already pulls it in: the CLI calls it
+  # directly, and depending on a transitive dependency is depending on someone
+  # else's decision not to drop it.
+  "python-dotenv>=1.0",
+  # LiteLLM's `num_retries` is tenacity-backed but tenacity is NOT installed by
+  # litellm core -- it raises at the first retry. D10 counts that retry-with-backoff
+  # as covering the guard-rail's requirement, so the dependency is load-bearing
+  # rather than incidental. Measured, on the first real call through the gateway.
+  "tenacity>=8.0",
   "psycopg[binary]>=3.2",
   "PyYAML>=6.0",
 ]

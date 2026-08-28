@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
-        ingest db-up db-down docker-build clean
+        ingest db-up db-down services-up services-down docker-build clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
@@ -35,9 +35,15 @@ build: ## Prove a clean clone reproduces this environment, and the package impor
 	uv run python -c "import fi_rag_eval; print(fi_rag_eval.__version__)"
 
 db-up: ## Start the local Postgres the harness measures against
+	docker compose up -d --wait postgres
+
+db-down: ## Stop everything (the corpus volume is tmpfs, so the corpus is discarded)
+	docker compose down
+
+services-up: ## Start Postgres AND the LiteLLM gateway (needed by anything that answers)
 	docker compose up -d --wait
 
-db-down: ## Stop it (the data volume is tmpfs, so this discards the corpus)
+services-down: ## Stop them. The gateway's spend ledger is a named volume and survives.
 	docker compose down
 
 ingest: db-up ## Fetch, chunk and load the corpus described by corpus/manifest.yaml

@@ -739,6 +739,93 @@ what the answer metrics exist to catch, and it is early support for prediction 5
   urllib User-Agent exactly as tampere.fi did. Not a blocker — LiteLLM and the `openai` SDK set
   their own — but the debt entry is broader than the corpus fetch it was written about.
 
+## Tracer slice 2 — measured result (28 Aug 2026)
+
+`One golden question answered end to end through the gateway, three times (reasoning off, and on
+at two caps), plus the red proofs. ~$0.08 total.`
+
+**AC2: MET.** The LiteLLM Proxy runs in `compose.yaml`, the harness reaches both models through
+it, and `git ls-files -z | xargs -0 grep` finds no key literal.
+**AC3: MET, seen red.** 13 malformed envelopes are rejected; making `_envelope` tolerant turned
+three tests red, and they went green again on revert.
+**AC6: MET, seen red.** The token ceiling fires; disabling the comparison turned three tests red.
+**AC17: MET.** Cost is read from the gateway's `response_cost`, never estimated here.
+
+### What was refuted
+
+**D8's second enforcer did not exist.** The gateway's budget was configured in
+`litellm_settings.max_budget` with the harness authenticating as the proxy master key. Measured
+while trying to watch it go red: **$0.074910 of spend against a $0.001 budget was served
+HTTP 200.** LiteLLM does not apply budgets to its master key. A virtual key was refused
+**HTTP 429** at $0.000029 against $0.00001. Corrected in-slice — the harness now spends through a
+derived virtual key, whose spend was then watched accruing ($0.0256206, matching the run's reported
+cost exactly). **ADR-0009** records it; `REVIEW-DEBT.md` keeps the lesson. The spec said "per-key
+budget" and was right; the first implementation was not.
+
+**D8's 600K token ceiling is too low for a legitimate run.** Measured on one real five-chunk
+context:
+
+| | prompt | completion | of which reasoning | tokens | cost |
+|---|---|---|---|---|---|
+| reasoning **off** | 4,866 | 353 | 0 | 5,219 | $0.003980 |
+| reasoning **on** (cap 8k) | 4,866 | 6,018 | 5,143 | 10,884 | $0.020974 |
+| reasoning **on** (cap 16k) | 4,866 | 7,567 | 6,646 | 12,433 | $0.025621 |
+
+At 64 questions the answer phase alone is ~340K tokens with reasoning off and **~700K with it on**,
+before a single judge call. The ceiling was **deliberately left at D8's 600K** rather than fitted
+to one measurement — see the confession.
+
+**Prediction 6 is heading for refutation.** It fixed cost per run within 2x of $0.067. The answer
+phase alone is ~$0.25 with reasoning off and **~$1.34 with it on**, judge excluded. Scored properly
+when a full run exists; recorded now so it cannot be reinterpreted later. Qwen's Groq pricing,
+unconfirmed at the end of tracer 1, is **$0.60/M input and $3.00/M output**, derived from three
+measured calls and consistent to five decimals.
+
+### The finding that changes prediction 7
+
+Tracer 1 predicted refusal quality depends on reasoning. **Comprehension does too, and more
+sharply.** On `biojatteen-kerays-jarjestaminen` with reasoning **off**, `qwen/qwen3.6-27b` produced
+the *same inversion of `17 §`* that disqualified `gpt-oss-20b` — it listed self-composting as a
+condition that puts a property **in** scope of the separate-collection duty, when `15 §` exempts it.
+With reasoning **on**, the same model on the same context stated all three required branches
+correctly, named the two determining variables it could not resolve, and cited each branch by
+address.
+
+So prediction 7's trade-off is worse than "refusal quality costs tokens": **the cheap configuration
+produces confidently wrong answers of exactly the kind this project exists to catch.** If that holds
+across the set, reasoning is not optional and the expensive cost model is the real one.
+
+### Four smaller findings
+
+1. **`num_retries` needs `tenacity`, which litellm core does not install.** The first real call
+   through the gateway died on *"tenacity import failed"*. D10 counts LiteLLM's backoff as
+   satisfying the guard-rail's retry requirement, so the dependency is load-bearing; it is now
+   declared.
+2. **A 3,000-token cap fails as `json_validate_failed` with an empty `failed_generation`** — the
+   same failure tracer 1 saw at 700 tokens wearing a different error code, because the cap covers
+   reasoning and answer together. The default is now 8,000, measured.
+3. **Qwen returns its `<think>` block inside `content`** while `gpt-oss` reports it as
+   `reasoning_tokens` with clean content. `reasoning_format: hidden` is set explicitly rather than
+   relying on JSON mode's side effect of suppressing it.
+4. **`load_dotenv()` searches from the *caller's file*,** so it found the repository only because
+   this is an editable install; a wheel would have found nothing. Changed to search from the
+   working directory — the exact "worked in the dev checkout" failure the clean-clone build gate
+   exists to catch.
+
+### Spec deltas from this slice
+
+- **D10 is amended by ADR-0009**: the enforcer is a **budgeted virtual key**, not
+  `litellm_settings.max_budget`, and the gateway gets **its own Postgres with a persistent volume**
+  (the corpus database's `tmpfs` is untouched — the two have opposite persistence requirements).
+- **D8's ceiling is contradicted by measurement and left in place**, with the numbers recorded at
+  the constant and the re-derivation assigned to tracer 6.
+- **`make db-up` now starts only Postgres; `make services-up` starts the gateway too.** Nothing
+  that answers can run without the latter.
+- **The gateway image is pinned by digest**, not by `main-stable`: a floating tag would silently
+  change the provider price table that both the published cost and the ceiling depend on.
+
+---
+
 ## Spec deltas
 
 _None yet. Anything the build teaches that contradicts the above lands here, dated, rather than

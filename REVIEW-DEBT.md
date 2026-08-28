@@ -537,3 +537,60 @@ ledger is worse than none, because sessions trust it.
   a workflow exists and has been seen to go red on a real regression, the central claim of this
   project is untested.
 - **Disposition:** open — closes at M3.
+
+## 2026-08-28 — no automated test makes a live model call
+
+- **What:** `tests/test_answer.py` covers the envelope contract, the token ceiling, the per-model
+  reasoning shim and the context format — all pure. The only gateway test lists models, which
+  spends nothing. **Nothing in `make gate` proves an answer can actually be generated.**
+- **Where:** `tests/test_answer.py:1-12` (the docstring states this deliberately)
+- **Why:** `make gate` runs before every commit. A test that spends money on every commit is a
+  test that gets deleted the first time it is inconvenient, and this project's cost ceiling exists
+  precisely to stop unattended spend.
+- **What green tests do NOT prove here:** that the answering path works at all. 226 green tests are
+  compatible with a gateway that 401s on the first real call. The live exercise is
+  `fi-rag-eval answer <id>`, run by a human, and it is the only thing that proves this layer.
+- **Disposition:** open — the answer phase's own `make eval` integration (tracer 6) will exercise
+  it on every eval run, which is where a networked assertion belongs.
+
+## 2026-08-28 — a spent budget is detected by string-matching the gateway's message
+
+- **What:** An exhausted key budget and an ordinary rate limit both arrive as HTTP 429. The
+  boundary distinguishes them with `"budget has been exceeded" in str(exc).lower()`.
+- **Where:** `src/fi_rag_eval/answer.py`, the `RateLimitError` branch of `complete()`
+- **Why:** The distinction is load-bearing — a rate limit is worth retrying and an exhausted budget
+  never is — but LiteLLM surfaces no structured code that separates them at this boundary.
+- **What green tests do NOT prove here:** nothing tests this branch, because reaching it means
+  actually exhausting a $25 budget. If LiteLLM rewords the message, the harness will silently
+  retry an exhausted budget three times and then report it as a rate limit.
+- **Disposition:** open. Cheap partial fix available: assert the message shape against a
+  deliberately-tiny budget on a throwaway key, which is how the behaviour was measured in the
+  first place.
+
+## 2026-08-28 — D8's 600K token ceiling is known to be wrong and was left alone
+
+- **What:** `answer.TokenBudget` ships with `TOKEN_CEILING = 600_000`, the figure `SPEC-slice-5` D8
+  specified. Tracer slice 2 measured one answer at ~10,900 tokens with reasoning on, which puts a
+  64-question answer phase at **~700K tokens — a legitimate run would trip the ceiling**, the one
+  thing a ceiling must never do.
+- **Where:** `src/fi_rag_eval/answer.py`, `TOKEN_CEILING` (its docstring carries the measurement)
+- **Why:** Raising it now would be fitting the spec's number to a single measurement. The right
+  denominator is a full 64-question run, which does not exist until tracer 6, and prediction 7
+  decides whether reasoning is on at all — which changes the answer by a factor of two.
+- **What green tests do NOT prove here:** the tests prove the ceiling *fires*, not that it is set
+  to a sensible number. A gate at the wrong threshold is green until the day it stops the work.
+- **Disposition:** open — closes in tracer 6, re-derived from a real run.
+
+## 2026-08-28 — the gateway's budget was decorative for the length of one commit
+
+- **What:** The gateway's first configuration put `max_budget: 25.0` in `litellm.config.yaml` and
+  authenticated with the proxy master key. Measured: **$0.074910 of spend against a $0.001 budget
+  was served HTTP 200.** LiteLLM does not apply budgets to its master key. Corrected in the same
+  slice — the harness now spends through a derived virtual key (`gateway.py`), which was watched
+  refusing at HTTP 429.
+- **Where:** `litellm.config.yaml` (the comment now records what was measured),
+  `src/fi_rag_eval/gateway.py`
+- **Why it is recorded although it is fixed:** it is the project's own "standard with no enforcer"
+  anti-pattern, and it survived being written, reviewed and reasoned about — right up until
+  someone tried to watch it fail. The lesson is the entry, not the bug.
+- **Disposition:** **CLOSED 28 Aug 2026 (slice 5, tracer 2)**, by ADR-0009 and a red proof.
