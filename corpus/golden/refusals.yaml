@@ -1,0 +1,334 @@
+# Golden set -- the REFUSAL population. 14 questions whose only correct answer is
+# a Refusal (slice 5, D4/D5).
+#
+# ==============================================================================
+# WHY THIS IS A SEPARATE FILE AND A SEPARATE TYPE
+# ==============================================================================
+#
+# These questions are a separate POPULATION, not a separate authority. They never
+# enter complete-set recall -- a question with nothing to retrieve would score a
+# vacuous 1.0 -- so the retrieval headline stays N=50 and ADR-0007's continuity is
+# untouched. Keeping them in their own file makes that exclusion something you can
+# see rather than something you have to remember, and `golden.RefusalQuestion` is
+# a different type from `golden.Question` so that pooling the two does not
+# type-check.
+#
+# ==============================================================================
+# THE TWO KINDS, AND WHY THEY ARE SCORED APART
+# ==============================================================================
+#
+#   out-of-corpus (8)        The subject matter is genuinely absent from these
+#                            jatehuoltomaaraykset -- it lives in another
+#                            instrument entirely (the jatetaksa, the waste tax
+#                            act, producer responsibility, rescue-services law).
+#                            The EASY refusal: little that is truly on point
+#                            retrieves, so declining is nearly free.
+#
+#   out-of-jurisdiction (6)  Answerable only from authority A, asked with
+#                            authority B's filter. Retrieval hands the answerer
+#                            five plausible, same-topic chunks from the authority
+#                            it was actually asked about, and nothing in the
+#                            prompt says the question belongs elsewhere. The HARD
+#                            refusal, and the one that closes the hard-filter
+#                            debt: CLAUDE.md specifies the filter as a REFUSAL,
+#                            and what was verified before this slice was only
+#                            that a foreign chunk never enters the top-k.
+#
+# Pooling them would let the easy kind carry the metric. That is structurally the
+# same move as diluting a golden set with easy questions, which this project has
+# spent two slices measuring and refusing to do.
+#
+# ==============================================================================
+# `absent_lexeme` -- A DRIFT DETECTOR, NOT A PROOF
+# ==============================================================================
+#
+# Every entry names a substring that WOULD appear in the asked authority's text if
+# the topic were covered, and the harness asserts at every run that it is absent
+# from it. For out-of-jurisdiction entries the check is TWO-SIDED: the lexeme must
+# also be PRESENT in the authority that does answer the question, so an entry
+# cannot quietly become vacuous from either direction.
+#
+# What this buys is that the central claim cannot rot silently: add the clause, or
+# ingest a new edition that covers the topic, and the run goes red instead of
+# scoring a correct answer as a missed refusal. What it does NOT buy is proof of
+# absence -- a word can be absent while the topic is covered under another name.
+# `sakokaivo` is the standing example: absent from both documents, while
+# `saostussailio` is regulated at length. A refusal labelled on that word would
+# have been wrong, and refusing would have been the defect.
+#
+# So the absence CLAIM is hand-made, from the clause lists, and `absence_source`
+# records how. The lexeme only keeps the claim honest over time.
+#
+# ==============================================================================
+# THREE PRE-REGISTERED ASYMMETRIES DID NOT SURVIVE THIS CHECK
+# ==============================================================================
+#
+# SPEC-slice-5 D5 named six out-of-jurisdiction topics, harvested by reading both
+# CLAUSE LISTS. Checking the BODY TEXT refuted three of them:
+#
+#   Kunnan toissijainen jatehuoltopalvelu  KEPT, but only with a phrase.
+#       Lounais-Suomi's 1 SS applies its rules to "kunnan toissijaiselle
+#       jatehuoltovastuulle kuuluviin jatehuoltopalveluihin" and 41 SS speaks of
+#       "toissijaisen siivoamisvastuun", so the word `toissijainen` is present in
+#       both. What is absent from Lounais-Suomi is the SERVICE and its request
+#       procedure, so the lexeme is the phrase, and the question asks for the
+#       procedure rather than for the concept.
+#
+#   Hyodyntaminen omassa maanrakentamisessa  DROPPED.
+#       Pirkanmaa 17 SS: "Rakennus- ja purkujatteen hyodyntamisesta
+#       maarakentamisessa maarataan naiden jatehuoltomaaraysten SS 19:ssa." Both
+#       authorities regulate it. The clause TITLE differs; the coverage does not.
+#
+#   Roskaantumisen ehkaiseminen yleisilla alueilla  DROPPED.
+#       Pirkanmaa has no clause with that title but addresses roskaantuminen in
+#       nine chunks, 31 SS and 42 SS among them. A refusal label here would have
+#       been wrong.
+#
+# Three replacements were found the same way and each passes the two-sided check:
+# jateastian puhdistustiheys, tieyhteydeton saari, and lisajate.
+#
+# ==============================================================================
+# PROVENANCE
+# ==============================================================================
+#
+# All 14 are `phrasing: authored`. No public resident-facing page asks a question
+# it cannot be answered from, so there is nothing to harvest here; saying so is
+# cheaper than pretending otherwise. Leakage is not computed over this population
+# -- it is a property of the answerable set and its targets, and these have none.
+#
+# NO REFUSAL QUESTION POINTS AT pirkanmaa@2021-07-01#18. That chunk silently
+# absorbs `18 a SS KOMPOSTOINTI-ILMOITUS`, so a citation naming it names a clause
+# that does not carry that text under its own number. Enforced on load.
+
+version: 1
+
+refusals:
+
+  # ---------------------------------------------------------------- out-of-jurisdiction
+  # Three asked in Pirkanmaa, three in Lounais-Suomi, so a systematic failure in
+  # one direction cannot hide behind the other.
+
+  - id: ooj-jatemylly-pirkanmaa
+    question: Saanko asentaa keittiöön jätemyllyn, joka johtaa jätteet viemäriin?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Tampere
+    absent_lexeme: jätemylly
+    absence_source: >-
+      Pirkanmaan 48 pykälän otsikkoluettelo luettiin läpi eikä jätemyllyä
+      käsitellä missään pykälässä; sanaa ei esiinny asiakirjan tekstissä
+      kertaakaan. Lounais-Suomessa asialla on oma pykälänsä.
+    answerable_from: lounais-suomi@2024-08-01#19
+    label_source: >-
+      Lounais-Suomi 19 § Jätemylly: "Jätevesiviemäriin liitetyn jätemyllyn
+      käyttäminen ja jätteiden johtaminen jätevesiviemäriin on kielletty."
+      Pirkanmaan määräyksissä ei ole vastaavaa säännöstä.
+
+  - id: ooj-jateastian-puhdistustiheys-pirkanmaa
+    question: Kuinka monta kertaa vuodessa sekajäteastia on vähintään puhdistettava?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Nokia
+    absent_lexeme: puhdistettava
+    absence_source: >-
+      Pirkanmaan 26 § KERÄYSVÄLINEEN KUNNOSSAPITO velvoittaa puhtaanapitoon mutta
+      ei aseta mitään puhdistustiheyttä, eikä sanaa "puhdistettava" esiinny
+      asiakirjassa. 20 §:n maininta "kuumapesun kestäviä" koskee keräysvälineen
+      rakennetta, ei pesuvälejä -- minkä vuoksi lekseemi on "puhdistettava" eikä
+      "pesu".
+    answerable_from: lounais-suomi@2024-08-01#27
+    label_source: >-
+      Lounais-Suomi 27 § Jäteastioiden kunnossapito ja pesu: "Sekajäteastia on
+      kuitenkin puhdistettava vähintään kerran vuodessa ja biojäteastia vähintään
+      kaksi kertaa vuodessa." Kysymys pyytää nimenomaan tämän luvun, jota
+      Pirkanmaan määräyksissä ei ole.
+
+  - id: ooj-tieyhteydeton-saari-pirkanmaa
+    question: >-
+      Järjestääkö kunta erilliskerättävien jätteiden kiinteistöittäisen
+      kuljetuksen saareen, jonne ei ole tieyhteyttä?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Ylöjärvi
+    absent_lexeme: tieyhteyttä
+    absence_source: >-
+      Pirkanmaan määräyksissä ei ole yhtään mainintaa tieyhteydettömistä
+      kiinteistöistä tai saarista; sanaa "tieyhteyttä" ei esiinny asiakirjassa.
+      Lounais-Suomessa saaristo on oma erikseen säädetty tilanteensa.
+    answerable_from: lounais-suomi@2024-08-01#15
+    label_source: >-
+      Lounais-Suomi 15 §: "Kunta ei järjestä erilliskerättävien jätteiden
+      kiinteistöittäistä kuljetusta tieyhteyttä vailla olevissa saarissa,
+      Houtskarissa eikä Nauvon ja Korppoon taajamien ulkopuolisilla alueilla."
+
+  - id: ooj-putkikerays-lounais-suomi
+    question: >-
+      Miten jätteiden putkikeräysjärjestelmään liittyneen kiinteistön jätehuolto
+      järjestetään ja mistä kuljetus alkaa?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Turku
+    absent_lexeme: putkikeräys
+    absence_source: >-
+      Lounais-Suomen 50 pykälän otsikkoluettelo luettiin läpi: putkikeräystä ei
+      käsitellä missään pykälässä eikä sana esiinny asiakirjan tekstissä.
+      Pirkanmaalla järjestelmällä on oma pykälänsä ja oma määritelmänsä 2 §:ssä.
+    answerable_from: pirkanmaa@2021-07-01#10
+    label_source: >-
+      Pirkanmaa 10 § JÄTTEIDEN PUTKIKERÄYSJÄRJESTELMÄ: liittyneiden kiinteistöjen
+      yhteisenä keräysvälineenä toimii koonta-asema, ja "Pirkanmaan Jätehuolto
+      Oy:n järjestämä jätteenkuljetus alkaa edellä mainituista keräyspisteistä."
+
+  - id: ooj-toissijainen-jatehuoltopalvelu-lounais-suomi
+    question: >-
+      Miten pyydän kunnalta toissijaista jätehuoltopalvelua, jos yksityistä
+      palvelua ei ole saatavilla?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Salo
+    absent_lexeme: toissijainen jätehuoltopalvelu
+    absence_source: >-
+      Lounais-Suomi mainitsee toissijaisen jätehuoltovastuun soveltamisalassaan
+      (1 §) ja toissijaisen siivoamisvastuun 41 §:ssä, mutta ei säädä itse
+      PALVELUSTA eikä sen pyytämisestä; fraasi "toissijainen jätehuoltopalvelu" ei
+      esiinny asiakirjassa. Tämän vuoksi lekseemi on fraasi eikä sana
+      "toissijainen", joka esiintyy molemmissa -- ja tämän vuoksi kysymys pyytää
+      menettelyä eikä käsitettä.
+    answerable_from: pirkanmaa@2021-07-01#5
+    label_source: >-
+      Pirkanmaa 5 § KUNNAN TOISSIJAINEN JÄTEHUOLTOPALVELU: jätteen haltija "voi
+      palvelutarjonnan puutteen vuoksi pyytää jätehuollon järjestämistä
+      Pirkanmaan Jätehuolto Oy:ltä", ja pykälä kertoo kuka pyynnön voi esittää.
+
+  - id: ooj-lisajate-lounais-suomi
+    question: >-
+      Millä ehdoilla jätettä saa jättää tilapäisesti keräysvälineen ulkopuolelle
+      keräyspaikan välittömään läheisyyteen?
+    kind: out-of-jurisdiction
+    phrasing: authored
+    municipality: Raisio
+    absent_lexeme: lisäjäte
+    absence_source: >-
+      Lounais-Suomen 25 § Jäteastioiden täyttäminen vaatii, että astian kansi
+      menee kiinni, mutta ei säädä poikkeusta astian ulkopuolelle jätettävälle
+      jätteelle -- sanaa "lisäjäte" ei esiinny asiakirjassa. Kysymys pyytää
+      nimenomaan poikkeuksen EHDOT, joita Lounais-Suomessa ei ole.
+    answerable_from: pirkanmaa@2021-07-01#25
+    label_source: >-
+      Pirkanmaa 25 § LISÄJÄTE: "Keräysvälineen ulkopuolelle saa jättää jätettä
+      vain poikkeustapauksissa. Jos jäte ei mahdu tai sitä ei muusta syystä voi
+      panna keräysvälineeseen, se voidaan sijoittaa tilapäisesti jätteelle
+      varatun keräyspaikan välittömään läheisyyteen."
+
+  # ---------------------------------------------------------------------- out-of-corpus
+  # Four asked in Lounais-Suomi, four in Pirkanmaa. Each topic is governed by a
+  # DIFFERENT INSTRUMENT -- the jatetaksa, the waste tax act, producer
+  # responsibility, rescue-services law, feed and fertiliser law -- rather than by
+  # any municipal waste regulation, which is what makes the absence structural
+  # rather than an oversight either authority might fix next edition.
+
+  - id: ooc-jatemaksun-suuruus
+    question: Paljonko sekajäteastian tyhjennys maksaa omakotitalolta?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Turku
+    absent_lexeme: jätemaksu
+    absence_source: >-
+      Jätemaksujen suuruudesta määrätään jätetaksassa, joka on eri asiakirja kuin
+      jätehuoltomääräykset. Kumpikaan asiakirja ei sisällä sanaa "jätemaksu" eikä
+      yhtään hintaa; Pirkanmaa viittaa jätetaksaan neljästi mutta ei toista sen
+      sisältöä.
+    label_source: >-
+      Ei lähdepykälää: kysymystä ei voi vastata näistä jätehuoltomääräyksistä
+      lainkaan. Oikea vastaus on kieltäytyminen ja jätetaksaan ohjaaminen.
+
+  - id: ooc-autonrenkaiden-vastaanotto
+    question: Mihin vanhat autonrenkaat pitää toimittaa?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Salo
+    absent_lexeme: rengas
+    absence_source: >-
+      Renkaat kuuluvat tuottajavastuun piiriin, ja niiden vastaanotto järjestetään
+      tuottajayhteisön verkostossa. Sanaa "rengas" ei esiinny kummankaan
+      viranomaisen tekstissä missään muodossa.
+    label_source: >-
+      Ei lähdepykälää. Molemmat asiakirjat mainitsevat tuottajavastuun yleisesti
+      mutta eivät säädä renkaiden vastaanotosta.
+
+  - id: ooc-tavarat-uudelleenkayttoon
+    question: Mihin voin viedä käyttökelpoiset tavarat kirpputorille uudelleenkäyttöön?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Kaarina
+    absent_lexeme: kirpputori
+    absence_source: >-
+      Jätehuoltomääräykset säätävät jätteestä; uudelleenkäyttöön menevä tavara ei
+      ole jätettä eikä kumpikaan asiakirja nimeä yhtään uudelleenkäytön kanavaa.
+      Sanaa "kirpputori" ei esiinny kummassakaan.
+    label_source: >-
+      Ei lähdepykälää. Etusijajärjestys mainitaan tavoitepykälässä, mutta se ei
+      kerro minne tavaraa viedään.
+
+  - id: ooc-nuohousvali
+    question: Kuinka usein takka ja savuhormi on nuohottava?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Raisio
+    absent_lexeme: nuohous
+    absence_source: >-
+      Nuohouksesta säädetään pelastuslaissa, ei kunnallisissa
+      jätehuoltomääräyksissä. Sanaa "nuohous" ei esiinny kummassakaan
+      asiakirjassa. Tuhkan käsittelystä sen sijaan määrätään -- kysymys koskee
+      nuohousväliä, ei tuhkaa.
+    label_source: Ei lähdepykälää; asia kuuluu kokonaan toiselle säädökselle.
+
+  - id: ooc-romuajoneuvon-toimituspaikka
+    question: Mihin romuajoneuvon voi toimittaa ja mitä siitä pitää tehdä?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Tampere
+    absent_lexeme: romuajoneuvo
+    absence_source: >-
+      Romuajoneuvot kuuluvat tuottajavastuun piiriin ja niiden vastaanotosta
+      säädetään erikseen. Sanaa "romuajoneuvo" ei esiinny kummassakaan
+      asiakirjassa.
+    label_source: Ei lähdepykälää.
+
+  - id: ooc-hevosenlannan-kaytto
+    question: Saako hevosenlantaa levittää omalle pellolle lannoitteeksi?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Nokia
+    absent_lexeme: hevosenlanta
+    absence_source: >-
+      Lannan peltokäytöstä säädetään lannoitevalmiste- ja
+      nitraattilainsäädännössä. Kumpikaan jätehuoltomääräys ei mainitse lantaa
+      lainkaan.
+    label_source: Ei lähdepykälää.
+
+  - id: ooc-jatevero
+    question: Peritäänkö kaatopaikalle toimitettavasta jätteestä jäteveroa?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Ylöjärvi
+    absent_lexeme: jätevero
+    absence_source: >-
+      Jäteverosta säädetään jäteverolaissa. Kunnallinen jätehuoltoviranomainen ei
+      määrää veroista, eikä sanaa "jätevero" esiinny kummassakaan asiakirjassa.
+    label_source: Ei lähdepykälää.
+
+  - id: ooc-kuolinpesan-jatehuoltomaksu
+    question: >-
+      Kuka vastaa jätehuoltomaksun maksamisesta, kun kiinteistön omistaja on
+      kuollut ja kiinteistö on kuolinpesän hallinnassa?
+    kind: out-of-corpus
+    phrasing: authored
+    municipality: Kangasala
+    absent_lexeme: kuolinpesä
+    absence_source: >-
+      Maksuvelvollisuudesta säädetään jätelaissa ja jätetaksassa, eivät nämä
+      määräykset. Sanat "kuolinpesä" ja "jätehuoltomaksu" puuttuvat molemmista
+      asiakirjoista. Määräykset puhuvat "kiinteistön haltijasta" velvoitteiden
+      kantajana, mikä on eri kysymys kuin kuka maksun maksaa.
+    label_source: Ei lähdepykälää.

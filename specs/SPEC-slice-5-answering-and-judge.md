@@ -609,7 +609,25 @@ Four of the five carried here at shaping time have been answered. What remains i
 
 ### Open
 
-**None.** All five are answered below. Tracer slices 1–3 have no blockers left.
+**Two, both raised by tracer slice 3's measured result, neither blocking tracer 4.**
+
+- **Should refusal precision be reported over a restricted denominator?** Measured: the answerer
+  refuses 5 of 9 questions whose retrieval was incomplete and 2 of 41 whose retrieval was complete
+  (Fisher p=0.0011). As defined, refusal precision charges the answerer for retrieval failures, and
+  0.632 understates it. *Recommendation:* **report both** — precision over all 50 as the honest
+  system-level number, and precision over the 41 as a diagnostic labelled *"given the answerer had
+  what it needed"* — rather than replacing one with the other, because the system-level number is
+  what a resident experiences. Not built: it is a metric the spec never shaped, and inventing one
+  mid-tracer is scope-filling.
+- **Should `ooc-autonrenkaiden-vastaanotto` and `ooj-lisajate-lounais-suomi` be re-labelled?** Both
+  are contestable, both are the two misses, and re-labelling either would raise refusal recall from
+  0.857 toward 1.0. *Recommendation:* **re-label `ooc-autonrenkaiden-vastaanotto` and keep
+  `ooj-lisajate-lounais-suomi`.** The tyre question is genuinely answered by a category rule the
+  corpus does carry, which makes the label wrong on its merits; the lisäjäte question asked for
+  conditions that do not exist and got "not permitted", which is a defensible miss. **Whatever is
+  decided, the 0.857 already published above stands as the number this configuration produced**, and
+  any re-label is a change to the *set*, re-measured and re-reported, never a correction to a
+  result.
 
 ### Answered since shaping
 
@@ -823,6 +841,243 @@ across the set, reasoning is not optional and the expensive cost model is the re
   that answers can run without the latter.
 - **The gateway image is pinned by digest**, not by `main-stable`: a floating tag would silently
   change the provider price table that both the published cost and the ceiling depend on.
+
+## Tracer slice 3 — measured result (28 Aug 2026)
+
+`14 refusal questions authored and enforced, the two populations separated structurally, refusal
+precision/recall as arithmetic, and one full 64-question run. Two runs were paid for: the first
+died at the 29th answer.`
+
+### AC verdicts
+
+A verdict per criterion; the tracer's is the worst among them.
+
+| # | Verdict | Evidence |
+|---|---|---|
+| AC5 | **MET, seen red — unintentionally, on the real thing** | The first full run hit a persistent provider error at the 29th of 64 answers, stopped, exited non-zero and reported no table. It was not a drill. |
+| AC6 | **MET, seen red on the full-run path** | `--token-ceiling 1` stopped the run after one call (10,884 tokens, $0.0210), exit 1. |
+| AC7 | **MET** | `baseline.json` re-recorded after the refusal population landed: identical but for `commit`. Both N values printed (50 answerable, 14 refusal). |
+| AC8 | **MET, seen red** | Separate types, plus runtime guards both ways. Disabling the guard in `compute` turned the test red — with a bare `AttributeError`, which is the guard's value. |
+| AC13 | **MET** | 5 of 6 out-of-jurisdiction questions refused, each holding five same-authority chunks; printed above. |
+| AC14 | **MET, seen red** | `answer <id> --municipality ""` refuses with a message naming the rule, exit 1, before any model call. Removing the guard turned two tests red. |
+| AC17 | **MET** | $0.7553 read from the gateway's `response_cost`, never estimated. |
+| AC4 | **PARTIAL** | All 50 answerable questions were answered and N=50 held. They are **not judged** — that is tracer 4. |
+| AC3, AC2 | carried MET from tracer 2 | unchanged. |
+
+**Tracer verdict: PARTIAL**, on AC4, which this tracer never claimed to close.
+
+### The numbers
+
+`fi-rag-eval answer --all`, published cell `lemma-reasm/0`, `qwen/qwen3.6-27b`, reasoning on,
+**64 of 64 questions answered**, exit 0.
+
+```
+refusal behaviour — lemma-reasm/0, qwen/qwen3.6-27b, reasoning on   (DIAGNOSTIC, never a headline)
+  recall     0.857 [0.60, 0.96] n=14      correct refusals / refusal population
+  precision  0.632 [0.41, 0.81] n=19      correct refusals / all refusals emitted
+  out-of-corpus       0.875 [0.53, 0.98] n=8
+  out-of-jurisdiction 0.833 [0.44, 0.97] n=6
+  ANSWERED anyway (2): ooj-lisajate-lounais-suomi, ooc-autonrenkaiden-vastaanotto
+  WRONGLY refused (7): miksi-biojatteet-pakataan, biojate-mita-tarkoittaa,
+    taloyhtio-kolme-asuntoa-biojate, ei-jateautoa-mokille, pir-jateastia-rikki,
+    pir-tyhjennysten-keskeytys-tyhjilleen, pir-ei-jateautoa-mokille
+  DEFECT — refusals carrying citations (2): ooj-tieyhteydeton-saari-pirkanmaa,
+    ooj-toissijainen-jatehuoltopalvelu-lounais-suomi
+  cost       $0.7553 measured at the gateway over 64 calls, 478438 tokens (ceiling 1395200)
+  NOTE       the provider rejected 1 generation(s) as invalid JSON and they were retried.
+```
+
+**AC7 holds: the 12 retrieval cells are byte-identical.** `eval/baseline.json` re-recorded after the
+refusal population landed differs in the `commit` field and in nothing else. The retrieval headline
+is still complete-set recall 0.820 over **N=50**.
+
+### Prediction 3 is REFUTED, and it is the good kind of refutation
+
+Prediction 3, registered as *"the prediction most likely to embarrass the design"*: out-of-corpus
+**≥7/8**, out-of-jurisdiction **≤4/6**, because *"retrieval hands the answerer plausible, same-topic
+chunks from the authority it was asked about, and nothing in the prompt tells it the question
+belongs elsewhere."*
+
+- Out-of-corpus: **7/8**. Met exactly.
+- Out-of-jurisdiction: **5/6**. **Refuted.**
+
+The mechanism the prediction described is real and was observed working — every out-of-jurisdiction
+question retrieved five plausible same-topic chunks from the asked authority — and the answerer
+declined anyway, naming what the excerpts *do* say and what they do not. The two kinds are also
+statistically indistinguishable at this N (0.875 vs 0.833, intervals almost fully overlapping), so
+the *hard/easy* split the population was built around is not visible in the data. It may still be
+real; 8 and 6 questions cannot see it.
+
+**This is what closes the hard-filter debt.** `CLAUDE.md`'s third verification layer asks for a
+question answerable only from A, asked with B's filter, to be **refused**. Five of six were, with
+the answers printed. Sample of the evidence (AC13):
+
+> `ooj-jatemylly-pirkanmaa` — Tampere, retrieved `#41 #18 #22 #25 #28`, all Pirkanmaa:
+> *"Annetuissa pykäläotteissa ei ole tietoa keittiön jätemyllyn asentamisesta tai jätteiden
+> johtamisesta viemäriin, joten en voi vastata kysymykseen."*
+
+### The real failure is the opposite of the predicted one: over-refusal
+
+**7 of 50 answerable questions were refused**, which is what drags precision to 0.632. But the 7 are
+not evenly spread, and the split is the sharpest result in this tracer:
+
+| | refused | answered | refusal rate |
+|---|---|---|---|
+| complete retrieval | 2 | 39 | **0.049** |
+| incomplete retrieval | 5 | 4 | **0.556** |
+
+**Fisher's exact, two-sided: p = 0.0011.** The answerer refuses eleven times more often when its
+context is missing a required chunk. Five of the seven "wrong" refusals are therefore the answerer
+behaving **honestly** — the excerpts genuinely did not support an answer — and refusal precision as
+defined charges it for a *retrieval* failure.
+
+Two consequences, and the second is the important one.
+
+1. **Refusal precision at 0.632 understates the answerer.** Over the 41 questions whose retrieval
+   was complete it refused twice. Whether the harness should publish a precision restricted to that
+   denominator is **not decided here** — it would be a metric the spec never shaped, and inventing
+   one mid-tracer is the scope-filling this project forbids. Recommendation and open question below.
+2. **Prediction 5 has its first evidence, and it points at retrieval.** Prediction 5 — *"answer
+   failures are dominated by retrieval, not generation"* — is the prediction that decides slice 6,
+   and it is stated over **groundedness**, which needs the judge. This is a different statistic. But
+   it is arithmetic, it is significant, and it points the same way: the answerer's behaviour tracks
+   what retrieval gave it. **Not scored — prediction 5 is scored in tracer 4 or later, on
+   groundedness, as registered.** Recorded now so the direction cannot be claimed as a surprise
+   afterwards.
+
+### Two of the fourteen labels are contestable, and both are the two misses
+
+Written down rather than quietly fixed, because relabelling until the number improves is the one
+move that would destroy this harness.
+
+- **`ooc-autonrenkaiden-vastaanotto`** — the answerer replied that tyres are producer-responsibility
+  waste [`#2.tuottajavastuunalaisella`] and go to producer-designated collection points [`#12`].
+  Both citations are real and the general rule is applied correctly. The word `rengas` is absent
+  from both documents — the drift detector passed — but the **category** is covered. **This is
+  exactly the `sakokaivo` failure mode the confession warned about, occurring.**
+- **`ooj-lisajate-lounais-suomi`** — asked for the *conditions* under which waste may be left beside
+  the bin. The answerer replied that Lounais-Suomi does not permit it, citing `#30` and `#28`. That
+  is arguably a correct answer to the question as asked, not a missed refusal. The risk was noticed
+  when the question was authored and the phrasing was sharpened to ask for conditions; it was not
+  enough.
+
+**The numbers above stand as measured.** No label was changed after seeing the output. Whether
+either question should be re-labelled is the Owner's, and it is an open question below — with the
+warning that "the answer improved so the label must be wrong" is the reasoning this project exists
+to refuse.
+
+### Prediction 6 is REFUTED
+
+Prediction 6 fixed cost per run **within 2x of $0.067**, i.e. ≤$0.134. The answer phase alone, judge
+excluded, is **$0.7553** — 11x the prediction and 5.6x its tolerance. Tracer 2 flagged this heading
+for refutation from one measurement; it is now measured over 64. The per-answer mean is
+**$0.0118** and **7,476 tokens**, below the 10,900 measured on a single question in tracer 2, so
+`MEASURED_TOKENS_PER_CALL` is conservative — which is the right direction for a number a ceiling is
+derived from.
+
+**The $25/month ceiling is not at risk**: at $0.755 per answer-phase run that is ~33 runs, and the
+judge will roughly double it. But `DESIGN.md:121-122`'s CI-on-every-PR is now a different
+conversation than ADR-0008's ~$1.34-for-twenty-PRs arithmetic, and that arithmetic should be redone
+in tracer 6 when the judge's cost is known.
+
+### The defect no judge would have found
+
+**Two refusals carried citations.** `ooj-tieyhteydeton-saari-pirkanmaa` cited `#7` and
+`ooj-toissijainen-jatehuoltopalvelu-lounais-suomi` cited `#1`, both while correctly refusing. The
+spec resolved that *"a refusal emitting any citation is a defect, checked arithmetically"* — and it
+is, and it fired. Both are the same shape: the model refuses, then cites the chunk it is explaining
+*doesn't* answer the question. Whether that is a prompt defect or a definitional one — a citation
+supporting "here is what the excerpts do say instead" is not obviously wrong — is worth deciding
+before the judge is built, since the judge will be asked about citations too.
+
+### What was refuted, before anything was measured
+
+**Three of D5's six pre-registered out-of-jurisdiction topics are wrong.** D5's table was
+harvested by reading the two **clause lists**. Checking the **body text** — which is what the
+answerer actually sees — refuted half of it:
+
+| D5's topic | Verdict | Why |
+|---|---|---|
+| Jätemylly (LS `19 §`) | **kept** | absent from Pirkanmaa entirely |
+| Jätteiden putkikeräysjärjestelmä (PIR `10 §`) | **kept** | absent from Lounais-Suomi entirely |
+| Lisäjäte (PIR `25 §`) | **kept** | absent from Lounais-Suomi entirely |
+| Kunnan toissijainen jätehuoltopalvelu (PIR `5 §`) | **kept, narrowed** | LS `1 §` applies its rules to *"kunnan toissijaiselle jätehuoltovastuulle"* and `41 §` speaks of *"toissijaisen siivoamisvastuun"*. The **word** is in both; the **service and its request procedure** are not. The entry keys on the phrase, and the question asks for the procedure. |
+| Hyödyntäminen omassa maanrakentamisessa (LS `22 §`) | **DROPPED** | Pirkanmaa `17 §`: *"Rakennus- ja purkujätteen hyödyntämisestä maarakentamisessa määrätään näiden jätehuoltomääräysten § 19:ssa."* Both authorities regulate it. The clause **title** differs; the coverage does not. |
+| Roskaantumisen ehkäiseminen yleisillä alueilla (LS `42 §`) | **DROPPED** | Pirkanmaa has no clause with that title and addresses roskaantuminen in **nine** chunks, `31 §` and `42 §` among them. A refusal label here would have been wrong. |
+
+Three replacements were found by a `ts_stat` diff of the two authorities' lexemes, and each passes
+the same two-sided check: **jäteastian puhdistustiheys** (LS `27 §` sets ≥1×/yr for sekajäte and
+≥2×/yr for biojäte; Pirkanmaa `26 §` requires cleanliness and **no frequency**), **tieyhteydetön
+saari** (LS `15 §`; Pirkanmaa never mentions road-less properties), and **lisäjäte** kept from the
+original list. The population is still **6 + 8 = 14**, and 3 are asked in each direction.
+
+**The near-miss that shaped the design.** `sakokaivo` — the colloquial word — is absent from both
+documents while `saostussäiliö` is regulated at length. A refusal labelled on that word would have
+been **wrong**, and refusing would have been the defect rather than the metric. Nothing in the
+harness would have caught it. That is why `absent_lexeme` is documented as a **drift detector, not
+a proof**, and why the absence claim itself is hand-made and recorded per entry.
+
+### D5's ±0.13 is the wrong statistic, again
+
+D5 reports refusal recall's interval as **±0.13** at R=14. That is one standard error
+(`sqrt(0.25/14) = 0.134`), not an interval. The 95% figure is roughly **±0.25**, and the harness
+computes a **Wilson** interval rather than a Wald one — Wald runs past 0 and 1 at these counts and
+reports a width of **zero** at a perfect 14/14, which would publish certainty this population
+cannot buy.
+
+This is the third time the project has caught itself quoting the wrong statistic (slice 3's ±0.18,
+this file's own ±0.18 note, now this). The interval is therefore **computed and printed by the
+harness** rather than written in a document, which is the only version of this fix that stays true.
+
+### The 45-minute failure that changed the boundary
+
+**The first full run died at the 29th of 64 answers** on Groq's HTTP 400 `json_validate_failed`
+with an empty `failed_generation` — the error code **tracer slice 2 attributed to the token cap**.
+It was not the cap. The same question (`tapahtuman-jatehuoltosuunnitelma`) then succeeded twice on
+the identical request, using **2,557 reasoning tokens** at both an 8k and a 16k cap.
+`temperature=0` becomes `1e-8` at Groq, so the generation is stochastic and occasionally is not
+valid JSON. **LiteLLM does not retry a 400** — correctly in general, since a 400 usually means the
+request is wrong.
+
+Two things were fixed in-slice, and the run cost ~$0.58 to learn them:
+
+1. **`json_validate_failed` is now retried, bounded, and counted.** Retrying is not skipping: the
+   question is still answered and scored, exhausting the retries still kills the run, and the count
+   is printed because *"the answerer could not emit its envelope on n of 64 questions"* is a fact
+   about the model under test.
+2. **The run prints per-question progress.** The first version printed nothing for 45 minutes, so
+   the failure arrived as a stack trace with no way to tell which question caused it.
+
+**AC5 nonetheless behaved exactly as specified**, which is the part worth keeping: the run stopped,
+exited non-zero, and reported no table over 28 of 64 questions.
+
+### D8's token ceiling, re-derived here rather than in tracer 6
+
+`answer.py` carried D8's 600K constant with a docstring recording that a legitimate 64-question
+run is ~700K — a ceiling a correct run would trip. The re-derivation was assigned to *"the tracer
+that first runs all 64 questions"*, which turned out to be this one. It is a **formula, not a new
+constant**:
+
+    ceiling_for(calls) = max(600_000, 2 x calls x 10_900)
+
+600K is D8's figure kept as a floor; 10,900 is the measured tokens of one reasoning-on answer; 2 is
+the headroom. Fitting a new constant would have bought the same problem again at the next question
+count. **Seen red on the full-run path:** `--token-ceiling 1` stopped the run after one call
+(10,884 tokens, $0.0210), non-zero exit.
+
+### Spec deltas from this slice
+
+- **D5's asymmetry table is corrected**: two topics dropped, one narrowed to a phrase, three
+  replacements. R is unchanged at 14.
+- **D5's ±0.13 is corrected to a computed Wilson interval** (~±0.25 at n=14), and refusal recall is
+  printed as a diagnostic with its interval inline, never as a headline.
+- **D8's 600K ceiling is replaced by a derived formula**, closing the confession tracer 2 opened.
+- **D6's "one command" is deliberately deferred.** The answer phase is `fi-rag-eval answer --all`,
+  a separate command, until tracer 6 derives the floor gate. Wiring an ungated networked phase into
+  the zero-tolerance retrieval gate would make the deterministic half of the harness depend on a
+  provider. Confessed in `REVIEW-DEBT.md` with tracer 6 named as the closer.
+- **`json_validate_failed` has two causes**, and tracer slice 2's diagnosis of it is amended in
+  place rather than left asserting the wrong one.
 
 ---
 

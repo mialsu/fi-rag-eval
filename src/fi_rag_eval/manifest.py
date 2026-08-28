@@ -109,7 +109,23 @@ class Manifest:
         authorities claiming one municipality is a manifest bug, and silently
         picking one is exactly the cross-jurisdiction answer the filter exists
         to prevent.
+
+        **An absent municipality is refused rather than defaulted** (slice 5,
+        AC14). `CLAUDE.md`'s third verification layer requires that asking with
+        no municipality set must not silently pick one, and the cheapest place to
+        guarantee that is here: nothing downstream can reach a corpus without an
+        authority key, and this is where the key comes from. A default would be
+        indefensible whichever way it fell -- the first authority in the manifest
+        is arbitrary, and the largest is a guess about the asker.
         """
+        if not municipality.strip():
+            raise ManifestError(
+                "no municipality was given, so there is no authority to answer from. "
+                "The harness refuses rather than picking one: every answer is bound to "
+                "the jurisdiction it was asked about, and a defaulted jurisdiction is "
+                "the cross-municipality answer the hard filter exists to prevent "
+                "(DESIGN.md:15,67), wearing a correct-looking citation."
+            )
         folded = municipality.casefold()
         matches = [
             a for a in self.authorities if any(m.casefold() == folded for m in a.municipalities)

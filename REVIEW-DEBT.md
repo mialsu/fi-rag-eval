@@ -14,6 +14,144 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-28 (slice 5, tracer 3) — two of the fourteen refusal labels are contestable, and they are the two misses
+
+- **What:** The run answered 2 of 14 refusal questions instead of refusing, and on inspection both
+  labels are arguable:
+  - **`ooc-autonrenkaiden-vastaanotto`** — the answerer said tyres are producer-responsibility waste
+    [`lounais-suomi@2024-08-01#2.tuottajavastuunalaisella`] and go to producer-designated collection
+    points [`#12`]. Both citations are real; a general **category** rule answers the question. The
+    word `rengas` is genuinely absent, so the drift detector passed — **this is the `sakokaivo`
+    failure mode the sibling confession warned about, actually occurring.**
+  - **`ooj-lisajate-lounais-suomi`** — asked for the *conditions* under which waste may be left
+    beside the bin; the answerer said Lounais-Suomi does not permit it, citing `#30` and `#28`. That
+    is arguably a correct answer rather than a missed refusal. The risk was noticed at authoring
+    time and the phrasing was sharpened; it was not enough.
+- **Where:** `corpus/golden/refusals.yaml`; the spec's Tracer slice 3 measured result.
+- **What green tests do NOT prove here:** that the other twelve labels are right. Two contestable
+  out of fourteen is a **14% label-error rate on a population of 14**, discovered only because those
+  two happened to be the failures. Labels that a compliant answerer never challenges are never
+  examined at all.
+- **The trap this entry exists to name:** re-labelling both would raise refusal recall from 0.857
+  toward 1.0. *"The answer improved, so the label must be wrong"* is the reasoning that destroys a
+  harness. The measured 0.857 is published as-is; any re-label is a change to the **set**, followed
+  by a **re-measurement**, never a correction applied to a result.
+- **Disposition:** open, **the Owner's**. Raised in the spec's open questions with a
+  recommendation: re-label the tyre question (wrong on its merits), keep the lisäjäte one.
+
+## 2026-08-28 (slice 5, tracer 3) — two refusals emitted citations, and it is not obvious that is wrong
+
+- **What:** `ooj-tieyhteydeton-saari-pirkanmaa` cited `#7` and
+  `ooj-toissijainen-jatehuoltopalvelu-lounais-suomi` cited `#1` **while correctly refusing**. The
+  spec resolved that *"a refusal emitting any citation is a defect, checked arithmetically"*; the
+  check exists, fired, and named both.
+- **Where:** `src/fi_rag_eval/metrics.py` (`RefusalMetrics.refusals_with_citations`);
+  `src/fi_rag_eval/report.py` (`format_refusals`).
+- **What green tests do NOT prove here:** that the rule is right. Both answers use the citation for
+  *"here is what the excerpts do say instead"* — Pirkanmaa `7 §` on when kerbside collection is
+  possible, Lounais-Suomi `1 §` on the scope clause. That is arguably a **better** refusal than a
+  bare one, not a defect.
+- **Why it matters now rather than later:** the judge is asked about citations too (tracer 4), so a
+  definition that is wrong here will be wrong there, and the frozen agreement sample (tracer 5) will
+  be hand-labelled against whichever definition stands.
+- **Disposition:** open. Decide before tracer 4 builds the judge prompt.
+
+## 2026-08-28 (slice 5, tracer 3) — `json_validate_failed` is now retried, and tracer 2's diagnosis of it was incomplete
+
+- **What:** Groq validates JSON-mode generations server-side and returns HTTP **400**
+  `json_validate_failed` with an empty `failed_generation`. Tracer slice 2 met this error and
+  attributed it to the token cap covering reasoning and answer together — correct for the case it
+  had. Tracer slice 3 met the identical code at an ample cap: it killed a 64-question run at the
+  **29th** answer, and the same request then succeeded **twice**, using 2,557 reasoning tokens both
+  times. `temperature=0` becomes `1e-8` at Groq, so generation is not deterministic. The cap is one
+  cause; non-determinism is another.
+- **Where:** `src/fi_rag_eval/answer.py` (`JSON_RETRIES`, `_is_stochastic_json_failure`,
+  `complete`); `tests/test_answer.py::TestStochasticJsonFailuresAreRetriedAndCounted`.
+- **What green tests do NOT prove here:** that 4 attempts is enough. It was chosen because one
+  retry sufficed in the only case observed, which is a sample of one. The count of retries a run
+  needed is printed, so the number can be revised from evidence rather than from taste.
+- **Why retrying is not skipping:** the question is still answered and still scored, and if the
+  retries run out the run still dies rather than reporting 63 of 64. What would be dishonest is
+  hiding the frequency, so `json_validation_retries` is carried on the run and printed. "The
+  answerer could not emit its envelope on n of 64 questions" is a fact about the model under test.
+- **What this cost, and why it is worth writing down:** a **45-minute, ~$0.58 run was destroyed by
+  one transient 400** — and, because the first version printed nothing until it finished, the
+  failure arrived with no indication of which question caused it. Per-question progress output was
+  added in the same change. An expensive long-running command that reports nothing is unusable for
+  the thing it exists to do.
+- **Disposition:** open (the bound is unvalidated), the immediate defect fixed.
+
+## 2026-08-28 (slice 5, tracer 3) — "out-of-corpus" is a hand-made claim; the enforcer only stops it rotting
+
+- **What:** Each of the 14 refusal questions asserts that its topic is not answerable where it was
+  asked. The harness checks an `absent_lexeme` against the real corpus at every run — two-sided for
+  the out-of-jurisdiction kind (absent where asked, **present** where the answer lives) — and both
+  directions have been seen red. But **a lexeme check cannot establish absence.** A word can be
+  missing while the topic is covered under another name.
+- **Where:** `corpus/golden/refusals.yaml` (`absent_lexeme`, `absence_source`);
+  `src/fi_rag_eval/evaluate.py` (`assert_refusal_absences`); `src/fi_rag_eval/db.py`
+  (`chunks_containing`); `tests/test_refusals.py::TestAgainstTheCorpus`.
+- **What green tests do NOT prove here:** that any of the 14 topics is genuinely absent. They prove
+  the *claim has not changed since it was written*. The claim itself came from reading both clause
+  lists by hand, recorded per entry in `absence_source`, and is exactly as good as that reading.
+- **The concrete near-miss, kept as the standing example:** `sakokaivo` is absent from both
+  documents while `saostussäiliö` is regulated at length. A refusal labelled on that word would
+  have been **wrong**, and refusing would have been the defect rather than the metric. It was
+  caught by reading, not by any check that exists.
+- **Cost accepted:** the alternative is a judge deciding whether a topic is covered, which puts a
+  model inside the one part of the answer layer that is currently pure arithmetic — and arithmetic
+  is why these numbers can be trusted against a judge when the two disagree.
+- **Disposition:** open, accepted. Re-read the clause lists whenever an edition changes; the
+  manifest's `expected` block already refuses a document that parses differently, which is the
+  event that should trigger it.
+
+## 2026-08-28 (slice 5, tracer 3) — three of D5's six pre-registered asymmetries were wrong
+
+- **What:** `SPEC-slice-5` D5 named six out-of-jurisdiction topics, harvested by reading both
+  **clause lists**. Checking the **body text** refuted three: `maanrakentaminen` (Pirkanmaa 17 §
+  cross-references its own 19 § for exactly this), `roskaantuminen` (no clause with that title, but
+  addressed in nine Pirkanmaa chunks), and `toissijainen jätehuoltopalvelu` (survived, but only as a
+  *phrase* — Lounais-Suomi's 1 § and 41 § both use the word `toissijainen` for different things).
+  Three replacements were found the same way.
+- **Where:** `corpus/golden/refusals.yaml` header; the spec's Tracer slice 3 measured result.
+- **What green tests do NOT prove here:** that the six now in the file are the *best* six, or that
+  the remaining three are the only surviving asymmetries. The sweep that found the replacements was
+  a `ts_stat` diff of the two authorities' lexemes, which is thorough for single words and blind to
+  a mechanism described in two documents with no shared vocabulary.
+- **Disposition:** open, accepted. The population is six either way (D5's number), and the entries
+  that survived are individually stronger than the ones they replaced.
+
+## 2026-08-28 (slice 5, tracer 3) — every refusal question is `authored`, so their wording is ours
+
+- **What:** All 14 carry `phrasing: authored`. Not one is harvested from a resident-facing page.
+- **Where:** `corpus/golden/refusals.yaml`;
+  `tests/test_refusals.py::test_the_committed_file_declares_every_entry_authored`.
+- **What green tests do NOT prove here:** that a real resident would ask any of these. Lexical
+  leakage — the measure this project uses to catch questions written *from* the source text — is
+  not computed over this population at all, because these questions have no target chunks to leak
+  from. So the anti-circularity instrument that guards the answerable set has **no equivalent
+  here**, and the questions were written by the same person who knows what the corpus contains.
+- **Why it is not fixable cheaply:** no public FAQ asks a question its own regulations cannot
+  answer. Harvesting would mean finding residents' questions that the authority *declined*, which
+  is not published.
+- **Disposition:** open, accepted, and stated so nobody reads refusal recall as evidence about real
+  traffic. It is evidence about the behaviour under a constructed adversarial set.
+
+## 2026-08-28 (slice 5, tracer 3) — the answer phase is not in `make eval`, so a green gate still proves nothing about answering
+
+- **What:** `fi-rag-eval answer --all` is a separate command. `make eval` remains offline,
+  deterministic and gated at zero tolerance, and knows nothing about refusal metrics.
+- **Where:** `src/fi_rag_eval/cli.py` (`_answer_all`); `Makefile` (`eval` unchanged).
+- **What green tests do NOT prove here:** anything about answering. `make gate` is green with the
+  gateway down, and `make eval` is green without a single model call. The refusal numbers exist
+  only in the terminal output and `eval/answers.json` of a run a human chose to make.
+- **Why deliberately:** D6 requires one command, but the answer phase has no **floor gate** until
+  tracer 6 derives one, and wiring an ungated networked phase into the retrieval gate would make
+  the deterministic half of the harness depend on a provider. That is a real regression in the
+  half that currently works.
+- **Disposition:** open, **closes in tracer 6**, which owns the floors, the baseline extension and
+  the published table's structural unavailability when the answer phase is skipped (AC16).
+
 ## 2026-08-27 (slice 4) — the harness had never actually been run from a clean clone
 
 - **What:** `make eval` from a fresh `git clone` failed with **HTTP 403** on the Pirkanmaa source.
@@ -185,8 +323,20 @@ ledger is worse than none, because sessions trust it.
   answering layer, which does not exist. What is verified is **retrieval-layer isolation**: a
   foreign chunk is never a candidate. A future answering layer could still answer from an empty or
   wrong context, and nothing here would catch it.
-- **Disposition:** open, **PARTIAL**. Promote to CLOSED only when a refusal case can be scored,
-  which is the answering slice. Do not let a green filter assertion be read as a verified refusal.
+- **Disposition:** ~~open, **PARTIAL**~~ → **CLOSED 28 Aug 2026 (slice 5, tracer 3).** The
+  condition this entry set — *"promote to CLOSED only when a refusal case can be scored"* — is met.
+  Six out-of-jurisdiction questions now exist, each asked with the wrong authority's filter, each
+  reaching the answerer holding **five plausible same-topic chunks from the authority it was asked
+  about**; `CLAUDE.md`'s specified behaviour was measured rather than assumed and **5 of 6 refused**,
+  with the answers printed. Example, verbatim: *"Annetuissa pykäläotteissa ei ole tietoa keittiön
+  jätemyllyn asentamisesta tai jätteiden johtamisesta viemäriin, joten en voi vastata
+  kysymykseen."*
+- **What is CLOSED and what is not.** Closed: refusal is now a scored behaviour with a number, not
+  an untested design claim, and it is the number this project publishes rather than a hope.
+  **Not** closed and not claimed: 5/6 is not 6/6, the interval is [0.44, 0.97] at n=6, and the one
+  miss (`ooj-lisajate-lounais-suomi`) has a **contestable label** — see the next entry. Read this as
+  "the mechanism is verified and measured at 0.833 with a wide interval", never as "the filter
+  cannot fail".
 
 ## 2026-08-27 (slice 4) — the extractor damages text in three measured ways, and none was fixed
 
@@ -566,6 +716,13 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open. Cheap partial fix available: assert the message shape against a
   deliberately-tiny budget on a throwaway key, which is how the behaviour was measured in the
   first place.
+- **UPDATED 28 Aug 2026 (tracer 3): this pattern now has a second instance.**
+  `_is_stochastic_json_failure` matches `"json_validate_failed" in str(exc)` for the same reason —
+  every provider 400 arrives here as one `BadRequestError`, and the harness has to tell a
+  *retryable* one (the model emitted invalid JSON, which is stochastic) from a *permanent* one (the
+  request is wrong). This branch, unlike the budget one, **is** covered by tests, but they assert
+  against a message string this project does not control. Two string matches on provider prose is
+  the point at which this stops being an oddity and becomes a pattern worth a structured fix.
 
 ## 2026-08-28 — D8's 600K token ceiling is known to be wrong and was left alone
 
@@ -577,6 +734,14 @@ ledger is worse than none, because sessions trust it.
 - **Why:** Raising it now would be fitting the spec's number to a single measurement. The right
   denominator is a full 64-question run, which does not exist until tracer 6, and prediction 7
   decides whether reasoning is on at all — which changes the answer by a factor of two.
+- **CLOSED 28 Aug 2026 (tracer 3), earlier than planned and not by fitting a new constant.** The
+  first full 64-question run arrived here rather than in tracer 6, so the re-derivation came with
+  it. The fix is a **formula, not a number**: `ceiling_for(calls) = max(600_000, 2 x calls x 10_900)`,
+  where 600K is D8's figure kept as a floor, 10,900 is the measured tokens of one reasoning-on
+  answer, and 2 is the headroom. Every input is a figure this project measured and can re-measure,
+  and the ceiling now scales with the run instead of needing revision each time the question set
+  grows. Seen red on the full-run path: `--token-ceiling 1` stopped the run after one call
+  (10,884 tokens, $0.0210) with a non-zero exit.
 - **What green tests do NOT prove here:** the tests prove the ceiling *fires*, not that it is set
   to a sensible number. A gate at the wrong threshold is green until the day it stops the work.
 - **Disposition:** open — closes in tracer 6, re-derived from a real run.

@@ -439,6 +439,32 @@ def addresses_matching(
         return {str(row[0]) for row in cur.fetchall()}
 
 
+def chunks_containing(
+    conn: psycopg.Connection[tuple[object, ...]], *, authority_key: str, needle: str
+) -> list[str]:
+    """Addresses of this authority's chunks whose body contains `needle`, folded.
+
+    A deliberately blunt substring match over the raw body rather than a tsquery,
+    and the bluntness is the point. This backs the refusal population's drift
+    detector (slice 5, tracer 3), whose job is to notice when a topic a refusal
+    question claims is absent quietly becomes present. An analyser sits between a
+    tsquery and the text and can be changed; the text cannot. Matching the body
+    directly means the check cannot be weakened by a change to the thing being
+    measured.
+
+    `ILIKE` folds case the way Postgres does for the database's collation, which
+    is enough for Finnish here: every lexeme these entries use is lower-case in
+    the documents except where a heading shouts it.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT address FROM chunk WHERE authority_key = %s AND body ILIKE %s "
+            "ORDER BY clause, sub_key NULLS FIRST",
+            (authority_key, f"%{needle}%"),
+        )
+        return [str(row[0]) for row in cur.fetchall()]
+
+
 def _assert_normalisation(normalisation: int) -> None:
     if normalisation not in NORMALISATIONS:
         raise DatabaseError(

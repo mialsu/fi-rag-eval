@@ -11,8 +11,9 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (28 Aug 2026)
 
-**Slices 1–4 are built: the measurement spine, an honest golden set, a lemmatising analyser
-measured as a grid, and a second authority.** Two authorities are ingested into Postgres and
+**Slices 1–4 are built, and slice 5 is three tracers in: the measurement spine, an honest golden
+set, a lemmatising analyser measured as a grid, a second authority, and now an answering boundary
+with a scored refusal population.** Two authorities are ingested into Postgres and
 retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
 chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
 — 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
@@ -66,11 +67,15 @@ regresses. Nothing else exists.
   untouched, all 12 cells scored *identically* to the N=21 baseline. `SPEC-slice-2`'s claim that
   the headline "should be expected to fall when the corpus grows, and the second authority roughly
   doubles it" is **corrected there** — that claim would otherwise excuse a drop from elsewhere.
-- **The authority hard filter is verified at the retrieval layer, PARTIAL not CLOSED.** Every
-  question's top-k is asserted to hold zero foreign-authority chunks, inside `evaluate`, for 50×12;
-  seen red by deleting the WHERE clause, with a companion test proving foreign chunks really do
-  enter the top-5 without it. But `CLAUDE.md`'s specified behaviour is *refusal*, and refusing needs
-  an answering layer. Do not read a green filter assertion as a verified refusal.
+- **The authority hard filter now REFUSES, and that is measured rather than assumed (28 Aug 2026,
+  slice 5 tracer 3). The oldest PARTIAL debt is CLOSED.** Two layers, both real. (1) Retrieval-layer
+  isolation: every question's top-k holds zero foreign-authority chunks, asserted inside `evaluate`
+  for 50×12, seen red by deleting the WHERE clause. (2) **Refusal**: six out-of-jurisdiction
+  questions, each asked with the wrong authority's filter and each reaching the answerer holding
+  five plausible same-topic chunks from the authority it *was* asked about — **5 of 6 refused**,
+  [0.44, 0.97] at n=6. Read it as "the mechanism is verified and measured at 0.833 with a wide
+  interval", never as "the filter cannot fail". The one miss has a contestable label
+  (`REVIEW-DEBT.md`).
 - **ADR-0002 is amended: a municipality does NOT always resolve to exactly one authority.**
   Pirkanmaa's 1 § claims Sastamala only "(Mouhijärven ja Suodenniemen osalta)", so Sastamala is
   omitted from the map and refuses with a message naming the partial coverage. A Mouhijärvi
@@ -80,21 +85,49 @@ regresses. Nothing else exists.
   absent from the document's own table of contents, so the body/TOC cross-check is silent and its
   text is absorbed into 18 §'s chunk. Two clauses, one address. No golden question points at
   Pirkanmaa 18 § — do not add one before this is fixed.
-- **The answering boundary exists as of 28 Aug 2026 (slice 5, tracer 2); the answer *metrics* do
-  not.** `fi-rag-eval answer <question-id>` takes the published cell's top-5, calls
-  `qwen/qwen3.6-27b` through a LiteLLM gateway in `compose.yaml`, and prints a Conditional answer
-  with citations by address and the **measured** cost. That is one question, run by a human. There
-  is no judge, no refusal population, no answer metric, and nothing in `make eval` calls a model.
-  Requires `make services-up`, not `make db-up`. See ADR-0009.
+- **The answering boundary and the refusal population exist (tracers 2–3). The JUDGED answer
+  metrics do not.** `fi-rag-eval answer <id>` answers one question; `fi-rag-eval answer --all`
+  answers **all 64** — 50 answerable + 14 refusal — through `qwen/qwen3.6-27b` on a LiteLLM gateway,
+  and prints refusal precision/recall as arithmetic with Wilson intervals. Measured 28 Aug 2026:
+  **refusal recall 0.857 [0.60, 0.96] n=14; precision 0.632 [0.41, 0.81] n=19; out-of-corpus 0.875,
+  out-of-jurisdiction 0.833. $0.7553 for 64 calls, 478,438 tokens, ~50 minutes.** Still absent:
+  groundedness, branch coverage, over-claim, citation support, judge–human agreement — all of which
+  need the judge. Requires `make services-up`, not `make db-up`. See ADR-0009.
+- **The answer phase is NOT in `make eval`, deliberately, until tracer 6 derives its floor gate.**
+  `make eval` stays offline, deterministic and zero-tolerance; wiring an ungated networked phase
+  into it would make the deterministic half of the harness depend on a provider. So **a green
+  `make eval` still proves nothing about answering.**
+- **The two populations are separated structurally, not by documentation.** `Question` and
+  `RefusalQuestion` are different types; `compute` refuses a refusal outcome at runtime and
+  `refusal_metrics` refuses a retrieval one. The retrieval headline is still over **exactly 50**,
+  and `eval/baseline.json` was re-recorded byte-identical to prove the 14 changed nothing.
+- **The answerer over-refuses, and it does so almost entirely when retrieval failed it.** 7 of 50
+  answerable questions were refused: **5 of the 9 with incomplete retrieval, but only 2 of the 41
+  with complete retrieval** (Fisher exact p=0.0011). Most of the "wrong" refusals are the answerer
+  being honest about a context that genuinely lacked the answer — so refusal precision as defined
+  charges it for a *retrieval* failure. This is **not** prediction 5 scored: that is about
+  groundedness and needs the judge. It points the same way.
+- **Prediction 3 was REFUTED and prediction 6 was REFUTED.** The hard refusal kind was predicted to
+  fail (≤4/6) and did not (5/6); the two kinds are statistically indistinguishable at n=8 and n=6.
+  Cost per run was predicted within 2x of $0.067 and the answer phase alone is **$0.7553**, 11x —
+  the $25/month ceiling is not at risk (~33 runs) but ADR-0008's CI arithmetic must be redone once
+  the judge's cost is known.
+- **`json_validate_failed` has two causes, and tracer 2 only found one.** Groq's JSON mode rejects a
+  generation server-side, and `temperature=0` becomes `1e-8`, so it happens *stochastically*.
+  LiteLLM does not retry a 400. One such failure destroyed a 45-minute, $0.58 run at its 29th
+  answer. It is now retried (bounded) and **counted**, because how often the answerer cannot emit
+  its envelope is a fact about the model under test. Do not read this error code as "the token cap
+  was too small".
 - **Reasoning is not a performance knob here, it is a correctness one.** Measured on one question:
   with reasoning off, the answerer produced the *same inversion of `17 §`* that disqualified
   `gpt-oss-20b` in tracer 1; with it on, it stated all three required branches and named the
   determining variables it could not resolve. It costs ~5.3x the dollars ($0.0210 vs $0.0040 per
   answer). Pre-registered as prediction 7; do not turn reasoning off to save money without
   scoring it.
-- **Not built:** embeddings, pgvector, reranking, a judge, answer metrics, refusal scoring,
-  a third authority, CI, Docker, Cloud Run. `make docker-build` still exits non-zero on purpose —
-  do not "fix" it.
+- **Not built:** embeddings, pgvector, reranking, **a judge**, **judged answer metrics**
+  (groundedness, branch coverage, over-claim, citation support), **judge–human agreement**, the
+  frozen sample, the answer-metric floor gate, a third authority, CI, Docker, Cloud Run.
+  `make docker-build` still exits non-zero on purpose — do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a
@@ -131,7 +164,8 @@ Run them all with `make gate`. Every one below has been run, and has been proven
   `make gate` makes a live model call** — a green gate is compatible with an answering path that
   401s on its first real request (confessed in `REVIEW-DEBT.md`).
   Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`. Anything that answers additionally
-  needs `make services-up` and a filled `.env`.
+  needs `make services-up` and a filled `.env`. **`fi-rag-eval answer --all` is not part of any
+  gate**: it takes ~50 minutes and ~$0.76, and is run deliberately by a human.
 
 A gate you haven't run is not a gate. Green tests gate; they do not prove.
 
@@ -170,6 +204,10 @@ possible output, because everything else is trusted against it.
 - **Prove the regression gate goes red.** Break something on purpose — drop a chunk, downgrade the
   reranker, swap the model — and confirm CI actually fails. A gate never seen red is decoration.
 - **Keep a held-out slice** the tuning never touches, or the numbers stop predicting real quality.
+- **Never re-label a golden entry because the answer improved.** Two of the 14 refusal labels are
+  contestable and both happen to be the two the answerer got "wrong" — re-labelling either would
+  raise refusal recall toward 1.0. A re-label is a change to the **set**, followed by a
+  **re-measurement**; it is never a correction applied to a published result.
 - Trust the arithmetic over the model: `recall@k` and MRR involve no judge, so when the two layers
   disagree, retrieval metrics win the argument.
 

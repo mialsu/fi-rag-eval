@@ -18,7 +18,7 @@ import urllib.request
 
 import pytest
 
-from fi_rag_eval import db, gateway
+from fi_rag_eval import answer, db, gateway
 from fi_rag_eval.answer import (
     ANSWERER,
     JUDGE,
@@ -258,3 +258,100 @@ class TestSpendingKey:
         """$25/month, set by the Owner at Groq on 27 Aug 2026 (D8 enforcer #3)."""
         assert gateway.MONTHLY_BUDGET_USD == 25.0
         assert gateway.BUDGET_DURATION == "30d"
+
+
+class TestStochasticJsonFailuresAreRetriedAndCounted:
+    """Groq's JSON mode rejects a generation server-side, non-deterministically.
+
+    Measured in tracer slice 3: one such 400 killed a 64-question run at the 29th
+    answer, and the identical request then succeeded twice. LiteLLM does not retry
+    a 400, correctly in general -- so the retry has to live here, bounded, and the
+    count has to be reported rather than swallowed.
+
+    No live call: `_complete_once` is substituted, which is exactly the seam the
+    retry loop wraps.
+    """
+
+    JSON_400 = (
+        "the gateway could not serve qwen/qwen3.6-27b after 3 retries -- BadRequestError: "
+        'GroqException - {"error":{"code":"json_validate_failed",'
+        '"failed_generation":""}}'
+    )
+
+    def usage(self) -> answer.Usage:
+        return answer.Usage(
+            prompt_tokens=10,
+            completion_tokens=5,
+            reasoning_tokens=0,
+            total_tokens=15,
+            cost_usd=0.001,
+        )
+
+    def call(self, budget: answer.TokenBudget) -> tuple[str, answer.Usage, str]:
+        return answer.complete(model="m", messages=[], budget=budget)
+
+    def test_a_json_validation_failure_is_retried_and_the_retry_is_counted(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        attempts = {"n": 0}
+
+        def flaky(**_: object) -> tuple[str, answer.Usage, str]:
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise answer.ProxyError(self.JSON_400)
+            return '{"refused": false, "answer": "ok", "citations": []}', self.usage(), "stop"
+
+        monkeypatch.setattr(answer, "_complete_once", flaky)
+        budget = answer.TokenBudget()
+        content, _, _ = self.call(budget)
+        assert "ok" in content
+        assert attempts["n"] == 2
+        assert budget.json_validation_retries == 1
+
+    def test_it_gives_up_rather_than_retrying_forever(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Retrying is not skipping -- and it is not unbounded either."""
+        attempts = {"n": 0}
+
+        def always(**_: object) -> tuple[str, answer.Usage, str]:
+            attempts["n"] += 1
+            raise answer.ProxyError(self.JSON_400)
+
+        monkeypatch.setattr(answer, "_complete_once", always)
+        budget = answer.TokenBudget()
+        with pytest.raises(answer.ProxyError, match="json_validate_failed"):
+            self.call(budget)
+        assert attempts["n"] == answer.JSON_RETRIES
+
+    def test_any_OTHER_gateway_failure_is_not_retried_here(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A genuine 400 means the request is wrong; retrying it unchanged is waste."""
+        attempts = {"n": 0}
+
+        def broken(**_: object) -> tuple[str, answer.Usage, str]:
+            attempts["n"] += 1
+            raise answer.ProxyError("BadRequestError: model does not exist")
+
+        monkeypatch.setattr(answer, "_complete_once", broken)
+        with pytest.raises(answer.ProxyError):
+            self.call(answer.TokenBudget())
+        assert attempts["n"] == 1
+
+    def test_a_malformed_envelope_is_never_retried(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """That is the harness's own contract, and a retry would hide the breach."""
+        attempts = {"n": 0}
+
+        def bad_envelope(**_: object) -> tuple[str, answer.Usage, str]:
+            attempts["n"] += 1
+            raise answer.MalformedAnswerError("no `refused` field")
+
+        monkeypatch.setattr(answer, "_complete_once", bad_envelope)
+        with pytest.raises(answer.MalformedAnswerError):
+            self.call(answer.TokenBudget())
+        assert attempts["n"] == 1
+
+    def test_the_detector_reads_the_providers_own_code(self) -> None:
+        assert answer._is_stochastic_json_failure(Exception(self.JSON_400))
+        assert not answer._is_stochastic_json_failure(Exception("rate limit exceeded"))

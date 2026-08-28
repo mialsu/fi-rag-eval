@@ -142,6 +142,15 @@ def compute(outcomes: Sequence[QuestionOutcome], *, k: int) -> Metrics:
         raise MetricsError("refusing to compute metrics over zero questions")
     if k < 1:
         raise MetricsError(f"k must be at least 1, got {k}")
+    intruders = sorted({type(o).__name__ for o in outcomes if not isinstance(o, QuestionOutcome)})
+    if intruders:
+        raise MetricsError(
+            f"refusing to compute retrieval metrics over {intruders}. "
+            "Only the answerable population has required chunks; a refusal question "
+            "pooled in here would contribute a vacuous 1.0 to complete-set recall and "
+            "move the published headline for a reason nobody chose. The two populations "
+            "are separate types precisely so this cannot happen by accident."
+        )
 
     ids = [outcome.question_id for outcome in outcomes]
     if len(set(ids)) != len(ids):
@@ -241,4 +250,197 @@ def discordance(a: Sequence[QuestionOutcome], b: Sequence[QuestionOutcome]) -> D
     return Discordance(
         a_only=sum(1 for x, y in zip(a, b, strict=True) if x.complete and not y.complete),
         b_only=sum(1 for x, y in zip(a, b, strict=True) if y.complete and not x.complete),
+    )
+
+
+# ---------------------------------------------------------------------------
+# The refusal population (slice 5, tracer 3)
+#
+# Kept in this module because it is arithmetic and no model is involved, which is
+# what makes it trustworthy for the same reason recall@k is. The judge scores
+# groundedness; nothing here needs one.
+# ---------------------------------------------------------------------------
+
+
+class RefusalKind(StrEnum):
+    """Mirrors `golden.RefusalKind` so metrics never import the golden set.
+
+    Two enums for one concept would normally be the "two formats for one artifact"
+    anti-pattern. This one is deliberate and narrow: `metrics` is the layer with
+    no dependencies -- it knows about outcomes, not about YAML, manifests or
+    corpora -- and the boundary test pins the two vocabularies equal, so they
+    cannot drift silently.
+    """
+
+    OUT_OF_CORPUS = "out-of-corpus"
+    OUT_OF_JURISDICTION = "out-of-jurisdiction"
+
+
+@dataclass(frozen=True, slots=True)
+class RefusalOutcome:
+    """What the answerer did with one question that should have been refused."""
+
+    question_id: str
+    kind: RefusalKind
+    refused: bool
+    """Read from the envelope's `refused` field, never string-matched from prose."""
+
+    citations: tuple[str, ...] = ()
+    """A refusal that cites anything is a defect, counted rather than raised."""
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerOutcome:
+    """What the answerer did with one question that *was* answerable.
+
+    Present in this module for exactly one reason: refusal **precision** cannot be
+    computed without it. Its denominator is every refusal the system emitted, and
+    the wrong ones are emitted over here.
+    """
+
+    question_id: str
+    refused: bool
+
+
+@dataclass(frozen=True, slots=True)
+class Interval:
+    """A Wilson score interval for a proportion, and the n it was computed at.
+
+    Wilson rather than Wald because Wald is unusable at these counts: at 14
+    questions it runs past 0 and 1, and at a perfect 14/14 it reports a width of
+    zero, which would publish certainty this population cannot buy.
+
+    **This corrects D5.** The spec quotes "±0.13" for refusal recall at R=14, which
+    is one standard error (sqrt(0.25/14) = 0.134), not an interval. The 95%
+    interval at 7/14 is roughly [0.25, 0.75]. This project has already been burned
+    once by an interval that was the wrong statistic -- the ±0.18 slice 3 used --
+    so the number is computed here and the spec is corrected rather than quoted.
+    """
+
+    point: float
+    low: float
+    high: float
+    n: int
+
+    def render(self) -> str:
+        return f"{self.point:.3f} [{self.low:.2f}, {self.high:.2f}] n={self.n}"
+
+
+def wilson(successes: int, n: int, *, z: float = 1.959963985) -> Interval:
+    """The 95% Wilson score interval. Pure arithmetic, no approximation warnings."""
+    if n <= 0:
+        raise MetricsError("refusing to compute an interval over zero observations")
+    if not 0 <= successes <= n:
+        raise MetricsError(f"{successes} successes out of {n} is not a proportion")
+    p = successes / n
+    denominator = 1 + z**2 / n
+    centre = (p + z**2 / (2 * n)) / denominator
+    spread = z * math.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / denominator
+    return Interval(
+        point=p,
+        low=max(0.0, centre - spread),
+        high=min(1.0, centre + spread),
+        n=n,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class RefusalMetrics:
+    """Refusal behaviour, computed with no judge and no network.
+
+    Recall is reported **with its interval inline and never as a headline** (D5).
+    Fourteen questions cannot support a published figure; what they can support is
+    a floor and a direction, and the per-kind split is the part that carries the
+    information -- out-of-corpus is the easy refusal and out-of-jurisdiction is the
+    one the hard filter's debt turns on.
+    """
+
+    recall: Interval
+    """Correct refusals over the refusal population. The diagnostic."""
+
+    precision: Interval
+    """Correct refusals over every refusal the system emitted, both populations.
+
+    This is the metric that punishes cowardice at the population level: an
+    answerer that refuses everything scores a perfect recall and a precision of
+    14/64. Branch coverage does the same job question by question.
+    """
+
+    by_kind: tuple[tuple[RefusalKind, Interval], ...]
+    """Prediction 3 lives here: out-of-corpus >= 7/8 against out-of-jurisdiction <= 4/6."""
+
+    wrongly_refused: tuple[str, ...]
+    """Answerable questions the system declined. Named, not just counted."""
+
+    missed: tuple[str, ...]
+    """Refusal questions the system answered anyway. Named, not just counted."""
+
+    refusals_with_citations: tuple[str, ...]
+    """Refusals that emitted a citation.
+
+    A defect by decision, not by taste: a refusal asserts that the retrieved
+    context does not support an answer, so a citation attached to it points at a
+    chunk that supports nothing. Counted arithmetically because it can be, and
+    reported because a judge would never see it.
+    """
+
+
+def refusal_metrics(
+    *,
+    refusals: Sequence[RefusalOutcome],
+    answerable: Sequence[AnswerOutcome],
+) -> RefusalMetrics:
+    """Score the refusal population against the answerable one.
+
+    Two separately-typed arguments rather than one pooled sequence, and that is
+    the enforcement `metrics.py` was asked for: there is no argument you can pass
+    that mixes them, because the wrong type in either slot is rejected here and by
+    mypy before that. Precision genuinely needs both populations -- refusals are
+    emitted over all 64 questions -- so the two are *used* together and never
+    *merged*.
+    """
+    if not refusals:
+        raise MetricsError("refusing to compute refusal metrics over zero refusal questions")
+    if not answerable:
+        raise MetricsError(
+            "refusal precision needs the answerable population too: its denominator is "
+            "every refusal the system emitted, and the wrong ones are emitted there. "
+            "Computing it over the refusal population alone would report a vacuous 1.0."
+        )
+    misplaced = [o for o in refusals if not isinstance(o, RefusalOutcome)]
+    misplaced += [o for o in answerable if not isinstance(o, AnswerOutcome)]  # type: ignore[misc]
+    if misplaced:
+        raise MetricsError(
+            f"refusing to pool populations: {sorted({type(o).__name__ for o in misplaced})} "
+            "was passed where the other population was expected. A question is either "
+            "answerable or a refusal case, and one scored as the other silently changes "
+            "both metrics."
+        )
+    ids = [o.question_id for o in refusals] + [o.question_id for o in answerable]
+    if len(set(ids)) != len(ids):
+        raise MetricsError(
+            "the same question id appears in both populations, or twice in one. An id is "
+            "how a verdict is attached to a question; a collision attaches it to two."
+        )
+
+    correct = [o for o in refusals if o.refused]
+    wrongly_refused = tuple(o.question_id for o in answerable if o.refused)
+    emitted = len(correct) + len(wrongly_refused)
+
+    by_kind: list[tuple[RefusalKind, Interval]] = []
+    for kind in RefusalKind:
+        population = [o for o in refusals if o.kind is kind]
+        if population:
+            by_kind.append((kind, wilson(sum(1 for o in population if o.refused), len(population))))
+
+    return RefusalMetrics(
+        recall=wilson(len(correct), len(refusals)),
+        # An answerer that never refuses has no precision rather than a zero: 0/0
+        # is undefined, and reporting it as 0.0 would read as "every refusal it
+        # emitted was wrong" when it emitted none.
+        precision=wilson(len(correct), emitted) if emitted else Interval(0.0, 0.0, 1.0, 0),
+        by_kind=tuple(by_kind),
+        wrongly_refused=wrongly_refused,
+        missed=tuple(o.question_id for o in refusals if not o.refused),
+        refusals_with_citations=tuple(o.question_id for o in correct if o.citations),
     )

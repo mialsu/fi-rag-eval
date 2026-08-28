@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from fi_rag_eval.analyse import PROBE_WORDS, Analyser
+from fi_rag_eval.answering import AnswerRun
 from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
@@ -531,4 +532,86 @@ def format_probe_table(
         lines.append(f"  {word:<24} baseform: {' '.join(baseform)}")
         if reassembled != baseform:
             lines.append(f"  {'':<24} reasm:    {' '.join(reassembled)}")
+    return "\n".join(lines)
+
+
+def format_refusals(run: AnswerRun) -> str:
+    """The refusal population's arithmetic, with its interval on every figure.
+
+    Nothing here involves a judge, which is what makes it the answer phase's most
+    trustworthy output -- the same reason retrieval metrics win arguments against
+    one. Every proportion carries a Wilson interval and its n, because at R=14 the
+    point estimate alone is not a number anyone should act on.
+    """
+    metrics = run.metrics
+    lines = [
+        f"refusal behaviour — {run.cell.name}, {run.model}, "
+        f"reasoning {'on' if run.reasoning else 'off'}   (DIAGNOSTIC, never a headline)",
+        f"  recall     {metrics.recall.render():<28} correct refusals / refusal population",
+        f"  precision  {metrics.precision.render():<28} correct refusals / all refusals emitted",
+    ]
+    for kind, interval in metrics.by_kind:
+        lines.append(f"  {kind.value:<10} {interval.render()}")
+    lines.append(
+        "  Intervals are Wilson 95%, not the +/-0.13 the spec quotes -- that figure is one"
+    )
+    lines.append(
+        "  standard error. At n=14 a 95% interval is roughly +/-0.25, which is why refusal"
+    )
+    lines.append("  recall is reported as a floor and a direction, never as a published number.")
+    if metrics.missed:
+        lines.append(f"  ANSWERED anyway ({len(metrics.missed)}): {', '.join(metrics.missed)}")
+    if metrics.wrongly_refused:
+        lines.append(
+            f"  WRONGLY refused ({len(metrics.wrongly_refused)}): "
+            f"{', '.join(metrics.wrongly_refused)}"
+        )
+    if metrics.refusals_with_citations:
+        lines.append(
+            f"  DEFECT — refusals carrying citations ({len(metrics.refusals_with_citations)}): "
+            f"{', '.join(metrics.refusals_with_citations)}"
+        )
+        lines.append(
+            "  A refusal asserts the context does not support an answer; a citation on one"
+        )
+        lines.append("  points at a chunk that supports nothing.")
+    lines.append(
+        f"  cost       ${run.cost_usd:.4f} measured at the gateway over {run.calls} calls, "
+        f"{run.tokens} tokens (ceiling {run.ceiling})"
+    )
+    if run.json_validation_retries:
+        lines.append(
+            f"  NOTE       the provider rejected {run.json_validation_retries} generation(s) as "
+            "invalid JSON and they were retried."
+        )
+        lines.append(
+            "  Retrying is not skipping -- every question is still answered and scored -- but"
+        )
+        lines.append(
+            "  how often the answerer cannot emit its envelope is a fact about the answerer."
+        )
+    return "\n".join(lines)
+
+
+def format_refusal_detail(run: AnswerRun) -> str:
+    """Every refusal question, what it retrieved, and what the answerer did.
+
+    Printed in full rather than summarised because AC13 asks for the printed
+    answer of at least one out-of-jurisdiction case, and because a refusal metric
+    that cannot be read back question by question is a number with no defence.
+    """
+    lines = ["refusal population — question by question"]
+    for scored in run.refusals:
+        kind = run.refusal_kinds[scored.question_id]
+        verdict = "REFUSED" if scored.answer.refused else "ANSWERED (miss)"
+        lines.append("")
+        lines.append(f"  {scored.question_id}  [{kind.value}]  {scored.municipality}  -> {verdict}")
+        lines.append(f"    {scored.question}")
+        lines.append(f"    retrieved: {', '.join(scored.retrieved) or '(nothing)'}")
+        if scored.answer.citations:
+            lines.append(f"    citations: {', '.join(scored.answer.citations)}")
+        body = textwrap.fill(
+            scored.answer.text, width=WIDTH - 6, initial_indent="    ", subsequent_indent="    "
+        )
+        lines.append(body)
     return "\n".join(lines)

@@ -26,7 +26,7 @@ import psycopg
 
 from fi_rag_eval import db
 from fi_rag_eval.analyse import Analyser, Morphology
-from fi_rag_eval.golden import GoldenSet, Question
+from fi_rag_eval.golden import GoldenSet, Question, RefusalKind, RefusalQuestion
 from fi_rag_eval.manifest import Manifest
 from fi_rag_eval.metrics import Metrics, Miss, MissKind, QuestionOutcome, compute
 
@@ -217,10 +217,17 @@ def question_stopwords(
 
     Computed once for the whole set and shared by every lemma cell, so a question
     is stopped identically on the query side and the index side.
+
+    Both populations feed it, so one word is never a stopword for an answerable
+    question and a content word for a refusal one. This cannot move an answerable
+    question's lexemes: the result is a per-word lookup, and a word an answerable
+    question contains was already offered to it. Argued, then checked -- the
+    retrieval baseline was re-run byte-identical after the refusal population
+    landed (slice 5, AC7).
     """
-    return db.snowball_stopwords(
-        conn, [word for q in golden.questions for word in morphology.words(q.question)]
-    )
+    words = [word for q in golden.questions for word in morphology.words(q.question)]
+    words += [word for r in golden.refusals for word in morphology.words(r.question)]
+    return db.snowball_stopwords(conn, words)
 
 
 def cell_query_lexemes(
@@ -242,6 +249,170 @@ def cell_query_lexemes(
     if morphology is None:  # pragma: no cover - callers below always supply one
         raise EvaluationError(f"{cell.name} needs a morphological analyser")
     return morphology.query_lexemes(text, cell.analyser, stopwords=stopwords)
+
+
+@dataclass(frozen=True, slots=True)
+class RefusalRetrieval:
+    """What the retriever handed the answerer for one refusal question.
+
+    There is no `QuestionOutcome` here and there must not be: recall over a
+    question with no required chunks is a vacuous 1.0, and the surest way to keep
+    that out of the headline is to have no type that could carry it there.
+    """
+
+    refusal: RefusalQuestion
+    authority_key: str
+    effective_date: date
+    lexemes: tuple[str, ...]
+    hits: tuple[db.Hit, ...]
+
+
+def assert_refusal_absences(
+    conn: psycopg.Connection[tuple[object, ...]],
+    *,
+    manifest: Manifest,
+    refusals: Sequence[RefusalQuestion],
+) -> None:
+    """Check every refusal question's central claim against the corpus, per run.
+
+    A refusal question asserts that a topic is not answerable where it was asked.
+    That assertion decays: a new edition adds a clause, an authority adopts a
+    mechanism, and a question whose correct answer used to be a refusal quietly
+    becomes answerable. The metric would not go red -- it would score a *correct*
+    answer as a missed refusal and read as the answerer getting worse.
+
+    So the claim is checked rather than trusted, and for the out-of-jurisdiction
+    kind it is checked from **both sides**: the lexeme must be absent where the
+    question was asked and present where the answer lives. A one-sided check
+    passes just as happily when an entry has gone vacuous for the opposite reason
+    -- the foreign clause disappearing -- and that is the failure that would leave
+    six questions in the population measuring nothing.
+    """
+    if not refusals:
+        return
+    foreign = [str(r.answerable_from) for r in refusals if r.answerable_from is not None]
+    unresolvable = sorted(set(foreign) - db.resolve_addresses(conn, foreign))
+    if unresolvable:
+        raise EvaluationError(
+            f"these refusal questions name an answerable_from chunk that is not in the "
+            f"corpus: {unresolvable}. The entry claims the question is answerable in "
+            "another jurisdiction; if that chunk does not exist, the claim is not."
+        )
+
+    every_authority = [a.key for a in manifest.authorities]
+    for refusal in refusals:
+        asked = manifest.resolve_municipality(refusal.municipality).key
+        present = db.chunks_containing(conn, authority_key=asked, needle=refusal.absent_lexeme)
+        if present:
+            raise EvaluationError(
+                f"{refusal.id}: {refusal.absent_lexeme!r} is NOT absent from {asked!r} -- "
+                f"it appears in {present}. This question is scored as a refusal, so if "
+                "the topic has become covered, a correct answer would now be counted as "
+                "a missed refusal and the metric would read as the answerer regressing. "
+                "Fix the label or drop the question; do not relax the check."
+            )
+        if refusal.kind is RefusalKind.OUT_OF_JURISDICTION:
+            elsewhere = refusal.foreign_authority
+            if elsewhere is None:
+                # The loader refuses this, but a RefusalQuestion can be constructed
+                # directly -- and an `assert` would vanish under `python -O`, taking
+                # the guard with it.
+                raise EvaluationError(
+                    f"{refusal.id}: an out-of-jurisdiction refusal with no answerable_from "
+                    "claims the hard kind of refusal while carrying no evidence that the "
+                    "question is answerable anywhere."
+                )
+            if not db.chunks_containing(
+                conn, authority_key=elsewhere, needle=refusal.absent_lexeme
+            ):
+                raise EvaluationError(
+                    f"{refusal.id}: {refusal.absent_lexeme!r} is absent from {asked!r} but "
+                    f"ALSO absent from {elsewhere!r}, where this entry claims the answer "
+                    "lives. The question may now be unanswerable everywhere, which is a "
+                    "different kind of refusal scored in a different population."
+                )
+            continue
+        covered = {
+            key: db.chunks_containing(conn, authority_key=key, needle=refusal.absent_lexeme)
+            for key in every_authority
+        }
+        elsewhere_hits = {key: hits for key, hits in covered.items() if hits}
+        if elsewhere_hits:
+            raise EvaluationError(
+                f"{refusal.id}: this is an out-of-corpus refusal, so "
+                f"{refusal.absent_lexeme!r} must be absent from the WHOLE corpus, but it "
+                f"appears in {elsewhere_hits}. If one authority covers the topic, the "
+                "question is out-of-jurisdiction rather than out-of-corpus, and the two "
+                "are scored apart because they are not equally hard."
+            )
+
+
+def retrieve_refusals(
+    conn: psycopg.Connection[tuple[object, ...]],
+    *,
+    manifest: Manifest,
+    refusals: Sequence[RefusalQuestion],
+    k: int = DEFAULT_K,
+    cell: Cell = PUBLISHED,
+    morphology: Morphology | None = None,
+    stopwords: frozenset[str] | None = None,
+) -> tuple[RefusalRetrieval, ...]:
+    """Retrieve for each refusal question exactly as the answerable ones are.
+
+    Same cell, same query normalisation, same authority filter, same top-k. That
+    identity is the measurement: an out-of-jurisdiction question must reach the
+    answerer holding five plausible, same-topic chunks from the authority it was
+    asked about, because refusing *those* is the behaviour under test. Retrieving
+    differently here would be measuring a different system.
+    """
+    if cell.analyser.lemmatising:
+        morphology = morphology or Morphology.open()
+    stopwords = stopwords if stopwords is not None else frozenset()
+
+    retrieved: list[RefusalRetrieval] = []
+    for refusal in refusals:
+        authority = manifest.resolve_municipality(refusal.municipality)
+        if len(authority.sources) != 1:
+            raise EvaluationError(
+                f"{refusal.id}: authority {authority.key!r} has "
+                f"{len(authority.sources)} document versions, so the question must "
+                "say which one it is asked against."
+            )
+        effective_date = authority.sources[0].effective_date
+        lexemes = cell_query_lexemes(
+            conn, refusal.question, cell, morphology=morphology, stopwords=stopwords
+        )
+        if not lexemes:
+            raise EvaluationError(
+                f"{refusal.id}: the question normalises to zero lexemes under the "
+                f"{cell.name} analyser, so nothing would be retrieved for it at all. A "
+                "refusal earned by retrieving nothing measures the tokeniser, not the "
+                "answerer. Fix the question."
+            )
+        hits = db.search(
+            conn,
+            tsquery=db.or_tsquery(lexemes),
+            authority_key=authority.key,
+            effective_date=effective_date,
+            limit=k,
+            analyser=cell.analyser,
+            normalisation=cell.normalisation,
+        )
+        assert_one_authority(hits, authority.key, refusal.id)
+        retrieved.append(
+            RefusalRetrieval(
+                refusal=refusal,
+                authority_key=authority.key,
+                effective_date=effective_date,
+                lexemes=tuple(lexemes),
+                hits=tuple(hits),
+            )
+        )
+    if len(retrieved) != len(refusals):  # pragma: no cover - the loop cannot skip
+        raise EvaluationError(
+            f"retrieved for {len(retrieved)} of {len(refusals)} refusal questions"
+        )
+    return tuple(retrieved)
 
 
 def evaluate_grid(

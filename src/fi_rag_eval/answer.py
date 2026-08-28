@@ -60,29 +60,56 @@ DEFAULT_PROXY_URL = "http://localhost:4010"
 PROXY_KEY_ENV = "LITELLM_MASTER_KEY"
 
 TOKEN_CEILING = 600_000
-"""Roughly 2x a legitimate full run, so a real run never trips it (D8).
+"""D8's figure, kept as the **floor** the ceiling can never fall below.
 
-Deliberately counted in **tokens** rather than dollars: token counts are a
-property of what the harness did, while dollars are a property of a price list
-that can change under it. The dollar figure is recorded beside it, from the
-gateway, and is the number reported.
+Deliberately counted in tokens rather than dollars: token counts are a property
+of what the harness did, while dollars are a property of a price list that can
+change under it. The dollar figure is recorded beside it, from the gateway, and
+is the number reported.
+"""
 
-**Known to be too low, and deliberately left alone until a full run exists.**
-D8's figure was derived before tracer slice 1 established that both models are
-reasoning models whose hidden reasoning bills as output. Tracer slice 2 then
-measured one answer on a real five-chunk context:
+MEASURED_TOKENS_PER_CALL = 10_900
+"""One answer with reasoning on, measured at the gateway in tracer slice 2.
 
     reasoning off   ~4,900 prompt + ~350 completion   = ~5,250 tokens, $0.0040
     reasoning on    ~4,900 prompt + ~6,000 completion = ~10,900 tokens, $0.0210
 
-At 64 questions the answer phase alone is therefore ~340K tokens with reasoning
-off and ~700K with it on -- so with reasoning on, a *legitimate* run trips this
-ceiling, which is the one thing a ceiling must never do. The number is not being
-quietly raised to fit: it is D8's, the measurement that contradicts it is written
-down here, and the re-derivation belongs to the tracer that first runs all 64
-questions. Prediction 7 decides whether reasoning is on at all, and that decides
-which of the two rows above is the legitimate run.
+Reasoning is on because prediction 7 makes it a **correctness** knob rather than
+a cost one: with it off, `qwen/qwen3.6-27b` reproduced the same inversion of
+`17 §` that disqualified `gpt-oss-20b`. So the expensive row is the legitimate
+one, and the ceiling has to be derived from it.
 """
+
+CEILING_HEADROOM = 2
+"""How far past a legitimate run the ceiling sits.
+
+The ceiling exists to stop a runaway -- a retry storm, an accidental loop -- not
+to second-guess a planned run, so it scales with the number of calls the run
+actually intends to make rather than being a constant that has to be revised
+every time the question set grows.
+"""
+
+
+def ceiling_for(calls: int) -> int:
+    """The token ceiling for a run of `calls` completions.
+
+    **This replaces a constant that was measured to be wrong, and the arithmetic
+    is written down rather than the answer.** D8 set 600K as "roughly 2x a
+    legitimate run", derived before tracer slice 1 established that both models
+    are reasoning models whose hidden reasoning bills as output. At 64 questions
+    with reasoning on, a legitimate run is ~700K tokens -- so the constant made a
+    *correct* run trip its own enforcer, which is the one thing a ceiling must
+    never do.
+
+    Fitting a new constant to one run would have bought the same problem again at
+    the next question count. The formula is `headroom x calls x measured tokens
+    per call`, floored at D8's number so a one-question run keeps its ceiling, and
+    every input is a figure this project measured and can re-measure.
+    """
+    if calls < 1:
+        raise AnswerError(f"a run makes at least one call, not {calls}")
+    return max(TOKEN_CEILING, CEILING_HEADROOM * calls * MEASURED_TOKENS_PER_CALL)
+
 
 TIMEOUT_SECONDS = 120
 RETRIES = 3
@@ -107,6 +134,44 @@ class MalformedAnswerError(AnswerError):
 
 class BudgetExceededError(AnswerError):
     """The run passed its token ceiling and was stopped."""
+
+
+JSON_RETRIES = 4
+"""How many times a *stochastic* JSON-mode failure is retried before the run dies.
+
+Separate from `RETRIES` because LiteLLM's backoff does not cover this one. Groq's
+JSON mode validates the generation server-side and returns HTTP **400**
+`json_validate_failed` with an empty `failed_generation` when the model emits
+something that is not valid JSON. LiteLLM treats 400 as a client error and does
+not retry it -- correctly, in general: a 400 usually means the request is wrong,
+and retrying an unchanged wrong request is a waste.
+
+Here the request is not wrong. `temperature=0` becomes `1e-8` at Groq (ADR-0008),
+so generation is not deterministic, and the same question that failed can succeed
+unchanged on the next attempt. Measured: `tapahtuman-jatehuoltosuunnitelma` killed
+a 64-question run at the 29th answer and then succeeded twice in a row on the
+identical request, at both an 8k and a 16k cap, using 2,557 reasoning tokens
+either way -- so it was never the token cap that tracer slice 2 diagnosed for the
+same error code.
+
+**Retrying is not skipping.** The question is still answered and still scored, and
+if the retries run out the run still fails rather than reporting 63 of 64. What
+would be dishonest is hiding how often it happened, so the count is carried on the
+run's budget and printed.
+
+A failed generation is billed at zero tokens -- confirmed in the gateway's spend
+ledger -- so the retries cost wall-clock and nothing else.
+"""
+
+
+def _is_stochastic_json_failure(exc: Exception) -> bool:
+    """Groq's server-side JSON validation rejected the generation.
+
+    Matched on the provider's own error code rather than on the exception class,
+    because every 400 arrives here as the same `BadRequestError`. Fragile in the
+    same way as the budget/rate-limit discrimination below, and confessed with it.
+    """
+    return "json_validate_failed" in str(exc)
 
 
 SYSTEM_PROMPT = (
@@ -179,6 +244,19 @@ class TokenBudget:
     tokens: int = 0
     cost_usd: float = 0.0
     calls: int = 0
+    json_validation_retries: int = 0
+    """How many calls the provider rejected with `json_validate_failed` and were retried.
+
+    Carried here because this is the one object threaded through every call in a
+    run. It is reported rather than swallowed: "the answerer failed to emit valid
+    JSON on n of 64 questions" is a fact about the model under test, and a silent
+    retry would delete it.
+    """
+
+    @classmethod
+    def for_run(cls, calls: int) -> TokenBudget:
+        """A budget sized for a run that intends to make `calls` completions."""
+        return cls(ceiling=ceiling_for(calls))
 
     def record(self, usage: Usage) -> None:
         self.tokens += usage.total_tokens
@@ -346,14 +424,49 @@ def complete(
 
     `max_tokens` defaults high because both models are reasoning models and the cap
     covers reasoning **and** answer together. Measured, not guessed: on a real
-    five-chunk context this question needed 5,143 reasoning tokens before emitting
-    any answer, and a 3,000-token cap failed as Groq
-    `json_validate_failed` with an empty `failed_generation` -- the same failure
-    shape tracer slice 1 saw at 700 tokens, wearing a different error code.
+    five-chunk context one question needed 5,143 reasoning tokens before emitting
+    any answer, and a 3,000-token cap failed as Groq `json_validate_failed` with an
+    empty `failed_generation`.
+
+    **`json_validate_failed` has two causes and tracer slice 2 only found one.**
+    That slice attributed the error code to the token cap, which was right for the
+    case it had. Tracer slice 3 hit the identical code with an ample cap, on a
+    question that then succeeded twice on the unchanged request using 2,557
+    reasoning tokens. The cap is one cause; **non-determinism is the other**, and
+    `JSON_RETRIES` above exists for it. Read a `json_validate_failed` as "the model
+    emitted invalid JSON", not as "the cap was too small".
 
     With reasoning off the model stops at ~350 completion tokens regardless, so the
     high default costs nothing there.
     """
+    for attempt in range(1, JSON_RETRIES + 1):
+        try:
+            return _complete_once(
+                model=model,
+                messages=messages,
+                budget=budget,
+                max_tokens=max_tokens,
+                reasoning=reasoning,
+                response_format=response_format,
+            )
+        except MalformedAnswerError:
+            raise
+        except ProxyError as exc:
+            if not _is_stochastic_json_failure(exc) or attempt == JSON_RETRIES:
+                raise
+            budget.json_validation_retries += 1
+    raise AnswerError("unreachable: the retry loop always returns or raises")
+
+
+def _complete_once(
+    *,
+    model: str,
+    messages: list[dict[str, str]],
+    budget: TokenBudget,
+    max_tokens: int,
+    reasoning: bool,
+    response_format: dict[str, str] | None,
+) -> tuple[str, Usage, str]:
     try:
         response = litellm.completion(
             model=f"litellm_proxy/{model}",

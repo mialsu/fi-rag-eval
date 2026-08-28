@@ -8,13 +8,14 @@ if there is one, must not be trusted.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from fi_rag_eval import db
+from fi_rag_eval import answering, db
 from fi_rag_eval.analyse import AnalyserError, Morphology
 from fi_rag_eval.answer import ANSWERER, AnswerError, TokenBudget, answer_question
 from fi_rag_eval.chunking import ChunkingError
@@ -37,6 +38,8 @@ from fi_rag_eval.report import (
     format_grid,
     format_ingest,
     format_probe_table,
+    format_refusal_detail,
+    format_refusals,
     git_commit,
 )
 
@@ -98,15 +101,40 @@ def _parser() -> argparse.ArgumentParser:
     )
     answer_parser = subparsers.add_parser(
         "answer",
-        help="answer ONE golden question from the published cell's retrieval, and "
-        "print what it cost",
+        help="answer ONE golden question from the published cell's retrieval -- or, "
+        "with --all, both populations with refusal precision/recall. Prints what it cost",
     )
     answer_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     answer_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
     answer_parser.add_argument("--k", type=int, default=DEFAULT_K)
     answer_parser.add_argument(
         "question_id",
+        nargs="?",
         help="which golden question to answer; an unknown id lists the ones that exist",
+    )
+    answer_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="answer BOTH populations -- 50 answerable and 14 refusal questions -- and "
+        "print refusal precision/recall. This spends real money: budget the measured "
+        "per-answer cost times 64",
+    )
+    answer_parser.add_argument(
+        "--municipality",
+        default=None,
+        help="ask the question as a resident of this kunta instead of the one the "
+        "golden entry names. Pass an empty string to exercise the no-municipality "
+        "refusal, which must never silently pick an authority",
+    )
+    answer_parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write the whole run -- every answer text, verbatim -- to this JSON file. "
+        "The hand-labelled agreement sample is frozen from a file like this one, and a "
+        "sample regenerated from a later model is not the sample that was labelled. "
+        "Run artifacts belong under eval/runs/, which is gitignored; the frozen sample "
+        "is a deliberate copy, not whatever the last run happened to write",
     )
     answer_parser.add_argument(
         "--model",
@@ -201,6 +229,124 @@ def _eval(args: argparse.Namespace) -> int:
 
 
 def _answer(args: argparse.Namespace) -> int:
+    # Flags are rejected in the mode that would ignore them rather than accepted and
+    # dropped. A silently ignored flag on a command that spends money reads to the
+    # operator as a run they configured and did not get.
+    if args.all:
+        if args.question_id:
+            raise AnswerError(
+                f"--all answers every question, so it cannot also be given "
+                f"{args.question_id!r}. Drop one."
+            )
+        if args.municipality is not None:
+            raise AnswerError(
+                "--municipality cannot be combined with --all: every question carries the "
+                "kunta it is labelled against, and overriding all 64 at once would ask "
+                "each of them in a jurisdiction nobody labelled them for."
+            )
+        return _answer_all(args)
+    if not args.question_id:
+        raise AnswerError("say which question to answer, or pass --all for every question")
+    if args.out is not None:
+        raise AnswerError(
+            "--out writes a whole run, so it needs --all. One answer is already printed "
+            "in full; a one-question file would not be the frozen sample it looks like."
+        )
+    return _answer_one(args)
+
+
+def _answer_all(args: argparse.Namespace) -> int:
+    """Both populations, one pass, refusal precision/recall printed.
+
+    Deliberately **not** wired into `make eval` yet. `make eval` is offline,
+    deterministic and gated at zero tolerance; this run is networked, costs money
+    and has no floor gate to make it honest until tracer 6 derives one. Attaching
+    it early would make the retrieval gate depend on a provider, which is the one
+    property that half of the harness has that the other does not.
+    """
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    planned = len(golden.questions) + len(golden.refusals)
+    budget = (
+        TokenBudget(ceiling=args.token_ceiling)
+        if args.token_ceiling is not None
+        else TokenBudget.for_run(planned)
+    )
+    print(
+        f"answering {planned} questions "
+        f"({len(golden.questions)} answerable + {len(golden.refusals)} refusal) "
+        f"through {args.model}, token ceiling {budget.ceiling}"
+    )
+    with db.connect() as conn:
+        run = answering.run(
+            conn,
+            manifest=manifest,
+            golden=golden,
+            budget=budget,
+            k=args.k,
+            cell=PUBLISHED,
+            morphology=morphology,
+            model=args.model,
+            reasoning=not args.no_reasoning,
+            # Flushed per line: this run takes the better part of an hour, and a
+            # progress line held in a buffer is not progress.
+            progress=lambda line: print(line, flush=True),
+        )
+
+    print()
+    print(format_refusals(run))
+    print()
+    print(format_refusal_detail(run))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(_run_as_json(run), encoding="utf-8")
+        print(f"\nrun written to {args.out}")
+    return 0
+
+
+def _run_as_json(run: answering.AnswerRun) -> str:
+    """The whole run, verbatim, as the frozen sample will need it."""
+    payload = {
+        "cell": run.cell.name,
+        "k": run.k,
+        "model": run.model,
+        "reasoning": run.reasoning,
+        "commit": git_commit(),
+        "tokens": run.tokens,
+        "cost_usd": run.cost_usd,
+        "ceiling": run.ceiling,
+        "answers": [
+            {
+                "question_id": one.question_id,
+                "population": population,
+                "kind": (
+                    run.refusal_kinds[one.question_id].value if population == "refusal" else None
+                ),
+                "question": one.question,
+                "municipality": one.municipality,
+                "authority_key": one.authority_key,
+                "retrieved": list(one.retrieved),
+                "refused": one.answer.refused,
+                "text": one.answer.text,
+                "citations": list(one.answer.citations),
+                "finish_reason": one.answer.finish_reason,
+                "usage": {
+                    "prompt_tokens": one.answer.usage.prompt_tokens,
+                    "completion_tokens": one.answer.usage.completion_tokens,
+                    "reasoning_tokens": one.answer.usage.reasoning_tokens,
+                    "total_tokens": one.answer.usage.total_tokens,
+                    "cost_usd": one.answer.usage.cost_usd,
+                },
+            }
+            for population, answers in (("answerable", run.answerable), ("refusal", run.refusals))
+            for one in answers
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def _answer_one(args: argparse.Namespace) -> int:
     """One question, end to end, with the price on it.
 
     Deliberately reuses `evaluate` rather than re-running the search itself: the
@@ -209,6 +355,11 @@ def _answer(args: argparse.Namespace) -> int:
     """
     manifest = load_manifest(args.manifest)
     golden = load_golden_set(args.golden, manifest)
+    if args.municipality is not None:
+        # Resolved before anything else so the refusal costs nothing: an absent
+        # municipality has no authority to answer from, and the harness must not
+        # pick one (CLAUDE.md's third verification layer, AC14).
+        manifest.resolve_municipality(args.municipality)
     morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
     with db.connect() as conn:
         run = evaluate(
