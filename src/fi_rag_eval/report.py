@@ -27,7 +27,7 @@ from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
 from fi_rag_eval.ingest import IngestReport
 from fi_rag_eval.judging import ControlRun, JudgeRun
-from fi_rag_eval.metrics import Metrics, discordance
+from fi_rag_eval.metrics import Agreement, Metrics, discordance
 
 RANKER_NOTE = (
     "Postgres ts_rank over a tsvector, normalisation as shown per cell. NOT BM25: "
@@ -932,4 +932,94 @@ def format_control(run: ControlRun) -> str:
             f"  NOTE  {run.json_validation_retries} generation(s) rejected as invalid JSON "
             "and retried"
         )
+    return "\n".join(lines)
+
+
+def format_agreement(
+    agreement: Agreement,
+    *,
+    kind: str,
+    first: str,
+    second: str,
+    forced: int,
+    partial: bool,
+) -> str:
+    """Agreement, its cluster-aware interval, and D11's floor applied.
+
+    Two things this function refuses to let pass silently. It always prints the
+    **forced units it excluded** and why, because an exclusion nobody can see is
+    indistinguishable from a mistake. And it always prints the interval **kind**,
+    because `wilson-over-clusters` means the cluster-robust estimator hit its
+    degenerate boundary and the number is the conservative fallback, not the
+    estimate.
+    """
+    lines = [
+        f"{kind} — {first} against {second}",
+        f"  {agreement.render()}",
+        f"  agreed {agreement.agreed} of {agreement.units} field-verdicts "
+        f"in {agreement.clusters} questions",
+    ]
+    if partial:
+        lines.append(
+            "  !! PARTIAL — computed over the units labelled so far, which are not a random"
+        )
+        lines.append(
+            "     subset. A progress check only: no number here may be quoted as a result."
+        )
+    lines.append("")
+    lines.append("  by field — D5's prediction 2 lives here")
+    for field, agreed, units in agreement.by_field:
+        lines.append(f"    {field:<10} {agreed}/{units} = {agreed / units:.3f}")
+    lines.append(
+        "    Prediction 2 expects `asserted` LOWER than `stated`. Higher was pre-registered"
+    )
+    lines.append(
+        "    as a sign the prompt may be collapsing the two questions -- but a verdict class"
+    )
+    lines.append("    that is almost all negatives is consistent for free, so read the counts.")
+    lines.append("")
+    lines.append(
+        f"  EXCLUDED  {forced} units under refused answers. A refusal states nothing, so both"
+    )
+    lines.append("            sides are forced to the same verdict and the units measure nothing.")
+    lines.append(
+        "            Pooling them would hand this figure ~0.16 of agreement for free, and a"
+    )
+    lines.append(
+        "            judge agreeing on only ~0.83 of the real units would clear the 0.85 floor."
+    )
+    if agreement.disagreements:
+        lines.append("")
+        lines.append(f"  disagreements ({len(agreement.disagreements)}), named not just counted:")
+        for one in agreement.disagreements:
+            lines.append(
+                f"    {one.question_id:<44} {one.unit} {one.index} {one.field}: "
+                f"first said {str(one.value).lower()}"
+            )
+    lines.append("")
+    if kind.startswith("judge-human"):
+        if agreement.rate >= AGREEMENT_FLOOR and not partial:
+            lines.append(
+                f"  VERDICT   {agreement.rate:.3f} is at or above D11's {AGREEMENT_FLOOR:.2f} "
+                "floor, so the"
+            )
+            lines.append(
+                "            judged metrics become publishable — with branch coverage beside"
+            )
+            lines.append("            groundedness, never either alone.")
+            lines.append(
+                "            Report it against judge SELF-consistency, not against 1.0: the"
+            )
+            lines.append("            judge's own reproducibility is the ceiling on this number.")
+        else:
+            lines.append(
+                f"  VERDICT   {agreement.rate:.3f} is BELOW D11's {AGREEMENT_FLOOR:.2f} floor. "
+                "Groundedness stays"
+            )
+            lines.append(
+                "            WITHHELD, and the slice-6 decision rule says slice 6 is the judge."
+            )
+    else:
+        lines.append("  This is the CEILING on judge-human agreement, not a substitute for it: two")
+        lines.append("  judge runs that disagree with each other cannot both match a human.")
     return "\n".join(lines)

@@ -101,7 +101,7 @@ diagnostics, not headlines of their own.
 | Citation **address validity** | **1.000** | 58 citations | **publishable: arithmetic, no judge, no network.** Every citation names a chunk its question actually retrieved. 0 unparseable, 0 outside the context, **0 foreign-authority** |
 | Citation accuracy (judged) | **withheld** | | the other half of citation checking — *does the cited chunk support the claim* — needs the judge, so it inherits the withholding |
 | Refusal precision / recall | **0.632 / 0.857** | n=19 / n=14 | measured, **diagnostic and never a headline**: 14 questions cannot support a published figure. Wilson 95%: [0.41, 0.81] and [0.60, 0.96]. Precision is charged for retrieval failures — see the caveats |
-| Judge–human agreement | — | | the next slice. Judge **self-consistency** is measured at **0.975** [0.95, 1.00] over 199 units, and that is a *ceiling* on any agreement figure this judge can reach |
+| Judge–human agreement | — | 168 units to label | the next slice, and it is hand work. Judge **self-consistency** is measured at **0.964** [0.93, 1.00] over 274 field-verdicts, and that is a *ceiling* on any agreement figure this judge can reach |
 | p95 latency / cost per query | — / **$0.0165** | 50 questions | `make eval` itself costs €0 and always will. One answer averages $0.0118 and one judge call $0.0014; a full answer-plus-judge cycle over the golden set is **$0.83** and ~57 minutes |
 
 **Read the headline together with the leakage row.** The first version of this harness scored

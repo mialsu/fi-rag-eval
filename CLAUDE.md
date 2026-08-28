@@ -95,12 +95,15 @@ regresses. Nothing else exists.
   $0.0699 per run** ($0.3084 for the whole tracer). Every judged figure prints marked `DIAGNOSTIC` with the published value
   **WITHHELD**, because judge–human agreement does not exist until tracer 5 and D11 forbids
   groundedness without it. **A green judge run publishes no number.**
-- **The judge DISAGREES WITH ITSELF, measured rather than assumed away: self-consistency 0.975
-  [0.95, 1.00] over 199 units.** `temperature=0` becomes `1e-8` at Groq for the judge exactly as for
-  the answerer. Found because a re-run twenty minutes later moved a verdict. It is a **ceiling** on
-  judge–human agreement — two judge runs that differ cannot both match a human — so tracer 5 must
-  report its agreement figure against 0.975, not against 1.0. The ceiling is clear of D11's 0.85
-  floor, so this changes the *reading*, not the plan.
+- **The judge DISAGREES WITH ITSELF: self-consistency 0.964 [0.93, 1.00]** over 274 field-verdicts
+  in 43 questions (0.970 counting a branch as one unit), via
+  `fi-rag-eval agreement A.json --against B.json`. `temperature=0` becomes `1e-8` at Groq for the
+  judge exactly as for the answerer; found because a re-run twenty minutes later moved a verdict. It
+  is a **ceiling** on judge–human agreement — two judge runs that differ cannot both match a human —
+  so tracer 5 reports its agreement figure against 0.964, not against 1.0. Clear of D11's 0.85
+  floor, so it changes the *reading*, not the plan. **Tracer 4 first published 0.975 and that figure
+  is superseded**: it pooled in the 31 forced units (below), which is the inflation ADR-0011 exists
+  to exclude.
 - **GROUNDEDNESS SATURATES AT 1.000 AND CARRIES NO INFORMATION.** It is identical (1.000) whether
   retrieval was complete or not, because the denominator is branches *stated* and `qwen/qwen3.6-27b`
   never states a branch it cannot cite — it drops the branch instead. All the signal is in **branch
@@ -172,11 +175,27 @@ regresses. Nothing else exists.
   determining variables it could not resolve. It costs ~5.3x the dollars ($0.0210 vs $0.0040 per
   answer). Pre-registered as prediction 7; do not turn reasoning off to save money without
   scoring it.
-- **Not built:** embeddings, pgvector, reranking, **judge–human agreement** (tracer 5 — the
-  arithmetic and its cluster-aware interval exist and are tested in `metrics.unit_agreement` /
-  `cluster_robust_interval`, but nothing in the CLI computes agreement and there are no hand
-  labels), the frozen sample, the answer-metric floor gate, a third authority, CI, Docker,
-  Cloud Run.
+- **Tracer 5's Foreman half is BUILT; its Owner half is 168 hand labels that do not exist
+  (ADR-0011).** The sample is frozen and **committed** at `eval/frozen/sample-tracer5.json` — not
+  gitignored, stating its own provenance inside (`answered_at_commit: 4b75dfd-dirty`). Re-answering
+  from a clean commit was considered and **rejected**: the answerer is non-deterministic, so it
+  would produce different answers and move refusal recall 0.857 and precision 0.632 — re-publishing
+  two measured numbers to improve a provenance string.
+  - `fi-rag-eval label` drives **168 units** blind and resumable, writing after every unit.
+  - `fi-rag-eval agreement <verdicts>` computes judge–human agreement and applies D11's floor. It
+    **refuses to run** while any unit is unlabelled: the labelled subset is not a random subset.
+  - **Labelling is BLIND, and that is enforced by a signature.** `labelling.format_context` takes
+    `(one, bodies, citations)` — there is no parameter through which a judge verdict, suggestion or
+    stability flag could reach the labeller, and a test asserts the signature. Showing the judge's
+    verdict would measure the human's willingness to disagree, not the judge's accuracy.
+- **31 of the 199 units are FORCED-AGREEMENT and are excluded from the measurement.** A refused
+  answer states nothing, so both the judge and any honest human are forced to *not stated* on all of
+  its units. Pooling the 31 hands the judge **0.156 of agreement before a word is read**, and
+  `(x·168+31)/199 = 0.85` gives **x = 0.827** — a judge agreeing on only 0.827 of the real units
+  would clear D11's floor. Excluded, printed on every table, and it cuts the labelling from 199 to
+  168 units.
+- **Not built:** embeddings, pgvector, reranking, **the 168 hand labels and therefore judge–human
+  agreement**, the answer-metric floor gate, a third authority, CI, Docker, Cloud Run.
   `make docker-build` still exits non-zero on purpose — do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.

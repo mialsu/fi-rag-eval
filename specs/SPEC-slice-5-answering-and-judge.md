@@ -1319,3 +1319,101 @@ predicted.**
   and its substance holds decisively on branch coverage. *Recommendation:* **yes, treat the rule as
   fired for the reranker**, and require slice 6's spec to pre-register its fix size against branch
   coverage rather than groundedness — plus the 6-discordant-question bar, which is unchanged.
+
+---
+
+## Tracer slice 5 — the Foreman half (28 Aug 2026). NOT COMPLETE.
+
+`The sample is frozen and committed, the labelling protocol is decided and built, agreement has a
+command, and 31 forced units are excluded from the measurement. The 168 hand labels do not exist:
+they are the Owner's and cannot be delegated. Cost $0.00 — nothing here calls a model.`
+
+**This section is written at the halfway point deliberately.** Tracer 5's deliverable is a number
+that requires Owner labour, and a spec that recorded nothing until that labour happened would leave
+the next session unable to tell built-and-waiting from not-started.
+
+### AC verdicts
+
+| # | Verdict | Evidence |
+|---|---|---|
+| AC11 | **NOT MET, and correctly so** | Judge–human agreement needs a human. The arithmetic, the cluster-aware interval, the command (`fi-rag-eval agreement`) and the protocol all exist; the labels do not. `agreement` **refuses to run** over a partial label set and says why — seen, exit 1. |
+| — | **MET** | The sample is frozen at `eval/frozen/sample-tracer5.json`, **committed** (not gitignored), stating its own provenance inside: `answered_at_commit: 4b75dfd-dirty`, `provenance_is_a_tree_not_a_commit: true`. |
+| — | **MET** | `fi-rag-eval label` drives 168 units blind and resumable; verified by a scripted session that labelled, noted, quit, resumed, and skipped. |
+| — | **MET** | `fi-rag-eval agreement A --against B` reports judge self-consistency: **0.964 [0.93, 1.00]** over 274 field-verdicts in 43 questions, cluster-robust. |
+
+**Tracer verdict: PARTIAL by construction.** The half that can be built is built and green
+(399 tests); the half that is hand work is untouched.
+
+### The finding that changed the protocol before any label existed
+
+**31 of the 199 units are forced-agreement, and pooling them would let a below-floor judge
+publish.**
+
+A refused answer states nothing. `judge.parse_verdicts` already forces the judge to *not stated* on
+every branch of one and *not asserted* on every forbidden item; any honest human labels them the
+same. Both sides are structurally forced to agree, so the units measure nothing.
+
+Measured on the frozen sample: the **7 refused answers carry 31 units**. Pooled in, they hand the
+judge **0.156 of agreement before a word is read** — and the arithmetic that decides it:
+
+> `(x · 168 + 31) / 199 = 0.85`  →  **x = 0.827**
+
+**A judge agreeing on only 0.827 of the informative units would clear D11's 0.85 floor**, on the
+strength of 31 units nobody judged. So they are excluded from the labelling and from the
+denominator, printed on every agreement table, and recorded as ADR-0011 decision 6. It also cuts the
+Owner's burden from 199 units to **168**.
+
+### This corrects a number tracer slice 4 published
+
+Tracer 4 reported judge self-consistency at **0.975 over D3's 199 units** — computed with the forced
+units pooled in, before the decision above existed. Recomputed over the informative units:
+**0.964 [0.93, 1.00]** over 274 field-verdicts, or **0.970** counting a branch as one unit.
+
+**0.964 is the figure to quote.** The ceiling is clear of the 0.85 floor either way, so this changes
+the number and not the plan — but it is corrected everywhere rather than left standing, because the
+superseded figure was computed exactly the way this slice then documented as wrong.
+
+### Two decisions taken and recorded rather than discovered later → ADR-0011
+
+- **Labelling is BLIND**, and that includes the stability flags proposed during shaping. A flag does
+  not reveal *which way* the judge went, but it reveals *where the judge was uncertain*, which
+  allocates the Owner's attention by the judge's own doubt. Enforced by signature:
+  `labelling.format_context` takes `(one, bodies, citations)` and there is no parameter through
+  which a verdict could arrive. A test asserts the signature, so adding one fails the gate.
+- **The sample is committed, not regenerated**, reversing ADR-0010's suggestion. The answerer is
+  non-deterministic, so re-answering from a clean commit produces *different answers* and would move
+  refusal recall 0.857 and precision 0.632 — re-publishing two measured numbers to improve a
+  provenance string. Committing the artifact makes it reproducible **by inclusion** instead, which is
+  what "a frozen, committed set of answer texts" meant all along.
+
+### Also reversed: the two-pass labelling order
+
+Shaping proposed labelling every `stated` first and every `supported` second, on the ground that
+branch coverage rests on `stated`. That confused an **analysis** priority with a **procedure**: two
+passes make the Owner read all 43 answers twice for no measurement gain. One pass per unit, both
+fields together, grouped by question (ADR-0011 decision 2).
+
+### What the Owner does next
+
+```
+fi-rag-eval label          # 168 units, blind, resumable. Run it again to continue.
+fi-rag-eval agreement eval/runs/verdicts-A.json     # once the last unit is labelled
+```
+
+`label` writes after **every** unit, so a closed terminal costs nothing. `agreement` refuses to
+produce a number while any unit is unlabelled — the labelled subset is not a random subset, so
+agreement over it would be a reduced N arrived at by accident. `--partial` gives a progress check
+that says on its face that nothing in it may be quoted.
+
+### Spec deltas from this half-slice
+
+1. **Agreement is over 168 units, not 199.** D3's count stands as the *unit* count; the
+   *measurement* excludes the 31 forced ones, for the arithmetic above.
+2. **D3's "199 units" ambiguity is settled in code.** A branch carries two judgements and a
+   forbidden item one, so "199 units" did not define agreement on a branch. `fi-rag-eval agreement`
+   reports the **field-level** figure — the more conservative — and prints the strict per-unit
+   equivalent beside it.
+3. **Self-consistency is 0.964, superseding tracer 4's 0.975.** See above.
+4. **Inter-annotator agreement is unmeasurable here** and is now stated rather than implied: there
+   is one labeller, so "judge–human agreement 0.9" means agreement with *this* human, and no part of
+   the protocol can say whether a second person would label the same way. Confessed.

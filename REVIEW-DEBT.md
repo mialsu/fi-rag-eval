@@ -790,13 +790,17 @@ ledger is worse than none, because sessions trust it.
   is measured against *one* judge run. If the judge disagrees with **itself**, that
   self-consistency is a **ceiling** on any agreement it can reach — two runs that differ cannot
   both match a human. `CONTEXT.md` now carries **Judge self-consistency** as a term for it.
-- **MEASURED, so the ceiling is a number rather than a worry: 0.975 [0.95, 1.00] over D3's 199
-  units, 50 questions, cluster-robust.** Branch units 120/125 = 0.960; forbidden items 74/74 =
-  1.000 — and that 1.000 is consistent *for free*, because 73 of the 74 were unanimous negatives in
-  both runs. **The ceiling is therefore well clear of the 0.85 floor and does not threaten tracer
-  slice 5's construction — only the reading of its headline**, which must be reported against 0.975
-  rather than against 1.0. Computed with the shipped `metrics.unit_agreement`, the same function
-  tracer slice 5 will use against hand labels.
+- **MEASURED, so the ceiling is a number rather than a worry — and the first figure published for
+  it was computed the way this project has since documented as wrong.** Tracer slice 4 reported
+  **0.975 over D3's 199 units**. That pooled in the **31 units under refused answers**, where both
+  runs are structurally forced to the same verdict — the exact inflation ADR-0011 then excluded from
+  judge–human agreement. Excluding them, as `fi-rag-eval agreement --against` now does:
+  **0.964 [0.93, 1.00] over 274 field-verdicts in 43 questions**, cluster-robust; **0.970** counting
+  a branch as one unit. Per field: `asserted` 62/62 = 1.000, `stated` and `supported` 101/106 =
+  0.953 each. The 1.000 is consistent *for free* — 61 of 62 were unanimous negatives.
+  **The ceiling is still well clear of the 0.85 floor**, so this changes the number and not the
+  plan. **0.964 is the figure to quote**; 0.975 is superseded and should not be cited from tracer
+  slice 4's section, which now says so.
 - **Not fixed, and the options are not equal:** re-running the judge N times and taking a majority
   would raise consistency and multiply cost by N; caching a verdict per unit would make the harness
   deterministic and freeze in whatever the first run happened to say. Both are real designs and
@@ -808,11 +812,11 @@ ledger is worse than none, because sessions trust it.
   figure is 0.975 over 199. Scored per field it is 0.969 over 324, and that denominator is
   misleading anyway, because `parse_verdicts` forces `supported` false whenever `stated` is false,
   so the two fields are coupled by construction and every one of the five observed flips moved
-  both. **The strict 199-unit reading is the one to publish**; it is stated here so tracer slice 5
-  finds a decision rather than a choice.
-- **Disposition:** open. The number exists; what remains is that tracer slice 5 must report its
-  agreement figure against 0.975 rather than against 1.0, and must not re-derive the unit
-  definition.
+  both. **Settled in the code rather than in prose: `fi-rag-eval agreement` reports the field-level
+  figure**, which is the more conservative of the two, and prints the strict equivalent beside it.
+- **Disposition:** open. The number exists and has a command behind it
+  (`agreement --against`). What remains is that tracer slice 5 must report its agreement figure
+  against **0.964** rather than against 1.0, and must not re-derive the unit definition.
 
 ## 2026-08-28 (slice 5, tracer 4) — groundedness saturates at 1.000, so the published metric carries no information
 
@@ -866,3 +870,48 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open. Tracer slice 5's frozen sample is the deliberate committed copy that
   partly repays this, and it should be re-frozen from a **clean commit** rather than inheriting
   `-dirty`.
+
+## 2026-08-28 (slice 5, tracer 5, Foreman half) — one labeller, so inter-annotator agreement is unmeasurable
+
+- **What:** judge–human agreement will be agreement with **one** human. Nothing in the protocol can
+  say whether a second person, labelling the same 168 units blind, would produce the same labels.
+- **Where:** `docs/adr/0011-*.md` (Consequences); `src/fi_rag_eval/labelling.py`;
+  `eval/frozen/labels-owner.yaml` once it exists — the filename says `owner` for this reason.
+- **What green tests do NOT prove here:** the tests prove the protocol is blind, resumable and
+  arithmetically sound. None of that speaks to whether the labels are *right*. A confidently wrong
+  single labeller produces a clean 0.95 agreement and a judge validated against a misconception.
+- **Why it is accepted rather than fixed:** a second labeller is a second person, which this project
+  does not have. The mitigation that is available and taken: the label file carries a `note` field
+  per unit, and contestable units are expected to use it — two of the fourteen refusal labels turned
+  out arguable, so the base rate for "hand label needing a second look" in this project is ~14%.
+- **Disposition:** open, accepted. Revisit only if a second reader ever exists.
+
+## 2026-08-28 (slice 5, tracer 5, Foreman half) — the labelling burden is 168 units and nobody has done any of it
+
+- **What:** `fi-rag-eval label` exists, is blind, resumable and tested, and **has never been run to
+  completion**. `eval/frozen/labels-owner.yaml` does not exist. Judge–human agreement, D11's
+  publishability gate, therefore does not exist, and no judged metric is publishable.
+- **Where:** `src/fi_rag_eval/labelling.py`; `src/fi_rag_eval/cli.py` (`_label`, `_agreement`).
+- **What green tests do NOT prove here:** that a human can actually get through 168 units with this
+  surface. It was verified by a **scripted** session of a handful of units, not by a person doing the
+  real thing for two hours. The estimate of 20–40 seconds a unit is an estimate and is labelled as
+  one; it has never been measured.
+- **The specific risk:** if the surface turns out to be unusable at unit 40, the protocol changes and
+  the first 40 labels may not survive the change. Cheapest mitigation available and not taken:
+  labelling ten units for real before writing this entry.
+- **Disposition:** open. The Owner's next action, and the gate on the rest of slice 5.
+
+## 2026-08-28 (slice 5, tracer 5, Foreman half) — `--partial` can print an agreement figure that is not a result
+
+- **What:** `fi-rag-eval agreement --partial` computes over whatever is labelled so far. The labelled
+  subset is the *first* n units in golden-set order, which is not a random sample of the 168.
+- **Where:** `src/fi_rag_eval/cli.py` (`_agreement`); `src/fi_rag_eval/report.py`
+  (`format_agreement`, the `PARTIAL` block).
+- **What green tests do NOT prove here:** that the warning is enough. The table prints
+  `!! PARTIAL` and says no number may be quoted, and the flag's help says the same — but a number
+  printed with a caveat is a number that gets quoted without it, which is the exact failure the
+  recall/leakage rule exists to prevent.
+- **Why it exists at all:** a two-hour labelling job with no way to check progress is a job that gets
+  abandoned. The alternative considered was printing counts only and no rate; rejected because the
+  rate is the thing a person wants at the halfway point.
+- **Disposition:** open. If it is ever quoted, delete the flag.

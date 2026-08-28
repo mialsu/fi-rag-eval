@@ -1,4 +1,5 @@
-"""The command-line surface: ``ingest``, ``eval``, ``answer`` and ``judge``.
+"""The command-line surface: ``ingest``, ``eval``, ``answer``, ``judge``, ``label``
+and ``agreement``.
 
 Exit codes are a feature, not an afterthought -- CI reads them. Zero means the
 run completed and every metric held. Anything else means the table on stdout,
@@ -15,7 +16,7 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from fi_rag_eval import answering, db, judging
+from fi_rag_eval import answering, db, judging, labelling
 from fi_rag_eval.analyse import AnalyserError, Morphology
 from fi_rag_eval.answer import (
     ANSWERER,
@@ -37,13 +38,23 @@ from fi_rag_eval.golden import GoldenSetError, load_golden_set
 from fi_rag_eval.ingest import IngestError, ingest
 from fi_rag_eval.judge import judge_ceiling_for
 from fi_rag_eval.judging import DEFAULT_CONTROL, JudgingError, load_control, load_run
+from fi_rag_eval.labelling import (
+    DEFAULT_LABELS,
+    DEFAULT_SAMPLE,
+    LabellingError,
+    human_unit_labels,
+    judge_unit_labels,
+    load_labels,
+    questions_to_label,
+)
 from fi_rag_eval.manifest import ManifestError, load_manifest
-from fi_rag_eval.metrics import MetricsError
+from fi_rag_eval.metrics import MetricsError, unit_agreement
 from fi_rag_eval.report import (
     Baseline,
     BaselineError,
     compare,
     format_address_validity,
+    format_agreement,
     format_control,
     format_grid,
     format_ingest,
@@ -64,6 +75,7 @@ DEFAULT_BASELINE = Path("eval/baseline.json")
 HANDLED = (
     AnswerError,
     JudgingError,
+    LabellingError,
     ManifestError,
     GoldenSetError,
     ExtractionError,
@@ -245,6 +257,61 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also print every judged answer unit by unit, with the judge's own quote. "
         "This is the view tracer slice 5's hand labelling is done against",
+    )
+
+    label_parser = subparsers.add_parser(
+        "label",
+        help="hand-label the frozen sample's claims, one unit at a time. BLIND: it shows "
+        "you nothing the judge produced (ADR-0011). Resumable -- run it again to continue",
+    )
+    label_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    label_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
+    label_parser.add_argument(
+        "--sample",
+        type=Path,
+        default=DEFAULT_SAMPLE,
+        help=f"the frozen answer texts to label against (default: {DEFAULT_SAMPLE}). "
+        "Committed on purpose: a sample regenerated from a later model is not the sample "
+        "that was labelled",
+    )
+    label_parser.add_argument(
+        "--labels",
+        type=Path,
+        default=DEFAULT_LABELS,
+        help=f"where your labels are written, after every single unit (default: {DEFAULT_LABELS})",
+    )
+
+    agreement_parser = subparsers.add_parser(
+        "agreement",
+        help="compute judge-human agreement over the hand-labelled units, with a "
+        "cluster-aware interval, and apply D11's publishability floor",
+    )
+    agreement_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    agreement_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
+    agreement_parser.add_argument(
+        "verdicts",
+        type=Path,
+        help="a judge verdict file, as written by `judge --out`",
+    )
+    agreement_parser.add_argument(
+        "--against",
+        type=Path,
+        default=None,
+        help="a SECOND judge verdict file. Given one, this reports judge SELF-consistency "
+        "instead -- the ceiling on any agreement figure, since two judge runs that differ "
+        "cannot both match a human",
+    )
+    agreement_parser.add_argument(
+        "--sample", type=Path, default=DEFAULT_SAMPLE, help=f"default: {DEFAULT_SAMPLE}"
+    )
+    agreement_parser.add_argument(
+        "--labels", type=Path, default=DEFAULT_LABELS, help=f"default: {DEFAULT_LABELS}"
+    )
+    agreement_parser.add_argument(
+        "--partial",
+        action="store_true",
+        help="compute over the units labelled SO FAR instead of refusing. A progress "
+        "check, never a result: the output says so and no number from it may be quoted",
     )
 
     eval_parser.add_argument(
@@ -691,6 +758,115 @@ def _judge_control(args: argparse.Namespace) -> int:
     return 0
 
 
+def _label(args: argparse.Namespace) -> int:
+    """The interactive labelling shell. Holds no logic -- `labelling` holds it all.
+
+    The seam is deliberate: everything that decides what to show, in what order,
+    and what to write is a pure function exercised by tests, and this function
+    only connects it to a terminal. A protocol whose correctness depended on an
+    interactive loop nobody can test would be the weakest link in the slice.
+    """
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    run = load_run(args.sample)
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    questions = questions_to_label(golden=golden, run=run)
+
+    with db.connect() as conn:
+        # The same drift check the judge runs. Labels written against a context the
+        # corpus no longer produces would be labels of nothing, and the failure
+        # would surface as disagreement.
+        retrieval = evaluate(
+            conn,
+            manifest=manifest,
+            golden=golden,
+            k=run.k or DEFAULT_K,
+            cell=PUBLISHED,
+            morphology=morphology,
+        )
+        judging.assert_run_matches_corpus(run, retrieval=retrieval.runs, cell=PUBLISHED)
+        bodies = dict(db.chunk_bodies(conn))
+        citations = {
+            hit.address: hit.citation
+            for question_run in retrieval.runs
+            for hit in question_run.hits
+        }
+
+    # Exit 0 whether the session finished or was stopped part-way: stopping is the
+    # protocol working, not a failure. `agreement` is the command that refuses an
+    # incomplete label set, and it is the right place for that check because it is
+    # the one producing a number.
+    labelling.run_session(
+        questions=questions,
+        labels_path=args.labels,
+        sample_path=args.sample,
+        sample_commit=run.commit,
+        bodies=bodies,
+        citations=citations,
+        prompt=input,
+        emit=lambda line: print(line, flush=True),
+    )
+    return 0
+
+
+def _agreement(args: argparse.Namespace) -> int:
+    """Judge-human agreement, or judge self-consistency with `--against`."""
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    run = load_run(args.sample)
+    questions = questions_to_label(golden=golden, run=run)
+    verdicts = json.loads(args.verdicts.read_text(encoding="utf-8"))
+
+    if args.against is not None:
+        other = json.loads(args.against.read_text(encoding="utf-8"))
+        # Self-consistency needs no human labels, so it is computed over every
+        # informative unit rather than over what happens to be labelled.
+        reference = labelling.every_informative_label(questions)
+        first = judge_unit_labels(verdicts, restrict_to=reference)
+        second = judge_unit_labels(other, restrict_to=reference)
+        print(
+            format_agreement(
+                unit_agreement(first, second),
+                kind="judge self-consistency",
+                first=str(args.verdicts),
+                second=str(args.against),
+                forced=labelling.forced_units(questions),
+                partial=False,
+            )
+        )
+        return 0
+
+    labels = load_labels(args.labels)
+    if not labels:
+        raise LabellingError(
+            f"no hand labels at {args.labels}. Judge-human agreement is a comparison "
+            "against a human, and there is no human in it yet -- run `fi-rag-eval label`."
+        )
+    outstanding = labelling.pending(questions, labels)
+    if outstanding and not args.partial:
+        raise LabellingError(
+            f"{len(outstanding)} of {len(labels) + len(outstanding)} units are still "
+            f"unlabelled, e.g. {outstanding[0][0].question_id} {outstanding[0][1]} "
+            f"{outstanding[0][2]}. Agreement over the labelled subset would be a reduced N "
+            "arrived at by accident -- and it would be the labelled subset, which is not a "
+            "random one. Finish the labelling, or pass --partial for a progress check that "
+            "prints nothing quotable."
+        )
+    human = human_unit_labels(labels)
+    judged = judge_unit_labels(verdicts, restrict_to=labels)
+    print(
+        format_agreement(
+            unit_agreement(human, judged),
+            kind="judge-human agreement",
+            first=str(args.labels),
+            second=str(args.verdicts),
+            forced=labelling.forced_units(questions),
+            partial=bool(outstanding),
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     # The gateway's credentials live in `.env`, which docker compose already reads
     # for the services. Reading it here too means "clone it and run it" holds for
@@ -705,7 +881,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # the clean-clone build gate exists to catch.
     load_dotenv(find_dotenv(usecwd=True))
     args = _parser().parse_args(argv)
-    handlers = {"ingest": _ingest, "eval": _eval, "answer": _answer, "judge": _judge}
+    handlers = {
+        "ingest": _ingest,
+        "eval": _eval,
+        "answer": _answer,
+        "judge": _judge,
+        "label": _label,
+        "agreement": _agreement,
+    }
     try:
         return handlers[args.command](args)
     except HANDLED as exc:

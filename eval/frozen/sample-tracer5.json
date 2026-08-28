@@ -1,0 +1,1790 @@
+{
+  "_what_this_is": "THE FROZEN SAMPLE. The 64 answer texts that tracer slice 5's 199 hand labels are written against, committed rather than regenerated. Do not edit, do not re-generate. A sample regenerated from a later model is not the sample that was labelled, and the labels would silently become labels of nothing.",
+  "_why_it_is_committed": "The answers were produced into eval/runs/, which is gitignored, from a tree stamped 4b75dfd-dirty. Re-answering from a clean commit was considered and rejected: the answerer is non-deterministic (temperature=0 becomes 1e-8 at Groq), so a re-answered run would contain DIFFERENT answers and would move refusal recall 0.857 and precision 0.632 -- re-publishing two measured numbers to improve a provenance string. Committing the artifact makes it reproducible by INCLUSION instead. See ADR-0011.",
+  "answered_at_commit": "4b75dfd-dirty",
+  "frozen_at_commit": "f7dff8d",
+  "provenance_is_a_tree_not_a_commit": true,
+  "cell": "lemma-reasm/0",
+  "k": 5,
+  "model": "qwen/qwen3.6-27b",
+  "reasoning": true,
+  "tokens": 478438,
+  "cost_usd": 0.7552619999999999,
+  "answers": [
+    {
+      "question_id": "biojatteen-kerays-jarjestaminen",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miten biojätteen keräys tulee järjestää?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#6",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#25"
+      ],
+      "refused": false,
+      "text": "Biojätteen keräys järjestetään kiinteistön ominaisuuksien mukaan seuraavasti:\n- Biojäte on lajiteltava erikseen, jos kiinteistö kuuluu 15 §:n tai 16 §:n mukaiseen kiinteistöittäiseen erilliskeräykseen [lounais-suomi@2024-08-01#13].\n- Erilliskeräysvelvoite koskee kiinteistöjä, joilla on 1 tai enemmän huonistoa yli 10 000 asukkaan taajamassa [lounais-suomi@2024-08-01#15].\n- Erilliskeräysvelvoite koskee kiinteistöjä, joilla on 5 tai enemmän huonistoa taajamassa [lounais-suomi@2024-08-01#15].\n- Velvoite ei koske kiinteistöjä, joiden biojätteet kompostoidaan omatoimisesti 17 §:n mukaisesti [lounais-suomi@2024-08-01#15].\n- Jos biojätettä ei kompostoida 17 §:n mukaisesti eikä sitä kerätä vapaaehtoisessa kiinteistöittäisessä kuljetuksessa, se laitetaan sekajätteen astiaan [lounais-suomi@2024-08-01#13].\n- Muut kiinteistöt voivat liittyä vapaaehtoisesti kunnan järjestämään erilliskeräykseen sopimalla LSJH:n kanssa [lounais-suomi@2024-08-01#15].\n- Kunta ei järjestä erilliskeräystä tieyhteyttä vailla olevissa saarissa, Houtskarissa eikä Nauvon ja Korppoon taajamien ulkopuolella; näillä alueilla voi sopia yksityisen kuljetusyrityksen kanssa [lounais-suomi@2024-08-01#15].\n- Biojäte on pakattava biohajoavaan pussiin (esim. paperipussi) ennen jäteastiaan sijoittamista [lounais-suomi@2024-08-01#25].\n- Biojäteastiaan ei saa laittaa nestemäistä biojätettä [lounais-suomi@2024-08-01#25].\n- 160–240 l biojäteastia voidaan suojata suojasäkillä, jos se on välttämätöntä haittojen estämiseksi [lounais-suomi@2024-08-01#25].\n- Kiinteistöillä, joilla on erilliskeräysvelvoite, tulee olla käytössään biojätteelle tarkoitettu jäteastia [lounais-suomi@2024-08-01#6].\nHuomio: Tarkka keräysvelvoite riippuu kiinteistön sijainnista, huoneistomäärästä ja kompostointitavasta, joita tietoja kysymyksessä ei ole annettu.",
+      "citations": [
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#6"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4866,
+        "completion_tokens": 6018,
+        "reasoning_tokens": 5143,
+        "total_tokens": 10884,
+        "cost_usd": 0.020973600000000002
+      }
+    },
+    {
+      "question_id": "kerata-vai-kompostoida",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kerätä vai kompostoida?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#40",
+        "lounais-suomi@2024-08-01#1",
+        "lounais-suomi@2024-08-01#2.ekopisteella"
+      ],
+      "refused": false,
+      "text": "Kysymys koskee yleisesti jätteitä, mutta määräyksissä keräys- ja kompostointivalinta säädetään nimenomaisesti biojätteille [lounais-suomi@2024-08-01#13]. Valinta riippuu seuraavista ehdoista: Kiinteistön kuuluminen 15 tai 16 §:n mukaiseen biojätteiden kiinteistöittäiseen erilliskeräykseen (tieto puuttuu annetuista otteista) [lounais-suomi@2024-08-01#13]. Biojätteiden omatoiminen kompostointi kiinteistöllä 17 §:n mukaisesti [lounais-suomi@2024-08-01#13]. Jos kiinteistö kuuluu erilliskeräyksen piiriin, biojätteet on kerättävä erikseen [lounais-suomi@2024-08-01#13]. Jos kiinteistö kompostoi biojätteet omatoimisesti 17 §:n mukaisesti, ne kompostoidaan [lounais-suomi@2024-08-01#13]. Jos kumpaakaan ei toteuteta eikä biojätettä kerätä omaan astiaan vapaaehtoisessa kiinteistöittäisessä kuljetuksessa, se on laitettava sekajätteeseen [lounais-suomi@2024-08-01#13]. Muille jätelajeille kompostointivaihtoehtoa ei ole, vaan ne on toimitettava määrätyihin keräyspisteisiin tai jäteastioihin [lounais-suomi@2024-08-01#13].",
+      "citations": [
+        "lounais-suomi@2024-08-01#13"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4608,
+        "completion_tokens": 3916,
+        "reasoning_tokens": 3454,
+        "total_tokens": 8524,
+        "cost_usd": 0.0145128
+      }
+    },
+    {
+      "question_id": "miksi-biojatteet-pakataan",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miksi biojätteet pitää pakata?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#16",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#13"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei mainita syytä biojätteiden pakkaamiselle, joten en voi vastata kysymykseen [lounais-suomi@2024-08-01#25].",
+      "citations": [
+        "lounais-suomi@2024-08-01#25"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4719,
+        "completion_tokens": 4592,
+        "reasoning_tokens": 4482,
+        "total_tokens": 9311,
+        "cost_usd": 0.0166074
+      }
+    },
+    {
+      "question_id": "kompostoinnin-aloittaminen",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miten aloittaa kompostointi?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#40",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#1"
+      ],
+      "refused": false,
+      "text": "Kompostoinnin aloittaminen vaatii ilmoituksen jätehuoltoviranomaiselle, ja vaatimukset riippuvat kompostoitavasta jätelajista:\n- Biojäte: Ilmoitus on tehtävä vähintään kahden kuukauden sisällä kompostoinnin aloittamisesta [lounais-suomi@2024-08-01#18]. Ilmoituksessa on oltava kiinteistön haltijan tiedot, rakennustyyppi ja huoneistomäärä, vastuuhenkilön tiedot, laitteiston tilavuus ja käyttökuukaudet sekä kuvaus ilmastoinnista ja tiiviydestä [lounais-suomi@2024-08-01#18]. Kompostorin on oltava suljettu, ilmastoitunut, eläimiltä suojattu ja riittävän kokoinen [lounais-suomi@2024-08-01#17]. Yhteiskäytössä saa olla enintään viisi asuntoa enintään yhden kilometrin säteellä [lounais-suomi@2024-08-01#17].\n- Lietteet (saostus-/umpisäiliöt, pienpuhdistamot, harmaat jätevedet): Omatoiminen käsittely on kiellettyä lukuun ottamatta tiettyjä tilanteita [lounais-suomi@2024-08-01#40]. Ilmoitus on tehtävä kirjallisesti vähintään kaksi viikkoa etukäteen [lounais-suomi@2024-08-01#40]. Ilmoituksessa on oltava vastuuhenkilön tiedot, lietteiden määrä ja laatu, kiinteistötiedot, käsittelyjärjestelmän ja kompostorin merkki/malli sekä kompostin hyödyntämistapa [lounais-suomi@2024-08-01#40]. Kompostointi on sallittua vain, jos liete on valmistajan ohjeen mukaan suunniteltu omatoimiseen käsittelyyn tai harmaiden jätevesien liete erotellaan ja kuivataan tarkoitukseen suunnitellulla laitteistolla [lounais-suomi@2024-08-01#40].\n- Kuivakäymäläjätteet, lemmikkieläinten ulosteet ja lietteet: Kompostointi vaatii suljetun, hyvin ilmastoidun, eläimiltä suojatun kompostorin, josta valumavesi ei pääse maahan [lounais-suomi@2024-08-01#17]. Kompostointiaika on vähintään yksi vuosi [lounais-suomi@2024-08-01#17].\n- Puutarhajätteet: Saa kompostoida myös avonaisessa kompostorissa, kehikossa tai aumassa [lounais-suomi@2024-08-01#17].\nKaikissa tapauksissa kompostorin on sijoitettava ja hoidettava niin, ettei aiheudu roskaantumista tai haittaa terveydelle tai ympäristölle [lounais-suomi@2024-08-01#17].",
+      "citations": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4780,
+        "completion_tokens": 5160,
+        "reasoning_tokens": 4265,
+        "total_tokens": 9940,
+        "cost_usd": 0.018348
+      }
+    },
+    {
+      "question_id": "mita-kompostoriin-laitetaan",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä kompostoriin laitetaan?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "refused": false,
+      "text": "Kompostoriin saa laittaa ainoastaan kompostoituvia jätteitä, jotka eivät haittaa valmiin kompostituotteen käyttöä kiinteistöllä [lounais-suomi@2024-08-01#17]. Sallitut jätteet ja niiden ehdot:\n- Biojäte: Saa kompostoida vain sitä varten suunnitellussa suljetussa ja ilmastoidussa kompostorissa, johon eläimet eivät pääse [lounais-suomi@2024-08-01#17].\n- Kuivakäymäläjäte, lemmikkieläinten ulosteet, saostussäiliö- ja pienpuhdistamolietteet sekä fosforinpoistokaivojen massat: Saa kompostoida vain niitä varten suunnitellussa suljetussa ja hyvin ilmastoidussa kompostorissa, johon eläimet eivät pääse ja jonka valumavesien pääsy maahan on estetty [lounais-suomi@2024-08-01#17]. Ulosteperäisten jätteiden kompostointiajan tulee olla vähintään yksi vuosi [lounais-suomi@2024-08-01#17].\n- Puutarhajäte: Saa kompostoida myös avonaisessa kompostorissa, kehikossa tai aumassa [lounais-suomi@2024-08-01#17].\n- Haitallisten vieraslajien kasvijäte: Saa kompostoida vain, jos se ei sisällä lisääntymiskykyisiä kasvinosia, kuten siemeniä tai juuria [lounais-suomi@2024-08-01#17].\n- Jätevesien käsittelyssä syntyvät lietteet: Saa kompostoida vain, jos niiden omatoiminen kompostointi on sallittu määräysten 40 §:n mukaisesti [lounais-suomi@2024-08-01#17].\n- Käymisprosessoidut biojätteet (esim. bokashi): Täytyy jälkikompostoida kiinteistöllä ennen hyödyntämistä [lounais-suomi@2024-08-01#17].\n- Maatumatonta tai keskeneräisesti maatunutta biojätettä ei saa poistaa kompostorista [lounais-suomi@2024-08-01#17].",
+      "citations": [
+        "lounais-suomi@2024-08-01#17"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4786,
+        "completion_tokens": 4720,
+        "reasoning_tokens": 4071,
+        "total_tokens": 9506,
+        "cost_usd": 0.017031599999999997
+      }
+    },
+    {
+      "question_id": "kompostorin-valinta",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miten kompostori valitaan?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "refused": false,
+      "text": "Kompostorin valinnassa on noudatettava jätekohtaisia vaatimuksia:\n- Biojätteille: kompostorin tulee olla suljettu ja ilmastoidu, eläimiltä suojattu, sen tilavuuden riittää käyttäjämäärälle ja kylmien kausien hidastumiselle, sekä yhteiskäyttö on sallittu enintään viidelle asuinhuoneistolle tai vapaa-ajan asunnolle [lounais-suomi@2024-08-01#17].\n- Kuivakäymäläjätteille, lemmikkieläinten ulosteille ja lietteille: kompostorin tulee olla suljettu, hyvin ilmastoidu, eläimiltä suojattu ja sen valumavesien pääsy maahan on estetty [lounais-suomi@2024-08-01#17].\n- Puutarhajätteille: kompostori saa olla avoin, kehikko tai auma [lounais-suomi@2024-08-01#17].\n- Yleisesti: kompostorin sijoitus, rakennus, käyttö ja kunnossapito ei saa aiheuttaa roskaantumista, terveys- tai ympäristöhaittaa [lounais-suomi@2024-08-01#17].\n- Lietekompostoinnissa: kompostointi on sallittu vain, jos liete on suunniteltu omatoimiseen käsittelyyn tai eroteltu ja kuivattu tarkoitukseen suunnitellulla laitteistolla [lounais-suomi@2024-08-01#40].",
+      "citations": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2905,
+        "completion_tokens": 4489,
+        "reasoning_tokens": 4020,
+        "total_tokens": 7394,
+        "cost_usd": 0.01521
+      }
+    },
+    {
+      "question_id": "biojateastian-tyhjennys-kesalla",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka usein biojäteastia tyhjennetään kesällä?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#27",
+        "lounais-suomi@2024-08-01#2.tuulettuvalla",
+        "lounais-suomi@2024-08-01#13"
+      ],
+      "refused": false,
+      "text": "Biojäteastian tyhjennysväli kesäaikana (viikot 18–40) on 2 viikkoa [lounais-suomi@2024-08-01#26]. Jos biojäte kerätään tuulettuvalla biojäteastialla, syväkeräysastialla tai jäähdytettyyn jätehuoneeseen sijoitettuihin jäteastioihin, tyhjennysväli on 4 viikkoa [lounais-suomi@2024-08-01#26]. Tarkka väli riippuu käytetystä jäteastian tyypistä tai sijoituspaikasta, jota otteissa ei ole erikseen määritelty.",
+      "citations": [
+        "lounais-suomi@2024-08-01#26"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3255,
+        "completion_tokens": 3347,
+        "reasoning_tokens": 3119,
+        "total_tokens": 6602,
+        "cost_usd": 0.011994000000000001
+      }
+    },
+    {
+      "question_id": "biojateastian-pesu",
+      "population": "answerable",
+      "kind": null,
+      "question": "Montako kertaa vuodessa biojäteastia pestään?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#27",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#41",
+        "lounais-suomi@2024-08-01#16"
+      ],
+      "refused": false,
+      "text": "Biojäteastia on puhdistettava vähintään kaksi kertaa vuodessa [lounais-suomi@2024-08-01#27].",
+      "citations": [
+        "lounais-suomi@2024-08-01#27"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3862,
+        "completion_tokens": 2189,
+        "reasoning_tokens": 2097,
+        "total_tokens": 6051,
+        "cost_usd": 0.0088842
+      }
+    },
+    {
+      "question_id": "biojate-mita-tarkoittaa",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä biojäte tarkoittaa?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#15"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei määritellä, mitä biojätteellä tarkoitetaan. Otteissa käsitellään vain biojätteen lajittelu-, keräys- ja kompostointivelvoitteita.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4512,
+        "completion_tokens": 1561,
+        "reasoning_tokens": 1479,
+        "total_tokens": 6073,
+        "cost_usd": 0.0073901999999999995
+      }
+    },
+    {
+      "question_id": "mika-on-taajama",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mikä on taajama?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#16",
+        "lounais-suomi@2024-08-01#2.taajamalla",
+        "lounais-suomi@2024-08-01#20",
+        "lounais-suomi@2024-08-01#26"
+      ],
+      "refused": false,
+      "text": "Taajama on rakennusryhmä, jossa on vähintään 200 asukasta ja jossa rakennusten välinen etäisyys on yleensä enintään 200 metriä [lounais-suomi@2024-08-01#2.taajamalla].",
+      "citations": [
+        "lounais-suomi@2024-08-01#2.taajamalla"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3108,
+        "completion_tokens": 1809,
+        "reasoning_tokens": 1683,
+        "total_tokens": 4917,
+        "cost_usd": 0.0072918
+      }
+    },
+    {
+      "question_id": "taloyhtio-kolme-asuntoa-biojate",
+      "population": "answerable",
+      "kind": null,
+      "question": "Meillä on taloyhtiössä kolme asuntoa keskustassa. Tarvitaanko biojäteastia?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#27",
+        "lounais-suomi@2024-08-01#2.tuulettuvalla",
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, onko biojäteastian hankkiminen velvoitettua kolmen asunnon taloyhtiölle keskustassa. Otteet käsittelevät vain jäteastioiden tyhjennysvältejä, täyttöohjeita, kunnossapitoa, määritelmiä ja yhteisiä jäteastioita, mutta eivät säätele jäteastioiden pakollista hankintaa kiinteistön tyypin tai koon perusteella.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3074,
+        "completion_tokens": 2515,
+        "reasoning_tokens": 2365,
+        "total_tokens": 5589,
+        "cost_usd": 0.009389400000000001
+      }
+    },
+    {
+      "question_id": "sekajateastia-pakollinen",
+      "population": "answerable",
+      "kind": null,
+      "question": "Pitääkö joka kiinteistöllä olla sekajäteastia?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#10",
+        "lounais-suomi@2024-08-01#4",
+        "lounais-suomi@2024-08-01#27",
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#6"
+      ],
+      "refused": false,
+      "text": "Sekajäteastian hankkimisvelvoite on ehdollinen. Se koskee vain kiinteistöjä, jotka kuuluvat kiinteistöittäisen jätteenkuljetuksen piiriin [lounais-suomi@2024-08-01#6]. Sekajätteen aluekeräysalueilla sijaitsevilla kiinteistöillä ei järjestetä kiinteistöittäistä kuljetusta [lounais-suomi@2024-08-01#10]. Näillä alueilla sijaitsevilla kiinteistöillä ei tarvitse olla omaa sekajäteastiaa, vaan sekajätteet on luovutettava aluekeräyspisteisiin [lounais-suomi@2024-08-01#10]. Kiinteistön kuuluminen jätteenkuljetusjärjestelmään riippuu sen sijainnista aluekeräyskartassa, jota otteissa ei ole [lounais-suomi@2024-08-01#4].",
+      "citations": [
+        "lounais-suomi@2024-08-01#6",
+        "lounais-suomi@2024-08-01#10",
+        "lounais-suomi@2024-08-01#4"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2808,
+        "completion_tokens": 3003,
+        "reasoning_tokens": 2672,
+        "total_tokens": 5811,
+        "cost_usd": 0.0106938
+      }
+    },
+    {
+      "question_id": "kuka-hankkii-jateastiat",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuka hankkii jäteastiat?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#6",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "refused": false,
+      "text": "Jäteastioiden hankkija riippuu jätteenkuljetuksen järjestäjästä ja astioiden tyypistä:\n- Jos jätteenkuljetus on kunnan järjestämä, LSJH toimittaa jäteastiat, jos kyseessä ovat käsin siirrettävät 140–660 litran jäteastiat [lounais-suomi@2024-08-01#6].\n- Jos jätteenkuljetus on kunnan järjestämä, kiinteistön haltija vastaa hankinnasta, jos kyseessä ovat muut kuin käsin siirrettävät pinta-astiat [lounais-suomi@2024-08-01#6].\n- Jos jätteenkuljetus on kiinteistönhaltijan järjestämä, kiinteistön haltija vastaa kiinteistöllä tarvittavien jäteastioiden hankinnasta [lounais-suomi@2024-08-01#6].",
+      "citations": [
+        "lounais-suomi@2024-08-01#6"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4631,
+        "completion_tokens": 3064,
+        "reasoning_tokens": 2777,
+        "total_tokens": 7695,
+        "cost_usd": 0.011970600000000001
+      }
+    },
+    {
+      "question_id": "pelkka-jatesakki",
+      "population": "answerable",
+      "kind": null,
+      "question": "Riittääkö pelkkä jätesäkki?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#1",
+        "lounais-suomi@2024-08-01#13"
+      ],
+      "refused": false,
+      "text": "Ei riitä. Kiinteistöittäisessä jätteenkuljetuksessa pelkkää jätesäkkiä ei saa käyttää [lounais-suomi@2024-08-01#23].",
+      "citations": [
+        "lounais-suomi@2024-08-01#23"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4874,
+        "completion_tokens": 2041,
+        "reasoning_tokens": 1938,
+        "total_tokens": 6915,
+        "cost_usd": 0.0090474
+      }
+    },
+    {
+      "question_id": "jateastian-paino",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka painava jäteastia saa olla?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#30"
+      ],
+      "refused": false,
+      "text": "Määräyksissä ei ole erillistä painorajaa jäteastian omalle painolle. Jätteen painoraja on ehdollinen:\n- Ehto: Jäteastian on oltava käsin siirrettäväksi tarkoitettu.\n- Raja: Jätteen paino saa olla työturvallisuussyistä enintään 60 kg [lounais-suomi@2024-08-01#25].",
+      "citations": [
+        "lounais-suomi@2024-08-01#25"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4417,
+        "completion_tokens": 2149,
+        "reasoning_tokens": 1993,
+        "total_tokens": 6566,
+        "cost_usd": 0.0090972
+      }
+    },
+    {
+      "question_id": "risujen-poltto-pihalla",
+      "population": "answerable",
+      "kind": null,
+      "question": "Saako pihalla polttaa risuja?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#20",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#2.puutarha",
+        "lounais-suomi@2024-08-01#22",
+        "lounais-suomi@2024-08-01#17"
+      ],
+      "refused": false,
+      "text": "Risujen polttaminen on yleisesti kiellettyä [lounais-suomi@2024-08-01#20]. Sallittua on kuitenkin seuraavissa tapauksissa: 1. Taajaman ulkopuolella saa polttaa avopolttona vähäisiä määriä kuivia risuja [lounais-suomi@2024-08-01#20]. 2. Kiinteistön tulipesissä saa polttaa risuja [lounais-suomi@2024-08-01#20]. 3. Poltosta ei saa aiheutua vaaraa tai haittaa terveydelle tai ympäristölle [lounais-suomi@2024-08-01#20]. Koska kysymyksessä ei kerrota pihapiirin sijaintia (taajama tai taajaman ulkopuoli) tai käytetäänkö tulipesää, tarkka sallittavuus riippuu näistä puuttuvista tiedoista.",
+      "citations": [
+        "lounais-suomi@2024-08-01#20"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2972,
+        "completion_tokens": 3937,
+        "reasoning_tokens": 3640,
+        "total_tokens": 6909,
+        "cost_usd": 0.0135942
+      }
+    },
+    {
+      "question_id": "naapurin-kanssa-yhteinen-astia",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voimmeko käyttää naapurin kanssa samaa jäteastiaa?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#29"
+      ],
+      "refused": false,
+      "text": "Kyllä, lähekkäin sijaitsevien kiinteistöjen haltijat voivat sopia yhteisen jäteastian (kimppa) käyttämisestä [lounais-suomi@2024-08-01#7]. Tähän liittyy seuraavat ehdot:\n- Asuinhuoneistojen tai vapaa-ajan asuntojen etäisyys keräyspaikasta saa olla enintään 1 km, ellei ne sijaitse saman yksityistien tai -tiestön varrella [lounais-suomi@2024-08-01#7]. Saaristossa etäisyys lasketaan satamapaikasta [lounais-suomi@2024-08-01#7].\n- Jäteastian on oltava riittävän suuri käyttäjien tarpeisiin ja määräysten tyhjennysvelvoitteisiin nähden [lounais-suomi@2024-08-01#7].\n- Osakkaiden on huolehdittava jäteastioiden ja keräyspaikan siisteydestä [lounais-suomi@2024-08-01#7].\n- Kimpalla on oltava vastuuhenkilö, joka hoitaa ilmoitukset [lounais-suomi@2024-08-01#7].\n- Yhteisen jäteastian käytön aloittamisesta on ilmoitettava kirjallisesti vähintään kaksi viikkoa etukäteen [lounais-suomi@2024-08-01#7]. Ilmoituksessa on oltava yhteyshenkilön tiedot, kerättävät jätelajit, jäteastioiden sijainti/koko/lukumäärä, tyhjennysvälit, kuljetusyritys (jos ei kunnan kuljetus), kiinteistöjen osoitteet/tunnukset/omistajat/haltijat sekä kiinteistöjen käyttötarkoitus [lounais-suomi@2024-08-01#7].\n- Vastuuhenkilön vaihtuessa siitä on ilmoitettava ennen tehtävästä eroamista [lounais-suomi@2024-08-01#7].\nIlmoitus tehdään kunnan järjestämässä kuljetuksessa LSJH:lle ja kiinteistön haltijan järjestämässä kuljetuksessa jätehuoltoviranomaiselle [lounais-suomi@2024-08-01#7]. Tarkka ilmoitusviranomainen ja hyväksyntä riippuvat kuljetuksen järjestäjästä sekä kiinteistöjen sijainnista ja käyttötarkoituksesta, joita tietoja et ole antanut.",
+      "citations": [
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4576,
+        "completion_tokens": 4694,
+        "reasoning_tokens": 4007,
+        "total_tokens": 9270,
+        "cost_usd": 0.0168276
+      }
+    },
+    {
+      "question_id": "yhteisen-astian-etaisyys",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka kauas yhteinen jäteastia saa olla asunnosta?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#26"
+      ],
+      "refused": false,
+      "text": "Yhteisen jäteastian (kimpan) keräyspaikan etäisyys asuinhuoneistosta tai vapaa-ajan asunnosta saa olla yleensä korkeintaan yksi kilometri [lounais-suomi@2024-08-01#7]. Etäisyysrajoitusta ei sovelleta, jos asunto ja keräyspaikka sijaitsevat saman yksityistien tai -tiestön varrella [lounais-suomi@2024-08-01#7]. Saariston aluekeräysalueella etäisyys lasketaan siitä satamapaikasta, josta kiinteistölle kuljetaan, mutta etäisyysrajoituksia on noudatettava [lounais-suomi@2024-08-01#7].",
+      "citations": [
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4750,
+        "completion_tokens": 2962,
+        "reasoning_tokens": 2724,
+        "total_tokens": 7712,
+        "cost_usd": 0.011736
+      }
+    },
+    {
+      "question_id": "kuljetuksen-keskeytys-mokilta",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voiko jätteenkuljetuksen keskeyttää, kun mökki on talvella tyhjillään?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#9",
+        "lounais-suomi@2024-08-01#37",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#11",
+        "lounais-suomi@2024-08-01#28"
+      ],
+      "refused": false,
+      "text": "Kyllä, kiinteistöittäinen jätteenkuljetus voidaan keskeyttää määräajaksi, jos täyttyvät seuraavat ehdot:\n- Kiinteistön on oltava asumattomana ja käyttämättömänä [lounais-suomi@2024-08-01#9].\n- Jäteastioiden on oltava tyhjiä keskeytyksen alkaessa [lounais-suomi@2024-08-01#9].\n- Keskeytyksestä on ilmoitettava vähintään kaksi viikkoa ennen sen alkamista (kunnan järjestämässä kuljetuksessa LSJH:lle, kiinteistön haltijan järjestämässä kuljetuksessa kuljettajalle) [lounais-suomi@2024-08-01#9].\n- Jos jäteastiat ovat useamman kiinteistön käytössä, kaikkien niiden on oltava käyttämättömiä [lounais-suomi@2024-08-01#9].\n- Koska kyseessä on vapaa-ajanasunto, jos keskeytys kestää yli yhden vuoden, siitä on ilmoitettava lisäksi kirjallisesti jätehuoltoviranomaiselle [lounais-suomi@2024-08-01#9]. Tarkka keskeytysaika ei ole kysymyksessä annettu, joten yli vuoden kesto ja siihen liittyvä ilmoitusvelvoitus on varmistettava erikseen.",
+      "citations": [
+        "lounais-suomi@2024-08-01#9"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3512,
+        "completion_tokens": 5073,
+        "reasoning_tokens": 4668,
+        "total_tokens": 8585,
+        "cost_usd": 0.0173262
+      }
+    },
+    {
+      "question_id": "poikkeus-maarayksista",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voiko määräyksistä hakea poikkeusta?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#49",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#1",
+        "lounais-suomi@2024-08-01#15"
+      ],
+      "refused": false,
+      "text": "Kyllä, määräyksissä on erikseen säädetty poikkeamisesta (48 §) [lounais-suomi@2024-08-01#1]. Annetuissa otteissa ei ole 48 §:n sisältöä, joten poikkeushakemuksen tarkkoja ehtoja tai menettelyä ei voida tässä tarkentaa.",
+      "citations": [
+        "lounais-suomi@2024-08-01#1"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4027,
+        "completion_tokens": 2635,
+        "reasoning_tokens": 2494,
+        "total_tokens": 6662,
+        "cost_usd": 0.0103212
+      }
+    },
+    {
+      "question_id": "kompostointi-ilmoitus-milloin",
+      "population": "answerable",
+      "kind": null,
+      "question": "Milloin kompostoinnista pitää ilmoittaa?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#40",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#1"
+      ],
+      "refused": false,
+      "text": "Ilmoitusvelvollisuuden aikataulu riippuu kompostoitavan jätteen lajista ja tapahtumasta:\n- Biojätteen kompostoinnin aloittamisesta on ilmoitettava vähintään kahden kuukauden sisällä aloittamisesta [lounais-suomi@2024-08-01#18].\n- Lietteiden omatoimisen kompostoinnin aloittamisesta on ilmoitettava kaksi viikkoa ennen aloittamista [lounais-suomi@2024-08-01#40].\n- Molempien kompostoinnin lopettamisesta on ilmoitettava kahden kuukauden kuluessa lopettamisesta [lounais-suomi@2024-08-01#18], [lounais-suomi@2024-08-01#40].\n- Kompostoinnin jatkumisesta ja annettuja tietoja koskevista olennaisista muutoksista on ilmoitettava vähintään viiden vuoden välein [lounais-suomi@2024-08-01#18], [lounais-suomi@2024-08-01#40].\n- Jos biojätteen käsittelystä vastaava henkilö vaihtuu, uudesta vastuuhenkilöstä on ilmoitettava ennen tehtävässä lopettamista [lounais-suomi@2024-08-01#18].",
+      "citations": [
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4808,
+        "completion_tokens": 3831,
+        "reasoning_tokens": 3408,
+        "total_tokens": 8639,
+        "cost_usd": 0.0143778
+      }
+    },
+    {
+      "question_id": "naapuruston-yhteiskerays",
+      "population": "answerable",
+      "kind": null,
+      "question": "Asuinalueellamme jätteet kerätään kaavan mukaan yhteiseen pisteeseen. Onko siihen pakko liittyä?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#4",
+        "lounais-suomi@2024-08-01#44",
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#17"
+      ],
+      "refused": false,
+      "text": "Asuinkiinteistöjen on velvoite liittyä kunnan jätehuoltojärjestelmään [lounais-suomi@2024-08-01#4]. Jos kyseinen yhteinen piste tarkoittaa kiinteistöjen välistä yhteistä jäteastian käyttöä (ns. kimppa), siihen liittyminen on vapaaehtoista ja perustuu haltijoiden sopimukseen [lounais-suomi@2024-08-01#7]. Tarkka velvoite riippuu siitä, onko kyseessä kunnan järjestämä aluekeräyspiste vai kiinteistöjen välinen kimppa, mistä annetuissa otteissa ei ole tietoa.",
+      "citations": [
+        "lounais-suomi@2024-08-01#4",
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3840,
+        "completion_tokens": 3696,
+        "reasoning_tokens": 3459,
+        "total_tokens": 7536,
+        "cost_usd": 0.013392000000000001
+      }
+    },
+    {
+      "question_id": "ei-jateautoa-mokille",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mökille ei tule jäteautoa. Minne jätteet pitää silloin viedä?",
+      "municipality": "Kemiönsaari",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#41"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, minne jätteet on viedä, jos kiinteistölle ei tule jäteautoa. Otteet käsittelevät jäteastioiden sijoittamista, täyttämistä, lajitteluvelvoitteita ja yleisötilaisuuksien jätehuoltoa, mutta eivät mainitse jätteiden toimituspaikkoja tai vaihtoehtoisia kuljetustapoja yleisesti.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4988,
+        "completion_tokens": 2264,
+        "reasoning_tokens": 2124,
+        "total_tokens": 7252,
+        "cost_usd": 0.0097848
+      }
+    },
+    {
+      "question_id": "astian-merkinnat",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä jäteastian kylkeen tai kanteen pitää merkitä?",
+      "municipality": "Raisio",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#24",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#41",
+        "lounais-suomi@2024-08-01#15"
+      ],
+      "refused": false,
+      "text": "Jäteastian kanteen tai etuseinään on kiinnitettävä selvästi erottuva merkintä, jossa on tiedot astiaan kerättävistä jätelajeista sekä tyhjennyksestä vastaavan yrityksen tai yhteisön yhteystiedot [lounais-suomi@2024-08-01#24]. Merkintöjen tulee olla LSJH:n ja tuottajien lajitteluohjeiden mukaiset [lounais-suomi@2024-08-01#24]. Lisäksi kiinteistön osoitetiedot on merkittävä selkeästi erottuvalla tavalla siten, että ne ovat havaittavissa ajoväylän suunnalta, jos jokin seuraavista ehdoista täyttyy [lounais-suomi@2024-08-01#24]:\n- jäteastia ei sijaitse kiinteistön välittömässä läheisyydessä, tai\n- jäteastia sijaitsee samassa keräyspaikassa muiden jäteastioiden kanssa.",
+      "citations": [
+        "lounais-suomi@2024-08-01#24"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4607,
+        "completion_tokens": 3364,
+        "reasoning_tokens": 3059,
+        "total_tokens": 7971,
+        "cost_usd": 0.0128562
+      }
+    },
+    {
+      "question_id": "jatetilan-lukitus",
+      "population": "answerable",
+      "kind": null,
+      "question": "Saako jätetilan pitää lukossa, ja miten kuljettaja pääsee sisään?",
+      "municipality": "Kaarina",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#29",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#35",
+        "lounais-suomi@2024-08-01#5"
+      ],
+      "refused": false,
+      "text": "Jätetilan voi pitää lukossa, jos kiinteistö kuuluu kiinteistöittäisen jätteenkuljetuksen piiriin [lounais-suomi@2024-08-01#29]. En tiedä, kuuluuko kyseinen kiinteistö tähän järjestelmään, joten säännöt soveltuvat vain, jos tämä ehto täyttyy. Lukituksen on täytettävä seuraavat ehdot:\n- Lukituksessa on käytettävä kaksoispesälukkoa, johon jätteenkuljettajan yleisavain sopii [lounais-suomi@2024-08-01#29].\n- Jos kaksoispesälukkoa ei voi käyttää, voidaan käyttää riippulukkoa, koodilukkoa tai avainsäiliötä, johon kuljettajan yleisavain sopii ja johon sijoitetaan tarvittava avain [lounais-suomi@2024-08-01#29].\n- Avainsäiliö on sijoitettava keräyspaikan välittömään läheisyyteen tai lukituksen viereen 120–170 cm korkeuteen [lounais-suomi@2024-08-01#29].\n- Koodilukkoa käytettäessä vaihdettu koodi on ilmoitettava välittömästi jätteenkuljettajalle [lounais-suomi@2024-08-01#29].\n- Kunnan järjestämässä kuljetuksessa käytetään LSJH:n yleisavainta tai koodilukkoa [lounais-suomi@2024-08-01#29].",
+      "citations": [
+        "lounais-suomi@2024-08-01#29"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3904,
+        "completion_tokens": 5364,
+        "reasoning_tokens": 4910,
+        "total_tokens": 9268,
+        "cost_usd": 0.018434399999999997
+      }
+    },
+    {
+      "question_id": "jateauton-etaisyys",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka lähelle astiaa jäteauton on päästävä?",
+      "municipality": "Lieto",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#25",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#2.syvakeraysastialla"
+      ],
+      "refused": false,
+      "text": "Vaatimus riippuu jäteastian tyypistä:\n- Käsin siirrettävien pyörällisten jäteastioiden kohdalla jäteauton on päästävä esteettömästi ja turvallisesti vähintään 10 metrin etäisyydelle astioista [lounais-suomi@2024-08-01#28].\n- Kiinteästi sijoitettavien jäteastioiden kohdalla jäteauton on päästävä esteettä tyhjennsetäisyydelle, ja jäteauton ja astian välin tulee olla esteetön [lounais-suomi@2024-08-01#28].\nTarkkaa tyhjennysväliä ei otteissa määritellä [lounais-suomi@2024-08-01#28].",
+      "citations": [
+        "lounais-suomi@2024-08-01#28"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4245,
+        "completion_tokens": 4613,
+        "reasoning_tokens": 4353,
+        "total_tokens": 8858,
+        "cost_usd": 0.016386
+      }
+    },
+    {
+      "question_id": "saostussailion-tyhjennys",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka usein saostussäiliö on tyhjennettävä?",
+      "municipality": "Salo",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#36",
+        "lounais-suomi@2024-08-01#2.saostus",
+        "lounais-suomi@2024-08-01#38",
+        "lounais-suomi@2024-08-01#39",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "refused": false,
+      "text": "Saostussäiliö on tyhjennettävä käyttö- ja huolto-ohjeiden mukaisesti, mutta kuitenkin vähintään kerran vuodessa [lounais-suomi@2024-08-01#36]. Poikkeukset:\n- Jos vakituisella asuinkiinteistöllä asuu vain yksi asukas tai kiinteistö on vapaa-ajan asunto, tyhjennys on tehtävä vähintään joka toinen vuosi [lounais-suomi@2024-08-01#36].\n- Jos säiliöön johdetaan vain pesuvesiä, tyhjennys on tehtävä vähintään joka kolmas vuosi [lounais-suomi@2024-08-01#36].\nLietteet on kuitenkin poistettava useammin, jos se on tarpeen ympäristö- ja terveyshaittojen ehkäisemiseksi [lounais-suomi@2024-08-01#36].",
+      "citations": [
+        "lounais-suomi@2024-08-01#36"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3470,
+        "completion_tokens": 2960,
+        "reasoning_tokens": 2670,
+        "total_tokens": 6430,
+        "cost_usd": 0.010962
+      }
+    },
+    {
+      "question_id": "vaarallisen-jatteen-tila",
+      "population": "answerable",
+      "kind": null,
+      "question": "Taloyhtiössä kerätään maaleja ja akkuja. Millaisessa tilassa niitä saa säilyttää?",
+      "municipality": "Naantali",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#35",
+        "lounais-suomi@2024-08-01#44",
+        "lounais-suomi@2024-08-01#13"
+      ],
+      "refused": false,
+      "text": "Taloyhtiössä (muu kuin omakotikiinteistö) vaaralliset jätteet on kerättävä erillisiin lukittuihin tai valvottuihin tiloihin tai lukittuihin kaappeihin tai astioihin [lounais-suomi@2024-08-01#44]. Kutakin vaarallista jätelajia varten on oltava oma merkitty jäteastia [lounais-suomi@2024-08-01#44]. Nestemäiset vaaralliset jätteet on säilytettävä ehjissä ja tiiviisti suljetuissa niille tarkoitetuissa astioissa [lounais-suomi@2024-08-01#44]. Nestemäistä vaarallista jätettä sisältävät astiat on sijoitettava nestettä läpäisemätöntä materiaalia olevalle reunakorokkeelliselle alustalle, joka on katettu [lounais-suomi@2024-08-01#44]. Keräyspisteen käyttöohjeet on asetettava kaikkien tilaa käyttävien nähtäville [lounais-suomi@2024-08-01#44].",
+      "citations": [
+        "lounais-suomi@2024-08-01#44"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4373,
+        "completion_tokens": 4525,
+        "reasoning_tokens": 4179,
+        "total_tokens": 8898,
+        "cost_usd": 0.0161988
+      }
+    },
+    {
+      "question_id": "tapahtuman-jatehuoltosuunnitelma",
+      "population": "answerable",
+      "kind": null,
+      "question": "Järjestämme ulkoilmatapahtuman. Pitääkö jätehuollosta tehdä suunnitelma viranomaiselle?",
+      "municipality": "Parainen",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#41",
+        "lounais-suomi@2024-08-01#16",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "refused": false,
+      "text": "Jätehuoltosuunnitelman laatiminen ja esittäminen kunnan ympäristönsuojeluviranomaiselle on ehdollista [lounais-suomi@2024-08-01#41]. Velvoite koskee tapahtumaa, jos kaikki seuraavat ehdot täyttyvät: 1) Kyseessä on yleisötilaisuus [lounais-suomi@2024-08-01#41]. 2) Tapahtuma järjestetään ulkona [lounais-suomi@2024-08-01#41]. 3) Tapahtuman kävijämäärä on yli 1 000 henkeä [lounais-suomi@2024-08-01#41]. Jos ehdot täyttyvät, suunnitelma on esitettävä viranomaiselle viimeistään kaksi viikkoa ennen tapahtumaa [lounais-suomi@2024-08-01#41]. Jos kävijämäärä on 1 000 tai vähemmän, suunnitelmaa ei määräyksissä vaadita [lounais-suomi@2024-08-01#41].",
+      "citations": [
+        "lounais-suomi@2024-08-01#41"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4997,
+        "completion_tokens": 2897,
+        "reasoning_tokens": 2557,
+        "total_tokens": 7894,
+        "cost_usd": 0.0116892
+      }
+    },
+    {
+      "question_id": "pir-miksi-jatehuoltoon-liityttava",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miksi jätehuoltoon pitää liittyä? Miksi myös mökkiläisen?",
+      "municipality": "Kangasala",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#43",
+        "pirkanmaa@2021-07-01#4",
+        "pirkanmaa@2021-07-01#6",
+        "pirkanmaa@2021-07-01#1"
+      ],
+      "refused": false,
+      "text": "Liittymisvelvollisuus perustuu jätelakiin [pirkanmaa@2021-07-01#4]. Vapaa-ajan asunnon (mökki) haltijan on liityttävä kunnan jätehuoltojärjestelmään jätelain velvoittamana, ja velvoite koskee syntyvän jätteen määrästä riippumatta [pirkanmaa@2021-07-01#4].",
+      "citations": [
+        "pirkanmaa@2021-07-01#4"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4281,
+        "completion_tokens": 2626,
+        "reasoning_tokens": 2468,
+        "total_tokens": 6907,
+        "cost_usd": 0.0104466
+      }
+    },
+    {
+      "question_id": "pir-kolmen-viikon-tyhjennysvali",
+      "population": "answerable",
+      "kind": null,
+      "question": "Miksi jäteastialle ei voi saada kolmen viikon tyhjennysväliä?",
+      "municipality": "Nokia",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#23",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#25",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#7"
+      ],
+      "refused": false,
+      "text": "Määräyksissä on määritelty kiinteät tyhjennysvälit (2, 4, 8 tai 52 viikkoa) jätelajin ja vuodenajan mukaan [pirkanmaa@2021-07-01#23]. Tyhjennysvälin on sovelluttava Pirkanmaan Jätehuolto Oy:n jätteenkuljetusjärjestelmään [pirkanmaa@2021-07-01#23]. Poikkeuslupaa voi hakea ainoastaan välin pidentämiseksi, ei lyhentämiseksi kolmeen viikkoon [pirkanmaa@2021-07-01#23]. Kolmen viikon väliä ei siten ole määräyksissä mahdollistettu [pirkanmaa@2021-07-01#23].",
+      "citations": [
+        "pirkanmaa@2021-07-01#23"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5861,
+        "completion_tokens": 3245,
+        "reasoning_tokens": 2995,
+        "total_tokens": 9106,
+        "cost_usd": 0.0132516
+      }
+    },
+    {
+      "question_id": "pir-jateastia-rikki",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä teen, kun jäteastia on mennyt rikki?",
+      "municipality": "Ylöjärvi",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#12",
+        "pirkanmaa@2021-07-01#41",
+        "pirkanmaa@2021-07-01#26",
+        "pirkanmaa@2021-07-01#18"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, mitä tulee tehdä, kun jäteastia on mennyt rikki. Otteissa mainitaan ainoastaan keräysvälineen haltijan yleinen velvoite huolehtia välineiden kunnossapidosta siten, etteivät ne aiheuta haittaa tai riskejä [pirkanmaa@2021-07-01#26], mutta konkreettiset ohjeet vaurioituneen astian korjaamiseen tai vaihtamiseen puuttuvat.",
+      "citations": [
+        "pirkanmaa@2021-07-01#26"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4690,
+        "completion_tokens": 2271,
+        "reasoning_tokens": 2094,
+        "total_tokens": 6961,
+        "cost_usd": 0.009627
+      }
+    },
+    {
+      "question_id": "pir-liukas-tie-jateauto",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuljettajan mukaan tie oli niin liukas, että jäteastiaa ei päässyt jäteautolla tyhjentämään. Mutta jos pihaan pääsee henkilöautolla, niin miksi ei jäteautolla?",
+      "municipality": "Ruovesi",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#36",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#30",
+        "pirkanmaa@2021-07-01#12"
+      ],
+      "refused": false,
+      "text": "Määräysten mukaan kiinteistön haltijan on huolehdittava ajoväylän kunnosta ja liukkauden torjunnasta siten, että keräysvälineet voidaan tyhjentää turvallisesti [pirkanmaa@2021-07-01#30]. Jäteauto on henkilöautoa raskaampi, joten ajoväylän tulee kantaa nimenomaan jäteauton paino [pirkanmaa@2021-07-01#30]. Jos tie tai kiinteistö ei rakenteidensa tai olosuhteidensa vuoksi mahdollista jäteauton turvallista pääsyä, jäteautoa ei ajeta alueelle [pirkanmaa@2021-07-01#30]. Tällöin haltijan on järjestettävä keräyspiste muualle tai ajoitettava tyhjennykset kelirikkokauden ulkopuolelle [pirkanmaa@2021-07-01#30]. Henkilöauton pääsy ei siis takaa jäteauton pääsyä, sillä määräykset asettavat erilliset turvallisuus- ja kantavuusvaatimukset nimenomaan jäteautolle.",
+      "citations": [
+        "pirkanmaa@2021-07-01#30"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5115,
+        "completion_tokens": 3069,
+        "reasoning_tokens": 2732,
+        "total_tokens": 8184,
+        "cost_usd": 0.012275999999999999
+      }
+    },
+    {
+      "question_id": "pir-mika-on-keraysvaline",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä keräysväline tarkoittaa?",
+      "municipality": "Tampere",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#22",
+        "pirkanmaa@2021-07-01#30",
+        "pirkanmaa@2021-07-01#28"
+      ],
+      "refused": false,
+      "text": "Keräysväline on jätteen keräämiseen tarkoitettu astia tai laite, jonka on sovelluttava kerättävälle jätelajille, vastattava kiinteistöllä syntyvää jätemäärää ja olla yhteensopiva alueen kuljetuskalustolle [pirkanmaa@2021-07-01#20]. Määräysten mukaisina keräysvälineinä saa käyttää ainoastaan käsin siirrettäviä pyörällisiä 140–770 litran kannellisia muovijäteastioita, maahan upotettuja tai pinnalle asennettuja nosturilla tyhjennettäviä erityisastioida, puristinsäiliöitä, vaihtolavasäiliöitä sekä putkikeräysjärjestelmän syöttöpisteitä [pirkanmaa@2021-07-01#20]. Keräysvälineiden tulee olla käyttökuntoisia, tiiviitä, kuormauskäsittelyn ja kuumapesun kestäviä sekä täyttää työturvallisuusvaatimukset [pirkanmaa@2021-07-01#20].",
+      "citations": [
+        "pirkanmaa@2021-07-01#20"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4997,
+        "completion_tokens": 2669,
+        "reasoning_tokens": 2337,
+        "total_tokens": 7666,
+        "cost_usd": 0.0110052
+      }
+    },
+    {
+      "question_id": "pir-mika-on-kimppa",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä kimppa tarkoittaa?",
+      "municipality": "Lempäälä",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#8",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#2",
+        "pirkanmaa@2021-07-01#2.kimpalla",
+        "pirkanmaa@2021-07-01#33"
+      ],
+      "refused": false,
+      "text": "Kimppa tarkoittaa kahden tai useamman nimetyn kiinteistön tai asuinhuoneiston sopimuksen varaista yhteistä keräysvälinettä tai niiden kokonaisuutta [pirkanmaa@2021-07-01#2.kimpalla]. Se toimii yhteisenä keräyspisteenä, jota lähekkäin sijaitsevien kiinteistöjen haltijat voivat keskinäisen sopimuksen perusteella käyttää kiinteistöittäisessä jätteenkuljetuksessa [pirkanmaa@2021-07-01#8].",
+      "citations": [
+        "pirkanmaa@2021-07-01#2.kimpalla",
+        "pirkanmaa@2021-07-01#8"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3220,
+        "completion_tokens": 2453,
+        "reasoning_tokens": 2243,
+        "total_tokens": 5673,
+        "cost_usd": 0.009291
+      }
+    },
+    {
+      "question_id": "pir-mika-on-harmaa-jatevesi",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä harmaa jätevesi tarkoittaa?",
+      "municipality": "Pälkäne",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#39",
+        "pirkanmaa@2021-07-01#37",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#2.harmaalla",
+        "pirkanmaa@2021-07-01#36"
+      ],
+      "refused": false,
+      "text": "Harmaa jätevesi tarkoittaa asumisessa erilaisista pesutoiminnoista syntynyttä jätevettä, joka ei sisällä virtsaa, ulostetta eikä muuta käymälästä tulevaa kiinteää tai nestemäistä jätettä [pirkanmaa@2021-07-01#2.harmaalla].",
+      "citations": [
+        "pirkanmaa@2021-07-01#2.harmaalla"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4822,
+        "completion_tokens": 1890,
+        "reasoning_tokens": 1756,
+        "total_tokens": 6712,
+        "cost_usd": 0.0085632
+      }
+    },
+    {
+      "question_id": "pir-yhteinen-astia-naapurin-kanssa",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voimmeko sopia naapurin kanssa yhteisestä astiasta, ja kenelle siitä ilmoitetaan?",
+      "municipality": "Vesilahti",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#8",
+        "pirkanmaa@2021-07-01#39",
+        "pirkanmaa@2021-07-01#29"
+      ],
+      "refused": false,
+      "text": "Kyllä, lähekkäin sijaitsevien kiinteistöjen haltijat voivat sopia yhteisen keräysastian käytöstä. [pirkanmaa@2021-07-01#8] Sopimuksesta on ilmoitettava ja siitä on sovittava kirjallisesti Pirkanmaan Jätehuolto Oy:n kanssa. [pirkanmaa@2021-07-01#8] Sopimus ja sitä koskevat muutokset on toimitettava tiedoksi Pirkanmaan Jätehuolto Oy:lle. [pirkanmaa@2021-07-01#8] Mahdollisista muutoksista tai käytöstä luopumisesta on ilmoitettava sekä Pirkanmaan Jätehuolto Oy:lle että muille kimpan osakkaille. [pirkanmaa@2021-07-01#8]",
+      "citations": [
+        "pirkanmaa@2021-07-01#8"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5043,
+        "completion_tokens": 3642,
+        "reasoning_tokens": 3396,
+        "total_tokens": 8685,
+        "cost_usd": 0.013951800000000002
+      }
+    },
+    {
+      "question_id": "pir-putkikerays-oma-astia",
+      "population": "answerable",
+      "kind": null,
+      "question": "Alueellamme jätteet menevät putkeen. Tarvitaanko silti oma astia pihaan?",
+      "municipality": "Tampere",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#10",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#48",
+        "pirkanmaa@2021-07-01#7"
+      ],
+      "refused": false,
+      "text": "Ei, putkikeräysjärjestelmään liittynyt kiinteistö ei ole velvollinen järjestämään omaa keräyspistettä tai astiaa pihaan jätteille, jotka kerätään putkikeräysjärjestelmässä tai sitä täydentävissä lähikeräyspisteissä [pirkanmaa@2021-07-01#10]. Jätteiden keräysvälineet järjestetään yhteisesti koonta-asemana ja niiden jätteiden osalta, joita ei kerätä putkijärjestelmässä, täydentävinä lähikeräyspisteinä [pirkanmaa@2021-07-01#10].",
+      "citations": [
+        "pirkanmaa@2021-07-01#10"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 6199,
+        "completion_tokens": 2707,
+        "reasoning_tokens": 2494,
+        "total_tokens": 8906,
+        "cost_usd": 0.0118404
+      }
+    },
+    {
+      "question_id": "pir-jatteet-irrallaan-astiaan",
+      "population": "answerable",
+      "kind": null,
+      "question": "Saako roskat laittaa astiaan irrallaan ilman pussia?",
+      "municipality": "Pirkkala",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#22",
+        "pirkanmaa@2021-07-01#28",
+        "pirkanmaa@2021-07-01#25",
+        "pirkanmaa@2021-07-01#20"
+      ],
+      "refused": false,
+      "text": "Ei, jätteet tulee pakata ennen niiden sijoittamista keräysvälineeseen likaantumisen ja roskaantumisen välttämiseksi [pirkanmaa@2021-07-01#22]. Biojätteen keräysvälineeseen ei saa laittaa pakkaamatonta jätettä [pirkanmaa@2021-07-01#22]. Jos jätettä jätetään keräysvälineen ulkopuolelle, sen on oltava jätesäkissä tai -pussissa, ellei sitä ole merkitty selvästi lisäjätteeksi ja pakattu turvallisesti [pirkanmaa@2021-07-01#25].",
+      "citations": [
+        "pirkanmaa@2021-07-01#22",
+        "pirkanmaa@2021-07-01#25"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5220,
+        "completion_tokens": 3012,
+        "reasoning_tokens": 2774,
+        "total_tokens": 8232,
+        "cost_usd": 0.012167999999999998
+      }
+    },
+    {
+      "question_id": "pir-ylimaarainen-sakki-astian-viereen",
+      "population": "answerable",
+      "kind": null,
+      "question": "Saako ylimääräisen jätesäkin jättää astian viereen?",
+      "municipality": "Ikaalinen",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#25",
+        "pirkanmaa@2021-07-01#28",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#22"
+      ],
+      "refused": false,
+      "text": "Kyllä, mutta vain seuraavien ehtojen täyttyessä:\n1. Kyseessä on poikkeustapaus (esim. jäte ei mahdu tai sitä ei muusta syystä voi panna astiaan) [pirkanmaa@2021-07-01#25].\n2. Sijoitus on tilapäinen ja keräyspaikan välittömässä läheisyydessä [pirkanmaa@2021-07-01#25].\n3. Jäte kuuluu kiinteistöittäiseen jätteenkuljetukseen [pirkanmaa@2021-07-01#25].\n4. Lisäjätteen on koostumukseltaan, määrältään ja kooltaan kuuluttava kyseiseen keräysvälineeseen [pirkanmaa@2021-07-01#25].\n5. Säkin paino saa olla korkeintaan 20 kg [pirkanmaa@2021-07-01#25].\n6. Pakkauksen on oltava sellainen, että kuljettaja saa sen helposti ja turvallisesti kuormattua ilman työturvallisuusriskiä [pirkanmaa@2021-07-01#25].\n7. Jos lisäjäte-erä on suurempi kuin keräysvälineen tilavuus, siitä on ilmoitettava etukäteen Pirkanmaan Jätehuolto Oy:lle [pirkanmaa@2021-07-01#25].\n8. Jos ylimääräistä jätettä muodostuu toistuvasti, keräysvälineen tilavuutta on lisättävä tai tyhjennysväliä lyhennettävä [pirkanmaa@2021-07-01#25].",
+      "citations": [
+        "pirkanmaa@2021-07-01#25"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5224,
+        "completion_tokens": 4142,
+        "reasoning_tokens": 3658,
+        "total_tokens": 9366,
+        "cost_usd": 0.015560400000000002
+      }
+    },
+    {
+      "question_id": "pir-tyhjennysten-keskeytys-tyhjilleen",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voiko astian tyhjennykset keskeyttää, kun talo on pitkään tyhjillään?",
+      "municipality": "Virrat",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#23",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#36"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, voidaanko jäteastian tyhjennykset keskeyttää kiinteistön pitkän poissaolon tai tyhjilläänolon vuoksi. Ote 7 §:n mukaan asiakkuutta koskevista muutoksista on ilmoitettava 44 §:n mukaisesti, mutta keskeytysmahdollisuudesta tai -velvoitteesta ei ole säännöstä.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5944,
+        "completion_tokens": 2167,
+        "reasoning_tokens": 2039,
+        "total_tokens": 8111,
+        "cost_usd": 0.0100674
+      }
+    },
+    {
+      "question_id": "pir-helpotus-erityisesta-syysta",
+      "population": "answerable",
+      "kind": null,
+      "question": "Voiko jätehuoltomääräyksistä saada helpotusta erityisestä syystä?",
+      "municipality": "Juupajoki",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#46",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#7"
+      ],
+      "refused": false,
+      "text": "Kyllä, poikkeusta jätehuoltomääräysten noudattamisesta voi hakea ja jätehuoltoviranomainen voi myöntää sen yksittäistapauksessa, jos täyttyvät seuraavat ehdot: 1) jätehuollon järjestäminen edellyttää sitä erityisestä syystä, 2) poikkeamisesta ei aiheudu ympäristö- tai terveyshaittaa ja 3) poikkeaminen ei voi koskea lakisääteisistä velvoitteista vapauttamista [pirkanmaa@2021-07-01#46].",
+      "citations": [
+        "pirkanmaa@2021-07-01#46"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 6091,
+        "completion_tokens": 3374,
+        "reasoning_tokens": 3181,
+        "total_tokens": 9465,
+        "cost_usd": 0.0137766
+      }
+    },
+    {
+      "question_id": "pir-naapuruston-yhteiskerays",
+      "population": "answerable",
+      "kind": null,
+      "question": "Asuinalueellamme jätteet kerätään kaavan mukaan yhteiseen pisteeseen. Onko siihen pakko liittyä?",
+      "municipality": "Tampere",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#10",
+        "pirkanmaa@2021-07-01#11",
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#8"
+      ],
+      "refused": false,
+      "text": "Kyllä, liittymiseen on velvoite, jos alueella täyttyvät seuraavat ehdot: 1) asuinalueen kaavassa tai muussa suunnittelussa on todettu keskitetty jätteenkeräysjärjestelmä [pirkanmaa@2021-07-01#11], ja 2) kaavassa tai suunnittelussa on osoitettu paikat keräyspisteille [pirkanmaa@2021-07-01#11]. Näillä alueilla on käytössä lähikeräysjärjestelmä, johon kiinteistöjen on liityttävä [pirkanmaa@2021-07-01#11].",
+      "citations": [
+        "pirkanmaa@2021-07-01#11"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4687,
+        "completion_tokens": 3254,
+        "reasoning_tokens": 3042,
+        "total_tokens": 7941,
+        "cost_usd": 0.0125742
+      }
+    },
+    {
+      "question_id": "pir-ei-jateautoa-mokille",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mökille ei tule jäteautoa. Minne jätteet pitää silloin viedä?",
+      "municipality": "Orivesi",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#36",
+        "pirkanmaa@2021-07-01#30",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#18"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, minne jätteet on viedä, jos kiinteistölle ei tule jäteautoa. Otteissa mainitaan ainoastaan velvoite hakea aluejätepisteen käyttöoikeutta sekajätteelle tai poikkeuslupaa, jos keräyspistettä ei voida perustaa, mutta ei vaihtoehtoisia jätteenkuljetuspaikkoja.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 6443,
+        "completion_tokens": 2585,
+        "reasoning_tokens": 2451,
+        "total_tokens": 9028,
+        "cost_usd": 0.0116208
+      }
+    },
+    {
+      "question_id": "pir-astian-merkinnat",
+      "population": "answerable",
+      "kind": null,
+      "question": "Mitä jäteastian kylkeen tai kanteen pitää merkitä?",
+      "municipality": "Hämeenkyrö",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#21",
+        "pirkanmaa@2021-07-01#26",
+        "pirkanmaa@2021-07-01#12",
+        "pirkanmaa@2021-07-01#41",
+        "pirkanmaa@2021-07-01#7"
+      ],
+      "refused": false,
+      "text": "Merkitsemisvelvoite on ehdollinen. Ehdot ja niihin liittyvät vaatimukset ovat seuraavat:\n1. Ehto: Kiinteistöllä, kimppa-astioissa tai aluejätepisteissä on useampia keräysvälineitä [pirkanmaa@2021-07-01#21]. Vaatimus: Kerättävän jätelajin nimi on merkittävä selvästi kanteen ja/tai etuseinään riittävän suurella kyltillä ja/tai tekstitarralla [pirkanmaa@2021-07-01#21]. Tarrassa tai kyltissä on oltava keräyksestä vastaavan tahon yhteystiedot [pirkanmaa@2021-07-01#21]. Jätelaji on ilmoitettava määräysten mukaisella nimellä (sekajäte, biojäte, paperi, kartonkipakkaukset, metalli, lasipakkaukset tai muovipakkaukset) [pirkanmaa@2021-07-01#21].\n2. Ehto: Keräysväline ei sijaitse kiinteistön välittömässä läheisyydessä tai se sijaitsee ryhmässä muiden kiinteistöjen keräysvälineiden kanssa [pirkanmaa@2021-07-01#21]. Vaatimus: Astia on merkittävä yksilöidysti, esimerkiksi kiinteistön numeroa tai kirjainta vastaavalla merkinnällä [pirkanmaa@2021-07-01#21].\n3. Ehto: Kyseessä on asbestijäteastia [pirkanmaa@2021-07-01#41]. Vaatimus: Astiaan on merkittävä selvästi erottuvalla tekstillä \"ASBESTIJÄTETTÄ\" [pirkanmaa@2021-07-01#41].",
+      "citations": [
+        "pirkanmaa@2021-07-01#21",
+        "pirkanmaa@2021-07-01#41"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3307,
+        "completion_tokens": 5112,
+        "reasoning_tokens": 4576,
+        "total_tokens": 8419,
+        "cost_usd": 0.0173202
+      }
+    },
+    {
+      "question_id": "pir-jatetilan-lukitus",
+      "population": "answerable",
+      "kind": null,
+      "question": "Saako jätetilan pitää lukossa, ja miten kuljettaja pääsee sisään?",
+      "municipality": "Kangasala",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#28",
+        "pirkanmaa@2021-07-01#36",
+        "pirkanmaa@2021-07-01#29",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#25"
+      ],
+      "refused": false,
+      "text": "Jätetilan saa pitää lukossa, mutta lukituksen on täytettävä seuraavat ehdot, jotta kuljettaja pääsee sisään:\n1. Lukituksessa on käytettävä kaksoispesäistä lukkoa, jossa toiseen pesään sopii Pirkanmaan Jätehuolto Oy:n yleisavain [pirkanmaa@2021-07-01#29].\n2. Jos kaksoispesälukkoa ei voi käyttää, on käytettävä seinään upotettavaa avainsäiliötä, joka avautuu yhtiön yleisavaimella ja sisältää jätetilan avaimen [pirkanmaa@2021-07-01#29].\n3. Avainsäilö on sijoitettava jätetilaan johtavan reitin välittömään läheisyyteen [pirkanmaa@2021-07-01#29].\n4. Avainsäilöön sijoitetulla avaimella saa avata vain jätehuoltoa varten tarvittavat tilat [pirkanmaa@2021-07-01#29].\n5. Kiinteistön haltija vastaa lukituksen asennus- ja huoltokustannuksista sekä toimintakuntoisuudesta [pirkanmaa@2021-07-01#29].\n6. Tarvittaessa Pirkanmaan Jätehuolto Oy voi sopia asiakkaan kanssa muustakin teknisestä ratkaisusta [pirkanmaa@2021-07-01#29].",
+      "citations": [
+        "pirkanmaa@2021-07-01#29"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4339,
+        "completion_tokens": 3826,
+        "reasoning_tokens": 3406,
+        "total_tokens": 8165,
+        "cost_usd": 0.0140814
+      }
+    },
+    {
+      "question_id": "pir-jateauton-etaisyys",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka lähelle astiaa jäteauton on päästävä?",
+      "municipality": "Mänttä-Vilppula",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#30",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#36",
+        "pirkanmaa@2021-07-01#41"
+      ],
+      "refused": false,
+      "text": "Etäisyys riippuu keräysvälineen tyypistä:\n- Käsin siirrettävät keräysvälineet: jäteauton on päästävä esteettömästi vähintään 5 metrin päähän astiasta [pirkanmaa@2021-07-01#27].\n- Keräysvälineet, joita ei voi siirtää käsin (esim. jätesäiliöt, vaihtolavat): jäteauton on päästävä esteettömästi niiden välittömään läheisyyteen [pirkanmaa@2021-07-01#27].",
+      "citations": [
+        "pirkanmaa@2021-07-01#27"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5207,
+        "completion_tokens": 3896,
+        "reasoning_tokens": 3693,
+        "total_tokens": 9103,
+        "cost_usd": 0.014812200000000001
+      }
+    },
+    {
+      "question_id": "pir-saostussailion-tyhjennys",
+      "population": "answerable",
+      "kind": null,
+      "question": "Kuinka usein saostussäiliö on tyhjennettävä?",
+      "municipality": "Parkano",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#37",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#23",
+        "pirkanmaa@2021-07-01#2.saostus",
+        "pirkanmaa@2021-07-01#39"
+      ],
+      "refused": false,
+      "text": "Saostussäiliön tyhjennysväli riippuu säiliössä olevan jäteveden laadusta, jota kysymyksessä ei ole määritelty:\n- Jos säiliössä on mustia jätevesiä, liete on poistettava aina tarvittaessa, kuitenkin vähintään kerran vuodessa [pirkanmaa@2021-07-01#37].\n- Jos säiliössä on pelkästään harmaavesilietteitä, liete on poistettava tarvittaessa, kuitenkin vähintään kolmen vuoden välein [pirkanmaa@2021-07-01#37].",
+      "citations": [
+        "pirkanmaa@2021-07-01#37"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4620,
+        "completion_tokens": 3223,
+        "reasoning_tokens": 3018,
+        "total_tokens": 7843,
+        "cost_usd": 0.012440999999999999
+      }
+    },
+    {
+      "question_id": "pir-vaarallisen-jatteen-tila",
+      "population": "answerable",
+      "kind": null,
+      "question": "Taloyhtiössä kerätään maaleja ja akkuja. Millaisessa tilassa niitä saa säilyttää?",
+      "municipality": "Nokia",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#41",
+        "pirkanmaa@2021-07-01#23",
+        "pirkanmaa@2021-07-01#28",
+        "pirkanmaa@2021-07-01#22",
+        "pirkanmaa@2021-07-01#25"
+      ],
+      "refused": false,
+      "text": "Säilytysvelvoitteet koskevat tilannetta, jossa kiinteistön haltija on järjestänyt vaarallisten jätteiden (kuten maalien ja akkujen) keräyksen [pirkanmaa@2021-07-01#41]. Tällöin tilan ja säilytyksen on täytettävä seuraavat ehdot erikseen:\n- Keräyksen on tapahduttava erillisessä lukitussa tilassa [pirkanmaa@2021-07-01#41].\n- Vaihtoehtoisesti keräyksen on tapahduttava valvotussa tilassa [pirkanmaa@2021-07-01#41].\n- Vaihtoehtoisesti vaarallinen jäte tulee kerätä lukittuihin kaappeihin tai astioihin [pirkanmaa@2021-07-01#41].\n- Kutakin vaarallista jätelajia varten on oltava oma merkitty jäteastiansa [pirkanmaa@2021-07-01#41].\n- Nestemäiset vaaralliset jätteet on säilytettävä nestettä läpäisemättömällä allastetulla alustalla [pirkanmaa@2021-07-01#41].\n- Nestemäiset vaaralliset jätteet on säilytettävä tiiviisti suljetuissa niille tarkoitetuissa astioissa [pirkanmaa@2021-07-01#41].\n- Säilytyksen on tapahduttava muutoin siten, ettei vaarana ole jätteen joutuminen maaperään tai viemäriin [pirkanmaa@2021-07-01#41].\n- Keräyksen on järjestettävä niin, ettei siitä aiheudu vaaraa tai haittaa ympäristölle tai terveydelle [pirkanmaa@2021-07-01#41].\nLisäksi kiinteistön haltijan on asetettava keräyspisteen käyttöohjeet kaikkien nähtäville ja tiedotettava käyttäjiä järjestelyistä [pirkanmaa@2021-07-01#41].",
+      "citations": [
+        "pirkanmaa@2021-07-01#41"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3774,
+        "completion_tokens": 5250,
+        "reasoning_tokens": 4649,
+        "total_tokens": 9024,
+        "cost_usd": 0.0180144
+      }
+    },
+    {
+      "question_id": "pir-tapahtuman-jatehuoltosuunnitelma",
+      "population": "answerable",
+      "kind": null,
+      "question": "Järjestämme ulkoilmatapahtuman. Pitääkö jätehuollosta tehdä suunnitelma viranomaiselle?",
+      "municipality": "Lempäälä",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#43",
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#35",
+        "pirkanmaa@2021-07-01#34",
+        "pirkanmaa@2021-07-01#15"
+      ],
+      "refused": false,
+      "text": "Jätehuoltosuunnitelman laatiminen ei ole automaattinen velvoite. Kunnan ympäristönsuojeluviranomainen voi tarvittaessa vaatia tapahtumajärjestäjältä tapahtuman jätehuoltosuunnitelmaa [pirkanmaa@2021-07-01#43]. Ehto: Viranomainen katsoo suunnitelman tarpeelliseksi. Tarkat kriteerit sille, milloin suunnitelma vaaditaan, eivät ole annetuissa otteissa määriteltyjä.",
+      "citations": [
+        "pirkanmaa@2021-07-01#43"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4273,
+        "completion_tokens": 2078,
+        "reasoning_tokens": 1897,
+        "total_tokens": 6351,
+        "cost_usd": 0.0087978
+      }
+    },
+    {
+      "question_id": "ooj-jatemylly-pirkanmaa",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Saanko asentaa keittiöön jätemyllyn, joka johtaa jätteet viemäriin?",
+      "municipality": "Tampere",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#41",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#22",
+        "pirkanmaa@2021-07-01#25",
+        "pirkanmaa@2021-07-01#28"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa keittiön jätemyllyn asentamisesta tai jätteiden johtamisesta viemäriin, joten en voi vastata kysymykseen.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4735,
+        "completion_tokens": 1333,
+        "reasoning_tokens": 1257,
+        "total_tokens": 6068,
+        "cost_usd": 0.00684
+      }
+    },
+    {
+      "question_id": "ooj-jateastian-puhdistustiheys-pirkanmaa",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Kuinka monta kertaa vuodessa sekajäteastia on vähintään puhdistettava?",
+      "municipality": "Nokia",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#37",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#23",
+        "pirkanmaa@2021-07-01#5",
+        "pirkanmaa@2021-07-01#15"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa sekajäteastian puhdistusvälistä. Tekstissä säädetään ainoastaan keräysvälineiden tyhjennysväleistä (sekajäteastia on tyhjennettävä vähintään 4 tai 8 viikon välein).",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4938,
+        "completion_tokens": 1369,
+        "reasoning_tokens": 1269,
+        "total_tokens": 6307,
+        "cost_usd": 0.0070698
+      }
+    },
+    {
+      "question_id": "ooj-tieyhteydeton-saari-pirkanmaa",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Järjestääkö kunta erilliskerättävien jätteiden kiinteistöittäisen kuljetuksen saareen, jonne ei ole tieyhteyttä?",
+      "municipality": "Ylöjärvi",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#36",
+        "pirkanmaa@2021-07-01#6",
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#34"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, järjestääkö kunta erilliskerättävien jätteiden kiinteistöittäisen kuljetuksen saareen, jonne ei ole tieyhteyttä. Määräyksissä todetaan ainoastaan, että kiinteistöittäiseen kuljetukseen voi liittyä myös alueen ulkopuolelta, mikäli kulkuyhteydet mahdollistavat jätteen noudon [pirkanmaa@2021-07-01#7], mutta saarista tai tieyhteyden puuttumisesta ei erikseen mainita.",
+      "citations": [
+        "pirkanmaa@2021-07-01#7"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5009,
+        "completion_tokens": 2741,
+        "reasoning_tokens": 2547,
+        "total_tokens": 7750,
+        "cost_usd": 0.011228400000000001
+      }
+    },
+    {
+      "question_id": "ooj-putkikerays-lounais-suomi",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Miten jätteiden putkikeräysjärjestelmään liittyneen kiinteistön jätehuolto järjestetään ja mistä kuljetus alkaa?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#4",
+        "lounais-suomi@2024-08-01#8",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#1"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa jätteiden putkikeräysjärjestelmään liittyvien kiinteistöjen jätehuollon järjestämisestä tai kuljetuksen alkamispaikasta. Vastaus ei ole mahdollista annettujen lähteiden perusteella.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3775,
+        "completion_tokens": 1064,
+        "reasoning_tokens": 968,
+        "total_tokens": 4839,
+        "cost_usd": 0.005457
+      }
+    },
+    {
+      "question_id": "ooj-toissijainen-jatehuoltopalvelu-lounais-suomi",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Miten pyydän kunnalta toissijaista jätehuoltopalvelua, jos yksityistä palvelua ei ole saatavilla?",
+      "municipality": "Salo",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#1",
+        "lounais-suomi@2024-08-01#16",
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#5",
+        "lounais-suomi@2024-08-01#4"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa siitä, miten toissijaista jätehuoltopalvelua pyydetään kunnalta, jos yksityistä palvelua ei ole saatavilla. Otteissa mainitaan vain, että määräyksiä sovelletaan myös kunnan toissijaiselle jätehuoltovastuulle kuuluviin palveluihin, mutta hakemismenettelystä ei ole säännöksiä.",
+      "citations": [
+        "lounais-suomi@2024-08-01#1"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4037,
+        "completion_tokens": 2978,
+        "reasoning_tokens": 2831,
+        "total_tokens": 7015,
+        "cost_usd": 0.0113562
+      }
+    },
+    {
+      "question_id": "ooj-lisajate-lounais-suomi",
+      "population": "refusal",
+      "kind": "out-of-jurisdiction",
+      "question": "Millä ehdoilla jätettä saa jättää tilapäisesti keräysvälineen ulkopuolelle keräyspaikan välittömään läheisyyteen?",
+      "municipality": "Raisio",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#30",
+        "lounais-suomi@2024-08-01#29",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#7"
+      ],
+      "refused": false,
+      "text": "Annettujen pykäläotteiden mukaan jätteitä ei saa jättää jäteastioiden ulkopuolelle [lounais-suomi@2024-08-01#30]. Keräyspaikkaan ei saa sijoittaa jätettä, jota ei ole tarkoitettu kuljetettavaksi [lounais-suomi@2024-08-01#28], ja kiinteistön haltijan on huolehdittava jäteastian ulkopuolelle sijoitettujen tai pudonneiden jätteiden siivouksesta [lounais-suomi@2024-08-01#28]. Tilapäistä jättämistä keräysvälineen ulkopuolelle ei ole sallittu.",
+      "citations": [
+        "lounais-suomi@2024-08-01#30",
+        "lounais-suomi@2024-08-01#28"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4056,
+        "completion_tokens": 2797,
+        "reasoning_tokens": 2542,
+        "total_tokens": 6853,
+        "cost_usd": 0.010824599999999998
+      }
+    },
+    {
+      "question_id": "ooc-jatemaksun-suuruus",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Paljonko sekajäteastian tyhjennys maksaa omakotitalolta?",
+      "municipality": "Turku",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#13",
+        "lounais-suomi@2024-08-01#26",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#7",
+        "lounais-suomi@2024-08-01#44"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa sekajäteastian tyhjennyksen hinnasta. Otteet käsittelevät ainoastaan lajitteluvelvoitteita, tyhjennysvälit, ilmoitusvelvollisuuksia ja yhteisiä jäteastioita.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3688,
+        "completion_tokens": 2074,
+        "reasoning_tokens": 1977,
+        "total_tokens": 5762,
+        "cost_usd": 0.0084348
+      }
+    },
+    {
+      "question_id": "ooc-autonrenkaiden-vastaanotto",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Mihin vanhat autonrenkaat pitää toimittaa?",
+      "municipality": "Salo",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#15",
+        "lounais-suomi@2024-08-01#2.tuottajavastuunalaisella",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#33",
+        "lounais-suomi@2024-08-01#12"
+      ],
+      "refused": false,
+      "text": "Vanhat autonrenkaat ovat tuottajavastuunalaisia jätteitä [lounais-suomi@2024-08-01#2.tuottajavastuunalaisella], joten ne on toimitettava tuottajien osoittamiin vastaanottopaikkoihin [lounais-suomi@2024-08-01#12].",
+      "citations": [
+        "lounais-suomi@2024-08-01#2.tuottajavastuunalaisella",
+        "lounais-suomi@2024-08-01#12"
+      ],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3530,
+        "completion_tokens": 2299,
+        "reasoning_tokens": 2124,
+        "total_tokens": 5829,
+        "cost_usd": 0.009015
+      }
+    },
+    {
+      "question_id": "ooc-tavarat-uudelleenkayttoon",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Mihin voin viedä käyttökelpoiset tavarat kirpputorille uudelleenkäyttöön?",
+      "municipality": "Kaarina",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#17",
+        "lounais-suomi@2024-08-01#38",
+        "lounais-suomi@2024-08-01#28",
+        "lounais-suomi@2024-08-01#23",
+        "lounais-suomi@2024-08-01#40"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa käyttökelpoisten tavaroiden viemisestä kirpputorille uudelleenkäyttöön. Otteet käsittelevät ainoastaan kompostointia, lietesäiliöiden sijoittamista, jäteastioiden sijoittamista ja tyyppejä sekä lietteiden käsittelyä.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 4955,
+        "completion_tokens": 1470,
+        "reasoning_tokens": 1355,
+        "total_tokens": 6425,
+        "cost_usd": 0.007383
+      }
+    },
+    {
+      "question_id": "ooc-nuohousvali",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Kuinka usein takka ja savuhormi on nuohottava?",
+      "municipality": "Raisio",
+      "authority_key": "lounais-suomi",
+      "retrieved": [
+        "lounais-suomi@2024-08-01#2.kerayspaikalla",
+        "lounais-suomi@2024-08-01#36",
+        "lounais-suomi@2024-08-01#18",
+        "lounais-suomi@2024-08-01#27",
+        "lounais-suomi@2024-08-01#44"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa takan ja savuhormin nuohotustiheydestä, joten en voi vastata kysymykseen.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2413,
+        "completion_tokens": 1352,
+        "reasoning_tokens": 1285,
+        "total_tokens": 3765,
+        "cost_usd": 0.0055038
+      }
+    },
+    {
+      "question_id": "ooc-romuajoneuvon-toimituspaikka",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Mihin romuajoneuvon voi toimittaa ja mitä siitä pitää tehdä?",
+      "municipality": "Tampere",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#7",
+        "pirkanmaa@2021-07-01#31",
+        "pirkanmaa@2021-07-01#2.tuottajavastuunalaisella",
+        "pirkanmaa@2021-07-01#43"
+      ],
+      "refused": true,
+      "text": "Annetuista pykäläotteista ei löydy tietoa romuajoneuvon toimittamispaikasta tai siitä vaadittavista toimenpiteistä. Ote määrittelee romuautot ainoastaan tuottajavastuunalaiseksi jätteeksi, mutta ei kerro, mihin ne tulee toimittaa tai mitä niillä tulee tehdä.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3937,
+        "completion_tokens": 2610,
+        "reasoning_tokens": 2498,
+        "total_tokens": 6547,
+        "cost_usd": 0.0101922
+      }
+    },
+    {
+      "question_id": "ooc-hevosenlannan-kaytto",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Saako hevosenlantaa levittää omalle pellolle lannoitteeksi?",
+      "municipality": "Nokia",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#39",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#37",
+        "pirkanmaa@2021-07-01#41",
+        "pirkanmaa@2021-07-01#22"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei mainita hevosenlantaa tai eläinten lantaa, joten en voi vastata kysymykseen niiden perusteella.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5076,
+        "completion_tokens": 955,
+        "reasoning_tokens": 888,
+        "total_tokens": 6031,
+        "cost_usd": 0.0059106
+      }
+    },
+    {
+      "question_id": "ooc-jatevero",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Peritäänkö kaatopaikalle toimitettavasta jätteestä jäteveroa?",
+      "municipality": "Ylöjärvi",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#3",
+        "pirkanmaa@2021-07-01#40",
+        "pirkanmaa@2021-07-01#17",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#34"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa jäteverosta tai sen perimisestä kaatopaikalle toimitettavasta jätteestä, joten en voi vastata kysymykseen.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 3876,
+        "completion_tokens": 1559,
+        "reasoning_tokens": 1484,
+        "total_tokens": 5435,
+        "cost_usd": 0.0070026
+      }
+    },
+    {
+      "question_id": "ooc-kuolinpesan-jatehuoltomaksu",
+      "population": "refusal",
+      "kind": "out-of-corpus",
+      "question": "Kuka vastaa jätehuoltomaksun maksamisesta, kun kiinteistön omistaja on kuollut ja kiinteistö on kuolinpesän hallinnassa?",
+      "municipality": "Kangasala",
+      "authority_key": "pirkanmaa",
+      "retrieved": [
+        "pirkanmaa@2021-07-01#20",
+        "pirkanmaa@2021-07-01#27",
+        "pirkanmaa@2021-07-01#18",
+        "pirkanmaa@2021-07-01#6",
+        "pirkanmaa@2021-07-01#29"
+      ],
+      "refused": true,
+      "text": "Annetuissa pykäläotteissa ei ole tietoa jätehuoltomaksun maksamisvelvollisuudesta tai siitä, kuka vastaa maksusta, kun kiinteistön omistaja on kuollut ja kiinteistö on kuolinpesän hallinnassa.",
+      "citations": [],
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5699,
+        "completion_tokens": 603,
+        "reasoning_tokens": 514,
+        "total_tokens": 6302,
+        "cost_usd": 0.005228399999999999
+      }
+    }
+  ]
+}
