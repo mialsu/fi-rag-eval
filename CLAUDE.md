@@ -11,9 +11,10 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (28 Aug 2026)
 
-**Slices 1–4 are built, and slice 5 is three tracers in: the measurement spine, an honest golden
-set, a lemmatising analyser measured as a grid, a second authority, and now an answering boundary
-with a scored refusal population.** Two authorities are ingested into Postgres and
+**Slices 1–4 are built, and slice 5 is four tracers in: the measurement spine, an honest golden
+set, a lemmatising analyser measured as a grid, a second authority, an answering boundary with a
+scored refusal population, and now a judge that passes an 8/8 known-bad control and publishes
+nothing.** Two authorities are ingested into Postgres and
 retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
 chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
 — 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
@@ -85,8 +86,55 @@ regresses. Nothing else exists.
   absent from the document's own table of contents, so the body/TOC cross-check is silent and its
   text is absorbed into 18 §'s chunk. Two clauses, one address. No golden question points at
   Pirkanmaa 18 § — do not add one before this is fixed.
-- **The answering boundary and the refusal population exist (tracers 2–3). The JUDGED answer
-  metrics do not.** `fi-rag-eval answer <id>` answers one question; `fi-rag-eval answer --all`
+- **The judge exists, passes 8/8 on a known-bad control, and PUBLISHES NOTHING (tracer 4, ADR-0010).**
+  `fi-rag-eval judge <run.json>` scores every claim and forbidden item of a **frozen** answer run —
+  **199 units in 50 calls**, exactly as D3 counted. It never generates the answers it scores: a
+  judge prompt is developed by iteration and iteration needs an input that cannot move. Measured
+  28 Aug 2026, three runs over the identical file: **groundedness 1.000/0.983, branch coverage
+  0.472/0.480, over-claim 0.020, citation address validity 1.000 (58 citations, 0 foreign),
+  $0.0699 per run** ($0.3084 for the whole tracer). Every judged figure prints marked `DIAGNOSTIC` with the published value
+  **WITHHELD**, because judge–human agreement does not exist until tracer 5 and D11 forbids
+  groundedness without it. **A green judge run publishes no number.**
+- **The judge DISAGREES WITH ITSELF, measured rather than assumed away: self-consistency 0.975
+  [0.95, 1.00] over 199 units.** `temperature=0` becomes `1e-8` at Groq for the judge exactly as for
+  the answerer. Found because a re-run twenty minutes later moved a verdict. It is a **ceiling** on
+  judge–human agreement — two judge runs that differ cannot both match a human — so tracer 5 must
+  report its agreement figure against 0.975, not against 1.0. The ceiling is clear of D11's 0.85
+  floor, so this changes the *reading*, not the plan.
+- **GROUNDEDNESS SATURATES AT 1.000 AND CARRIES NO INFORMATION.** It is identical (1.000) whether
+  retrieval was complete or not, because the denominator is branches *stated* and `qwen/qwen3.6-27b`
+  never states a branch it cannot cite — it drops the branch instead. All the signal is in **branch
+  coverage 0.472**. D11's "never publish groundedness without branch coverage beside it" is
+  necessary and, on this evidence, **not sufficient**: whether the headline should move to branch
+  coverage is an open question and is the Owner's.
+- **Prediction 5 — the prediction that decides slice 6 — is VOID as written, and its substance
+  holds.** It was registered over groundedness, which has zero variance here. Branch coverage
+  answers it decisively: **0.574 with complete retrieval against 0.042 without** (0.598 vs 0.111
+  excluding refusals). Answer failures track retrieval. This is the **third** pre-registered
+  statistic in this project to be the wrong one while its question was answerable. The slice-6
+  decision rule therefore fires for the reranker **on substituted evidence**, which is the Owner's
+  to accept.
+- **The known-bad control is real and was seen red.** 8 authored bad answers
+  (`corpus/control/known-bad.yaml`), 4 shapes x 2 authorities, each naming the unit verdict that
+  must catch it. `judge --control` = **8/8, exit 0**; `--weak-prompt` = **4/8, exit 1** — and it
+  failed on **all four citation-support cases and none of the four over-claim cases**. Over-claim
+  detection survives a credulous prompt; `supported` does not. Three cases require `stated: true`
+  *with* `supported: false`, so a judge that disapproved of everything would fail them.
+- **The judge must quote the answer, and the first version of that count overstated the problem.**
+  `stated` with no quote is a hard error; a quote absent from the text is recorded. The first run
+  flagged 9 of 50 — and the first one inspected was a **splice** (fragments joined, every word
+  present, claim genuinely stated), not an invention. `quote_words_present` now separates the two;
+  run B reports **2 splices, 0 fabrications**. Never read a splice count as judge fabrication.
+- **A citation on a refusal is no longer "any citation is a defect" (ADR-0010).** Citing an address
+  **outside** the retrieved set is a defect; citing a chunk it **did** retrieve is a counted
+  diagnostic. The old rule labelled the more auditable refusal as the worse one. **No published
+  number moved** — refusal recall 0.857 and precision 0.632 come from the `refused` field alone.
+- **The judge phase is not in `make eval` either**, for the same reason the answer phase is not.
+  `judge` needs `make services-up`, a filled `.env`, and a run file under `eval/runs/`, which is
+  **gitignored** — so the judged numbers are not reproducible from a clean clone. The **control**
+  is, deliberately: it needs no run file. The run this project has is stamped `4b75dfd-dirty`, and
+  every judged table prints a `!!` line saying so.
+- **The answering boundary and the refusal population exist (tracers 2–3).** `fi-rag-eval answer <id>` answers one question; `fi-rag-eval answer --all`
   answers **all 64** — 50 answerable + 14 refusal — through `qwen/qwen3.6-27b` on a LiteLLM gateway,
   and prints refusal precision/recall as arithmetic with Wilson intervals. Measured 28 Aug 2026:
   **refusal recall 0.857 [0.60, 0.96] n=14; precision 0.632 [0.41, 0.81] n=19; out-of-corpus 0.875,
@@ -124,9 +172,11 @@ regresses. Nothing else exists.
   determining variables it could not resolve. It costs ~5.3x the dollars ($0.0210 vs $0.0040 per
   answer). Pre-registered as prediction 7; do not turn reasoning off to save money without
   scoring it.
-- **Not built:** embeddings, pgvector, reranking, **a judge**, **judged answer metrics**
-  (groundedness, branch coverage, over-claim, citation support), **judge–human agreement**, the
-  frozen sample, the answer-metric floor gate, a third authority, CI, Docker, Cloud Run.
+- **Not built:** embeddings, pgvector, reranking, **judge–human agreement** (tracer 5 — the
+  arithmetic and its cluster-aware interval exist and are tested in `metrics.unit_agreement` /
+  `cluster_robust_interval`, but nothing in the CLI computes agreement and there are no hand
+  labels), the frozen sample, the answer-metric floor gate, a third authority, CI, Docker,
+  Cloud Run.
   `make docker-build` still exits non-zero on purpose — do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
@@ -164,8 +214,9 @@ Run them all with `make gate`. Every one below has been run, and has been proven
   `make gate` makes a live model call** — a green gate is compatible with an answering path that
   401s on its first real request (confessed in `REVIEW-DEBT.md`).
   Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`. Anything that answers additionally
-  needs `make services-up` and a filled `.env`. **`fi-rag-eval answer --all` is not part of any
-  gate**: it takes ~50 minutes and ~$0.76, and is run deliberately by a human.
+  needs `make services-up` and a filled `.env`. **Neither `fi-rag-eval answer --all` nor `fi-rag-eval judge` is
+  part of any gate**: the answer phase takes ~50 minutes and ~$0.76, the judge ~7 minutes and
+  ~$0.07, and both are run deliberately by a human. No test in `make gate` calls the judge either.
 
 A gate you haven't run is not a gate. Green tests gate; they do not prove.
 

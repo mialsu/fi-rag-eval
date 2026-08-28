@@ -388,7 +388,13 @@ class TestRefusalArithmetic:
         assert by_kind[MetricsRefusalKind.OUT_OF_CORPUS].point == 1.0
         assert by_kind[MetricsRefusalKind.OUT_OF_JURISDICTION].point == 0.0
 
-    def test_a_refusal_carrying_a_citation_is_counted_as_a_defect(self) -> None:
+    def test_citing_the_retrieved_context_is_a_diagnostic_and_not_a_defect(self) -> None:
+        """ADR-0010 narrowed the rule. This pins the half that was measured wrong.
+
+        Tracer slice 3 found two refusals citing a chunk they were given, both to
+        say what the excerpts DO cover. Under `CONTEXT.md:40` those are correct
+        citations, so counting them as defects punished the more auditable answer.
+        """
         metrics = refusal_metrics(
             refusals=[
                 RefusalOutcome(
@@ -396,6 +402,7 @@ class TestRefusalArithmetic:
                     kind=MetricsRefusalKind.OUT_OF_CORPUS,
                     refused=True,
                     citations=("lounais-suomi@2024-08-01#15",),
+                    retrieved=("lounais-suomi@2024-08-01#15", "lounais-suomi@2024-08-01#16"),
                 ),
                 RefusalOutcome(
                     question_id="r2", kind=MetricsRefusalKind.OUT_OF_CORPUS, refused=True
@@ -403,7 +410,48 @@ class TestRefusalArithmetic:
             ],
             answerable=[AnswerOutcome(question_id="a1", refused=False)],
         )
-        assert metrics.refusals_with_citations == ("r1",)
+        assert metrics.refusals_citing_context == ("r1",)
+        assert metrics.refusals_citing_outside == ()
+
+    def test_citing_outside_the_retrieved_set_is_still_a_defect(self) -> None:
+        """The half of the old rule that was always unambiguous.
+
+        A refusal says the retrieved context does not answer the question. An
+        address from outside that context contradicts the refusal itself, whether
+        it was hallucinated or belongs to the authority the question was not asked
+        about.
+        """
+        metrics = refusal_metrics(
+            refusals=[
+                RefusalOutcome(
+                    question_id="r1",
+                    kind=MetricsRefusalKind.OUT_OF_JURISDICTION,
+                    refused=True,
+                    citations=("pirkanmaa@2021-07-01#7",),
+                    retrieved=("lounais-suomi@2024-08-01#15",),
+                ),
+            ],
+            answerable=[AnswerOutcome(question_id="a1", refused=False)],
+        )
+        assert metrics.refusals_citing_outside == ("r1",)
+        assert metrics.refusals_citing_context == ()
+
+    def test_a_refusal_can_be_both_at_once_and_is_named_in_both(self) -> None:
+        """One citation inside the context and one outside it is two findings."""
+        metrics = refusal_metrics(
+            refusals=[
+                RefusalOutcome(
+                    question_id="r1",
+                    kind=MetricsRefusalKind.OUT_OF_CORPUS,
+                    refused=True,
+                    citations=("lounais-suomi@2024-08-01#15", "pirkanmaa@2021-07-01#7"),
+                    retrieved=("lounais-suomi@2024-08-01#15",),
+                ),
+            ],
+            answerable=[AnswerOutcome(question_id="a1", refused=False)],
+        )
+        assert metrics.refusals_citing_context == ("r1",)
+        assert metrics.refusals_citing_outside == ("r1",)
 
 
 class TestWilson:

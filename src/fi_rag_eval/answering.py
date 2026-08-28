@@ -226,6 +226,7 @@ def run(
                 kind=_kind(kinds[one.question_id]),
                 refused=one.answer.refused,
                 citations=one.answer.citations,
+                retrieved=one.retrieved,
             )
             for one in refused
         ],

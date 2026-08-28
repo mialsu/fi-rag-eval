@@ -3,11 +3,18 @@
 Finnish-language document question answering over municipal waste regulations — built so that
 **answer quality is measured, not asserted**.
 
-> **Status: the harness runs; the pipeline it measures is lexical only.** `make eval`
-> ingests one authority's regulations, retrieves with Postgres full-text search, scores a
+> **Status: the harness runs; the retrieval pipeline it measures is lexical only.** `make eval`
+> ingests two authorities' regulations, retrieves with Postgres full-text search, scores a
 > hand-labelled golden set across **12 retrieval configurations at once**, prints the tables
-> below, and fails on regression in **any** of them. No embeddings, no reranker, no language
-> model, no judge yet — those are the next slices.
+> below, and fails on regression in **any** of them. It is offline, deterministic and free.
+> No embeddings and no reranker — those are the next slices.
+>
+> **An answering layer and a judge now exist, and they publish nothing.** `fi-rag-eval answer`
+> answers with citations or refuses; `fi-rag-eval judge` scores every claim of a frozen answer
+> run and passes an 8/8 hand-authored known-bad control. Neither is part of `make eval`, both
+> cost real money, and every judged number is printed marked `DIAGNOSTIC` with the published
+> value **withheld** — because judge–human agreement does not exist yet, and a judged metric
+> whose judge is unvalidated is not publishable here.
 >
 > **Read the caveat under the table before quoting any number.**
 
@@ -88,13 +95,14 @@ diagnostics, not headlines of their own.
 | MRR | 0.569 | 50 questions | diagnostic. The right chunk is often found but rarely first |
 | **Lexical leakage of the questions** | **0.550** | 331 stems | how much of each question's vocabulary its own target chunk hands it. **Gated to never rise, per cell.** Read the note below before comparing this to 0.332 |
 | Misses: unreachable / out-ranked | **0** / 10 | 10 chunks | zero stem overlap vs. matched but below k. Nothing is unreachable |
-| Answer groundedness | — | | needs the answering slice |
-| Branch coverage | — | | needs the answering slice |
-| Over-claim rate | — | | needs the answering slice |
-| Citation accuracy | — | | needs the answering slice |
-| Refusal precision / recall | — | | needs the answering slice |
-| Judge–human agreement | — | | needs the judge |
-| p95 latency / cost per query | — | | no model runs yet; this slice costs €0 |
+| Answer groundedness | **withheld** | 59 branches stated | computed and **not published**: judge–human agreement does not exist yet. Diagnostic value 1.000, which is *saturated* — this answerer never states a branch it cannot cite, so the number carries no information on its own |
+| Branch coverage | **withheld** | 125 branches required | computed and **not published**, same reason. Diagnostic value 0.472 — and this is where all the answer-layer signal actually is |
+| Over-claim rate | **withheld** | 50 answers | computed and **not published**, same reason. Diagnostic value 0.020 |
+| Citation **address validity** | **1.000** | 58 citations | **publishable: arithmetic, no judge, no network.** Every citation names a chunk its question actually retrieved. 0 unparseable, 0 outside the context, **0 foreign-authority** |
+| Citation accuracy (judged) | **withheld** | | the other half of citation checking — *does the cited chunk support the claim* — needs the judge, so it inherits the withholding |
+| Refusal precision / recall | **0.632 / 0.857** | n=19 / n=14 | measured, **diagnostic and never a headline**: 14 questions cannot support a published figure. Wilson 95%: [0.41, 0.81] and [0.60, 0.96]. Precision is charged for retrieval failures — see the caveats |
+| Judge–human agreement | — | | the next slice. Judge **self-consistency** is measured at **0.975** [0.95, 1.00] over 199 units, and that is a *ceiling* on any agreement figure this judge can reach |
+| p95 latency / cost per query | — / **$0.0165** | 50 questions | `make eval` itself costs €0 and always will. One answer averages $0.0118 and one judge call $0.0014; a full answer-plus-judge cycle over the golden set is **$0.83** and ~57 minutes |
 
 **Read the headline together with the leakage row.** The first version of this harness scored
 **0.875** — on 8 questions written with the source PDF open, which leaked **60%** of their

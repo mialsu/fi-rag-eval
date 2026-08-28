@@ -1,4 +1,4 @@
-"""The command-line surface: ``fi-rag-eval ingest``, ``eval`` and ``answer``.
+"""The command-line surface: ``ingest``, ``eval``, ``answer`` and ``judge``.
 
 Exit codes are a feature, not an afterthought -- CI reads them. Zero means the
 run completed and every metric held. Anything else means the table on stdout,
@@ -15,9 +15,15 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from fi_rag_eval import answering, db
+from fi_rag_eval import answering, db, judging
 from fi_rag_eval.analyse import AnalyserError, Morphology
-from fi_rag_eval.answer import ANSWERER, AnswerError, TokenBudget, answer_question
+from fi_rag_eval.answer import (
+    ANSWERER,
+    JUDGE,
+    AnswerError,
+    TokenBudget,
+    answer_question,
+)
 from fi_rag_eval.chunking import ChunkingError
 from fi_rag_eval.evaluate import (
     DEFAULT_K,
@@ -29,14 +35,20 @@ from fi_rag_eval.evaluate import (
 from fi_rag_eval.extract import ExtractionError
 from fi_rag_eval.golden import GoldenSetError, load_golden_set
 from fi_rag_eval.ingest import IngestError, ingest
+from fi_rag_eval.judge import judge_ceiling_for
+from fi_rag_eval.judging import DEFAULT_CONTROL, JudgingError, load_control, load_run
 from fi_rag_eval.manifest import ManifestError, load_manifest
 from fi_rag_eval.metrics import MetricsError
 from fi_rag_eval.report import (
     Baseline,
     BaselineError,
     compare,
+    format_address_validity,
+    format_control,
     format_grid,
     format_ingest,
+    format_judged,
+    format_judged_detail,
     format_probe_table,
     format_refusal_detail,
     format_refusals,
@@ -51,6 +63,7 @@ DEFAULT_BASELINE = Path("eval/baseline.json")
 
 HANDLED = (
     AnswerError,
+    JudgingError,
     ManifestError,
     GoldenSetError,
     ExtractionError,
@@ -154,6 +167,84 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="override the run's token ceiling. Exists so the ceiling can be watched "
         "failing, which is the only thing that makes it a gate",
+    )
+
+    judge_parser = subparsers.add_parser(
+        "judge",
+        help="score a frozen answer run's every claim with the judge -- or, with "
+        "--control, run the 8/8 known-bad control. Prints what it cost",
+    )
+    judge_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    judge_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
+    judge_parser.add_argument(
+        "run",
+        nargs="?",
+        type=Path,
+        help="the answer run to judge, as written by `answer --all --out`. The judge "
+        "never generates the answers it scores (ADR-0010): a judge prompt is developed "
+        "by iteration, and iteration needs an input that cannot move underneath it",
+    )
+    judge_parser.add_argument(
+        "--control",
+        action="store_true",
+        help="run the known-bad control instead: 8 hand-authored bad answers the judge "
+        "must all catch. Needs no run file and is reproducible from a clean clone. "
+        "Exits non-zero below 8/8",
+    )
+    judge_parser.add_argument(
+        "--control-file",
+        type=Path,
+        default=DEFAULT_CONTROL,
+        help=f"where the control cases live (default: {DEFAULT_CONTROL})",
+    )
+    judge_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="judge only the first N answers. Exists so ONE judge call can be bought "
+        "and measured before the batch -- prediction 6 came in at 11x, so the judge's "
+        "cost is measured rather than predicted. A limited run is NEVER a result: the "
+        "table says so and no metric from it may be quoted",
+    )
+    judge_parser.add_argument(
+        "--weak-prompt",
+        action="store_true",
+        help="use the deliberately credulous judge prompt. This is how the control is "
+        "watched failing (AC10), which is the only thing that makes it a gate",
+    )
+    judge_parser.add_argument(
+        "--stub-agreement",
+        type=float,
+        default=None,
+        help="pretend judge-human agreement is this value. Exists so D11's withholding "
+        "rule can be watched changing the table (AC12); real agreement is tracer slice "
+        "5's and does not exist yet",
+    )
+    judge_parser.add_argument(
+        "--model",
+        default=JUDGE,
+        help=f"the judge (default: {JUDGE}). A different model FAMILY than the answerer, "
+        "by CONTEXT.md:66",
+    )
+    judge_parser.add_argument(
+        "--token-ceiling",
+        type=int,
+        default=None,
+        help="override the run's token ceiling, so the ceiling can be watched failing",
+    )
+    judge_parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write every unit verdict to this JSON file. Tracer slice 5 compares hand "
+        "labels against a file like this one, and two of these files compare the judge "
+        "against ITSELF -- which is what puts a ceiling on the agreement it can reach",
+    )
+    judge_parser.add_argument(
+        "--detail",
+        action="store_true",
+        help="also print every judged answer unit by unit, with the judge's own quote. "
+        "This is the view tracer slice 5's hand labelling is done against",
     )
 
     eval_parser.add_argument(
@@ -409,6 +500,197 @@ def _answer_one(args: argparse.Namespace) -> int:
     return 0
 
 
+def _judge(args: argparse.Namespace) -> int:
+    """Dispatch, and refuse the flag combinations that would silently do nothing."""
+    if args.control:
+        if args.run is not None:
+            raise JudgingError(
+                f"--control judges its own authored answers, so it cannot also be given "
+                f"{args.run}. Drop one."
+            )
+        if args.stub_agreement is not None:
+            raise JudgingError(
+                "--stub-agreement changes what the judged table publishes; the control "
+                "publishes no metric, so the flag would be silently ignored."
+            )
+        if args.limit is not None:
+            raise JudgingError(
+                "--limit cannot be combined with --control. The control is a FLOOR at "
+                "8/8, so a partial control is not a weaker pass -- it is no measurement "
+                "at all."
+            )
+        if args.out is not None:
+            raise JudgingError(
+                "--out freezes the unit verdicts over the golden set for tracer slice 5. "
+                "The control judges authored answers that are not in it, so the file "
+                "would look like a frozen sample and not be one."
+            )
+        return _judge_control(args)
+    if args.run is None:
+        raise JudgingError(
+            "say which answer run to judge, or pass --control for the known-bad control"
+        )
+    return _judge_run(args)
+
+
+def _judge_run(args: argparse.Namespace) -> int:
+    """Judge a frozen answer run. Networked, costs money, publishes nothing yet."""
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    run = load_run(args.run)
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+
+    if args.limit is not None and args.limit < 1:
+        raise JudgingError(f"--limit judges at least one answer, not {args.limit}")
+    planned = len(run.answerable) if args.limit is None else min(args.limit, len(run.answerable))
+    budget = (
+        TokenBudget(ceiling=args.token_ceiling)
+        if args.token_ceiling is not None
+        else TokenBudget(ceiling=judge_ceiling_for(planned))
+    )
+    print(
+        f"judging {planned} of {len(run.answerable)} answerable answers from {args.run} "
+        f"through {args.model}, token ceiling {budget.ceiling}"
+    )
+    if args.weak_prompt:
+        print(
+            "!! WEAKENED JUDGE PROMPT: this run measures a judge built to fail the "
+            "control. Nothing from it is a result."
+        )
+    with db.connect() as conn:
+        judged = judging.judge_run(
+            conn,
+            manifest=manifest,
+            golden=golden,
+            run=run,
+            budget=budget,
+            cell=PUBLISHED,
+            morphology=morphology,
+            model=args.model,
+            weak=args.weak_prompt,
+            limit=args.limit,
+            progress=lambda line: print(line, flush=True),
+        )
+
+    print()
+    print(format_address_validity(judged))
+    print()
+    print(format_judged(judged, agreement=args.stub_agreement))
+    if args.detail:
+        print()
+        print(format_judged_detail(judged))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(_judgement_as_json(judged), encoding="utf-8")
+        print(f"\nverdicts written to {args.out}")
+    if args.stub_agreement is not None:
+        print()
+        print(
+            "NOTE  --stub-agreement was set, so the agreement figure above is INVENTED. "
+            "It exists to watch D11's withholding rule change the table, and no number "
+            "from this run may be quoted."
+        )
+    return 0
+
+
+def _judgement_as_json(run: judging.JudgeRun) -> str:
+    """Every unit verdict, verbatim, as tracer slice 5 will need it.
+
+    Written per unit rather than per answer because the hand labels are per unit:
+    a file that recorded only the rolled-up counts could not be compared against
+    a human at the level D3 publishes agreement at.
+    """
+    payload = {
+        "source": str(run.source),
+        "source_commit": run.source_commit,
+        "cell": run.cell.name,
+        "k": run.k,
+        "answerer": run.answerer,
+        "judge": run.judge_model,
+        "weak_prompt": run.weak,
+        "judged_at_commit": git_commit(),
+        "partial": run.partial,
+        "tokens": run.tokens,
+        "cost_usd": run.cost_usd,
+        "incoherent_verdicts": run.incoherent_verdicts,
+        "answers": [
+            {
+                "question_id": one.judged.question_id,
+                "refused": one.judged.refused,
+                "required_branches": one.judged.required_branches,
+                "branches": [
+                    {
+                        "index": verdict.index,
+                        "stated": verdict.stated,
+                        "supported": verdict.supported,
+                        "quote": verdict.quote,
+                        "quote_found": verdict.quote_found,
+                        "quote_words_present": verdict.quote_words_present,
+                    }
+                    for verdict in one.judged.branches
+                ],
+                "forbidden": [
+                    {
+                        "index": verdict.index,
+                        "asserted": verdict.asserted,
+                        "quote": verdict.quote,
+                        "quote_found": verdict.quote_found,
+                        "quote_words_present": verdict.quote_words_present,
+                    }
+                    for verdict in one.judged.forbidden
+                ],
+            }
+            for one in run.judged
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def _judge_control(args: argparse.Namespace) -> int:
+    """The known-bad control. Exit code is the gate: non-zero below the floor."""
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    cases = load_control(args.control_file, golden)
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    budget = (
+        TokenBudget(ceiling=args.token_ceiling)
+        if args.token_ceiling is not None
+        else TokenBudget(ceiling=judge_ceiling_for(len(cases)))
+    )
+    print(
+        f"running {len(cases)} known-bad control cases through {args.model}, "
+        f"token ceiling {budget.ceiling}"
+    )
+    if args.weak_prompt:
+        print("!! WEAKENED JUDGE PROMPT: this run is the red proof, not a pass attempt.")
+    with db.connect() as conn:
+        control = judging.run_control(
+            conn,
+            manifest=manifest,
+            golden=golden,
+            cases=cases,
+            budget=budget,
+            cell=PUBLISHED,
+            morphology=morphology,
+            model=args.model,
+            weak=args.weak_prompt,
+            progress=lambda line: print(line, flush=True),
+        )
+
+    print()
+    print(format_control(control))
+    if not control.passed:
+        print(
+            f"\nfi-rag-eval judge --control: the judge caught {control.caught} of "
+            f"{control.total}. The bar is every case: a judge that misses a failure shape "
+            "cannot be trusted on that shape, and no judged metric may be published while "
+            "this is red.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     # The gateway's credentials live in `.env`, which docker compose already reads
     # for the services. Reading it here too means "clone it and run it" holds for
@@ -423,7 +705,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # the clean-clone build gate exists to catch.
     load_dotenv(find_dotenv(usecwd=True))
     args = _parser().parse_args(argv)
-    handlers = {"ingest": _ingest, "eval": _eval, "answer": _answer}
+    handlers = {"ingest": _ingest, "eval": _eval, "answer": _answer, "judge": _judge}
     try:
         return handlers[args.command](args)
     except HANDLED as exc:

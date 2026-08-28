@@ -1,0 +1,268 @@
+# The judge's known-bad control -- 8 hand-authored BAD answers the judge must catch.
+#
+# ==============================================================================
+# WHAT THIS FILE IS FOR
+# ==============================================================================
+#
+# `CLAUDE.md`'s second verification layer: *"The judge fails a known-bad control.
+# Feed it answers with deliberately wrong citations and fabricated claims. If they
+# pass as grounded, the judge is broken -- fix the judge, not the answer."*
+#
+# Every answer below is written by hand and is WRONG on purpose. None was produced
+# by a model, so nothing here can be contaminated by the answerer's habits, and
+# none is a strawman: each is the kind of wrong a competent, confident assistant
+# actually is. A control made of obvious nonsense would pass any judge and prove
+# nothing.
+#
+# The bar is 8/8 and it is a FLOOR, not a proportion (SPEC-slice-5, build-order
+# calls). A judge that catches three of the four failure shapes cannot be trusted
+# on the fourth, whatever its score. `fi-rag-eval judge --control` exits non-zero
+# below 8/8.
+#
+# ==============================================================================
+# THE FOUR SHAPES, AND WHY THESE FOUR
+# ==============================================================================
+#
+#   wrong-citation        The claim is right, the citation points at a chunk that
+#                         does not carry it. This is the failure `CONTEXT.md:48`
+#                         calls "worse than no citation", and the one a reader
+#                         cannot detect without opening the source.
+#
+#   fabricated-claim      A rule that is in no excerpt, stated with a citation as
+#                         though it were. This project's failure mode #1:
+#                         confident wrongness.
+#
+#   flattened-conditional A conditional obligation stated as one unconditional
+#                         value. ADR-0003 built the whole branch model because
+#                         this is the normal way an answer here goes wrong.
+#
+#   cross-authority       The right rule from the WRONG authority, cited by its
+#                         real address. The product's #1 failure mode
+#                         (`CLAUDE.md` §3) reappearing one layer above the filter:
+#                         tracer slice 3 proved no foreign chunk enters the top-k,
+#                         which is a different claim from "the answer never cites
+#                         one".
+#
+# Four shapes x two authorities = 8. Both authorities, because a judge that reads
+# Lounais-Suomi's prose well and Pirkanmaa's badly would show as a healthy
+# aggregate.
+#
+# ==============================================================================
+# HOW A CASE IS SCORED
+# ==============================================================================
+#
+# Each case names, in `must_catch`, the exact unit verdicts the judge has to
+# return. A case passes only if EVERY entry holds. That is deliberately narrower
+# than "the judge disliked this answer": a judge that marks everything unsupported
+# would pass a disapproval-based control while being useless, so the control tests
+# specific discrimination -- `stated: true` alongside `supported: false` means the
+# judge must recognise the claim IS made and still refuse it support.
+#
+#   unit    branch | forbidden      which list the verdict is in
+#   index   1-based                 which claim in the golden entry's own order
+#   field   stated | supported      for a branch
+#           asserted                for a forbidden item
+#   expect  true | false            what the judge must return
+#
+# ==============================================================================
+# THINGS DELIBERATELY NOT IN HERE
+# ==============================================================================
+#
+# * **No refusals.** A refusal of an answerable question is caught arithmetically
+#   by refusal precision, with no judge involved (tracer slice 3, measured). A
+#   control case for it would test the wrong instrument.
+# * **No question whose retrieval was incomplete.** `kerata-vai-kompostoida` and
+#   `pir-mika-on-keraysvaline` were both candidates and were dropped: their
+#   published-cell top-5 is missing a required chunk, so `supported: false` would
+#   be correct for a reason that has nothing to do with the judge.
+# * **No new question texts.** Every case attaches to an existing golden question
+#   and is judged against the context that question really retrieves in the
+#   published cell, fetched live from the corpus. So the control needs no run
+#   file and is reproducible from a clean clone -- unlike the judged metrics
+#   themselves (confessed in ADR-0010).
+# * **Two cases may share a question.** Holding the context fixed and varying only
+#   the failure shape is a feature: it isolates what the judge is being tested on.
+
+version: 1
+
+cases:
+  # --------------------------------------------------------------------------
+  # Lounais-Suomi
+  # --------------------------------------------------------------------------
+
+  - id: kb-ls-wrong-citation
+    question_id: kompostorin-valinta
+    shape: wrong-citation
+    answer: |
+      Kompostorin valinnassa ratkaisevat kolme asiaa:
+      - Kompostorin on oltava biojätteille suunniteltu, suljettu ja ilmastoitu, eivätkä eläimet
+        saa päästä siihen [lounais-suomi@2024-08-01#18].
+      - Tilavuuden on riitettävä kaikkien kompostoria käyttävien biojätteille, ja kylmien
+        vuodenaikojen hidastuminen on huomioitava [lounais-suomi@2024-08-01#18].
+      - Kompostori voi olla enintään viiden asuinhuoneiston tai vapaa-ajan asunnon yhteinen
+        [lounais-suomi@2024-08-01#18].
+    citations:
+      - lounais-suomi@2024-08-01#18
+    must_catch:
+      - { unit: branch, index: 1, field: stated, expect: true }
+      - { unit: branch, index: 1, field: supported, expect: false }
+    why: >-
+      Every claim is correct and every citation is real, retrieved and wrong. 18 § is
+      "Biojätteen kompostoinnista ilmoittaminen" and carries none of the kompostori
+      construction requirements; those are 17 §, which is also in the context. A judge
+      that reads the citation rather than the claim passes this answer, and a reader
+      who does not open 18 § never finds out.
+
+  - id: kb-ls-fabricated-claim
+    question_id: miksi-biojatteet-pakataan
+    shape: fabricated-claim
+    answer: |
+      Biojäte pakataan, jotta jäteastia pysyy puhtaana ja jäte on turvallista käsitellä.
+      - Biojäte on pakattava pussiin ennen sen sijoittamista biojäteastiaan. Sopivia ovat
+        sekä biohajoava paperipussi että tavallinen muovipussi [lounais-suomi@2024-08-01#25].
+      - Biojäteastiaan ei saa laittaa nestemäistä biojätettä [lounais-suomi@2024-08-01#25].
+    citations:
+      - lounais-suomi@2024-08-01#25
+    must_catch:
+      - { unit: forbidden, index: 1, field: asserted, expect: true }
+    why: >-
+      One clause of one sentence is fabricated -- "sekä tavallinen muovipussi" -- and it is
+      exactly the golden entry's forbidden claim #1. Everything around it is correct and
+      correctly cited, which is what makes it the realistic shape: a fabrication does not
+      arrive as a paragraph of nonsense, it arrives as three extra words inside a true
+      sentence. The rest of the answer is deliberately good so a judge cannot catch this
+      by disliking the answer as a whole.
+
+  - id: kb-ls-flattened-conditional
+    question_id: biojatteen-kerays-jarjestaminen
+    shape: flattened-conditional
+    answer: |
+      Biojätteen erilliskeräys on järjestettävä kaikilla kiinteistöillä: jokaiselle
+      kiinteistölle on hankittava erillinen biojäteastia [lounais-suomi@2024-08-01#15].
+      Biojäte on lisäksi pakattava biohajoavaan pussiin ennen astiaan laittamista
+      [lounais-suomi@2024-08-01#25].
+    citations:
+      - lounais-suomi@2024-08-01#15
+      - lounais-suomi@2024-08-01#25
+    must_catch:
+      - { unit: forbidden, index: 1, field: asserted, expect: true }
+      - { unit: branch, index: 2, field: stated, expect: false }
+    why: >-
+      15 § conditions the obligation on dwelling count and taajama size, and exempts a
+      property that composts under 17 §. This answer states one unconditional rule and
+      drops the exemption entirely -- so it tells a composting household to buy a bin,
+      which is the concrete harm `metrics.py`'s docstring names as the reason complete-set
+      recall is the headline. Two verdicts are required together because either alone is
+      passable: the over-claim without the dropped branch, or the dropped branch without
+      the over-claim, would each be a different and lesser failure.
+
+  - id: kb-ls-cross-authority
+    question_id: miksi-biojatteet-pakataan
+    shape: cross-authority
+    answer: |
+      Biojäte on pakattava biohajoavaan pussiin, esimerkiksi paperipussiin, ennen sen
+      sijoittamista biojäteastiaan [pirkanmaa@2021-07-01#25]. Biojäteastiaan ei saa laittaa
+      nestemäistä biojätettä [pirkanmaa@2021-07-01#25].
+    citations:
+      - pirkanmaa@2021-07-01#25
+    must_catch:
+      - { unit: branch, index: 1, field: stated, expect: true }
+      - { unit: branch, index: 1, field: supported, expect: false }
+    why: >-
+      A Turku resident's question answered with Pirkanmaa's address. The claims happen to
+      be right, which is the trap: the answer is useful-looking and its citation resolves
+      to a real chunk of a real document that this question was never given. `supported`
+      must be false because the cited address is not in EXCERPTS, and `stated` must be
+      true so the judge cannot pass the case by simply failing to see the claim. The
+      arithmetic half (`citations.py`) also flags this as a foreign citation; the control
+      exists to prove the JUDGE catches it, because the arithmetic cannot catch the
+      version where a foreign chunk is genuinely in the context.
+
+  # --------------------------------------------------------------------------
+  # Pirkanmaa
+  # --------------------------------------------------------------------------
+
+  - id: kb-pir-wrong-citation
+    question_id: pir-jateastia-rikki
+    shape: wrong-citation
+    answer: |
+      Rikkoutuneesta keräysvälineestä huolehtiminen kuuluu välineen haltijalle:
+      - Keräysvälineen haltijan on huolehdittava keräysvälineidensä kunnossapidosta siten,
+        etteivät ne aiheuta terveyshaittaa, hajuhaittaa, likaantumista tai roskaantumista,
+        houkuttele haittaeläimiä tai aiheuta turvallisuusriskiä [pirkanmaa@2021-07-01#7].
+      - Puhtaanapito kuuluu haltijalle siltä osin kuin toimenpiteet eivät sisälly
+        jätetaksaan veloituksettomina palveluina [pirkanmaa@2021-07-01#7].
+    citations:
+      - pirkanmaa@2021-07-01#7
+    must_catch:
+      - { unit: branch, index: 1, field: stated, expect: true }
+      - { unit: branch, index: 1, field: supported, expect: false }
+    why: >-
+      The claims are 26 § almost verbatim and the citation is 7 §, "LIITTYMINEN KUNNAN
+      JÄRJESTÄMÄÄN JÄTEHUOLTOON", which is in the retrieved context and carries none of it.
+      The Lounais-Suomi twin of this case cites a neighbouring clause; this one cites a
+      clause from a different part of the document, so the pair tests near and far.
+
+  - id: kb-pir-fabricated-claim
+    question_id: pir-kolmen-viikon-tyhjennysvali
+    shape: fabricated-claim
+    answer: |
+      Kolmen viikon tyhjennysväli on jätehuoltomääräyksissä nimenomaisesti kielletty:
+      määräykset luettelevat sallitut tyhjennysvälit, ja kolmen viikon väli ei ole niiden
+      joukossa [pirkanmaa@2021-07-01#23].
+    citations:
+      - pirkanmaa@2021-07-01#23
+    must_catch:
+      - { unit: forbidden, index: 1, field: asserted, expect: true }
+      - { unit: branch, index: 1, field: stated, expect: false }
+    why: >-
+      23 § sets the LONGEST permitted interval per waste type; it does not enumerate
+      permitted intervals and it forbids nothing at three weeks. The answer inverts the
+      clause's structure while citing it correctly, which is the same shape as the `17 §`
+      inversion that disqualified `gpt-oss-20b` as the answerer in tracer slice 1 -- so
+      this case is a known real failure of a real model, hand-authored rather than
+      harvested. Branch 1 is the claim that the rules set a maximum rather than a list;
+      the answer asserts its opposite, so `stated` must be false.
+
+  - id: kb-pir-flattened-conditional
+    question_id: pir-miksi-jatehuoltoon-liityttava
+    shape: flattened-conditional
+    answer: |
+      Kunnan jätehuoltojärjestelmään on liityttävä, koska jätelaki velvoittaa siihen
+      [pirkanmaa@2021-07-01#4]. Velvoite koskee vakituisia asuntoja; vapaa-ajan asunnot
+      jäävät liittymisvelvollisuuden ulkopuolelle [pirkanmaa@2021-07-01#7].
+    citations:
+      - pirkanmaa@2021-07-01#4
+      - pirkanmaa@2021-07-01#7
+    must_catch:
+      - { unit: forbidden, index: 2, field: asserted, expect: true }
+      - { unit: branch, index: 2, field: stated, expect: false }
+    why: >-
+      The most defensible-looking case in the file, and the one closest to a real mistake.
+      7 § really does carve out "(pois lukien Hämeenkyrön vapaa-ajan asuinkiinteistöt)", so
+      there IS a holiday-home exemption in the retrieved text -- and the answer generalises
+      one municipality's carve-out into a blanket rule, contradicting 4 §, which names
+      vapaa-ajan asunto explicitly and binds it "syntyvän jätteen määrästä riippumatta".
+      A judge that skims will find the exemption and agree. This is the case most likely
+      to be the one the judge misses, which is why it is in the control rather than in a
+      note.
+
+  - id: kb-pir-cross-authority
+    question_id: pir-kolmen-viikon-tyhjennysvali
+    shape: cross-authority
+    answer: |
+      Sekajäteastian pisin sallittu tyhjennysväli on neljä viikkoa, jos kiinteistöllä ei ole
+      biojätteen erilliskeräystä eikä kompostointia [lounais-suomi@2024-08-01#28]. Kolmen
+      viikon väli on siis sallittu, mutta sen on lisäksi sovelluttava jäteyhtiön
+      kuljetusjärjestelmään [lounais-suomi@2024-08-01#28].
+    citations:
+      - lounais-suomi@2024-08-01#28
+    must_catch:
+      - { unit: branch, index: 1, field: supported, expect: false }
+      - { unit: branch, index: 2, field: supported, expect: false }
+    why: >-
+      A Nokia resident's question answered with Lounais-Suomi's address. Both claims are
+      substantively right for Pirkanmaa and both citations are fabricated for this context.
+      Two branch verdicts rather than one, because this answer states BOTH required
+      branches -- so the only thing wrong with it is where the support was claimed to come
+      from, which is precisely the discrimination the judge exists to make.

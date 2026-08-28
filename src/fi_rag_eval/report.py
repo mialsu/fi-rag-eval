@@ -26,6 +26,7 @@ from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
 from fi_rag_eval.ingest import IngestReport
+from fi_rag_eval.judging import ControlRun, JudgeRun
 from fi_rag_eval.metrics import Metrics, discordance
 
 RANKER_NOTE = (
@@ -566,15 +567,29 @@ def format_refusals(run: AnswerRun) -> str:
             f"  WRONGLY refused ({len(metrics.wrongly_refused)}): "
             f"{', '.join(metrics.wrongly_refused)}"
         )
-    if metrics.refusals_with_citations:
+    if metrics.refusals_citing_outside:
         lines.append(
-            f"  DEFECT — refusals carrying citations ({len(metrics.refusals_with_citations)}): "
-            f"{', '.join(metrics.refusals_with_citations)}"
+            f"  DEFECT — refusals citing what they were not given "
+            f"({len(metrics.refusals_citing_outside)}): "
+            f"{', '.join(metrics.refusals_citing_outside)}"
         )
         lines.append(
-            "  A refusal asserts the context does not support an answer; a citation on one"
+            "  A refusal asserts the retrieved context does not answer the question, so an"
         )
-        lines.append("  points at a chunk that supports nothing.")
+        lines.append("  address from outside that context is wrong however it got there.")
+    if metrics.refusals_citing_context:
+        lines.append(
+            f"  diagnostic — refusals citing the context they explain "
+            f"({len(metrics.refusals_citing_context)}): "
+            f"{', '.join(metrics.refusals_citing_context)}"
+        )
+        lines.append(
+            "  NOT a defect (ADR-0010). These cite a retrieved chunk to say what the excerpts"
+        )
+        lines.append(
+            "  DO cover -- a more auditable refusal than a bare one. The count is watched;"
+        )
+        lines.append("  neither direction is wrong.")
     lines.append(
         f"  cost       ${run.cost_usd:.4f} measured at the gateway over {run.calls} calls, "
         f"{run.tokens} tokens (ceiling {run.ceiling})"
@@ -614,4 +629,307 @@ def format_refusal_detail(run: AnswerRun) -> str:
             scored.answer.text, width=WIDTH - 6, initial_indent="    ", subsequent_indent="    "
         )
         lines.append(body)
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# The judged answer layer (slice 5, tracer 4)
+# ---------------------------------------------------------------------------
+
+AGREEMENT_FLOOR = 0.85
+"""D11's pre-registered publishability floor for judge-human agreement.
+
+Fixed in the spec before any agreement figure existed, *because* a floor set
+afterwards is whatever the number happened to be. Below it the judge carries ~15%
+label noise and a 0.05 difference in groundedness stops being distinguishable from
+the judge disagreeing with itself.
+"""
+
+
+def _ratio(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+def format_address_validity(run: JudgeRun) -> str:
+    """Citation address validity: the answer layer's number that needs no judge.
+
+    Printed first and without a caveat, deliberately. It is arithmetic over the
+    retrieved sets, so it is the one figure here that is publishable the moment it
+    exists -- the same standing `metrics.py` has at the retrieval layer, and for
+    the same reason.
+    """
+    validity = run.validity
+    lines = [
+        "citation address validity — arithmetic only, no judge, no network, no floor",
+        f"  answers            {validity.answers} judged, {validity.answers_citing} cited anything",
+        f"  citations          {validity.citations} emitted",
+        f"  resolve            {_ratio(validity.validity)}   {validity.inside} name a chunk "
+        "this question actually retrieved",
+        f"  clean answers      {_ratio(validity.clean_answers)}   every citation resolves",
+        f"  unparseable        {validity.unparseable}   not a chunk address at all",
+        f"  outside context    {validity.outside}   a real-looking address the answerer was "
+        "not given",
+        f"  FOREIGN authority  {validity.foreign}   cited another authority's document",
+    ]
+    if validity.foreign_offenders:
+        lines.append(
+            f"  DEFECT — cross-authority citations in: {', '.join(validity.foreign_offenders)}"
+        )
+        lines.append(
+            "  The retrieval filter is proven to keep foreign chunks out of the top-k; that"
+        )
+        lines.append(
+            "  is a different claim from the answer never citing one, and this is the check"
+        )
+        lines.append("  for the second claim.")
+    elif validity.offenders:
+        lines.append(f"  answers with an unresolvable citation: {', '.join(validity.offenders)}")
+    return "\n".join(lines)
+
+
+def format_judged(run: JudgeRun, *, agreement: float | None = None) -> str:
+    """The judged metrics, and D11's publication rule enforced rather than described.
+
+    **This function is where "never publish a judged metric whose judge is
+    unvalidated" actually happens.** `JudgeRun` carries no agreement field, so the
+    caller has to supply one or state that there is none; and with none, or one
+    below the floor, groundedness is withheld from the published block and appears
+    only under a DIAGNOSTIC heading that says why it may not be quoted.
+
+    The alternative -- a metrics object that hides its own value -- was rejected
+    because it is harder to test than an object that carries the number and a
+    report that refuses it a headline.
+    """
+    metrics = run.metrics
+    publishable = agreement is not None and agreement >= AGREEMENT_FLOOR
+    lines = [
+        f"answer layer — {run.cell.name}, answerer {run.answerer}, judge {run.judge_model}",
+        f"  source        {run.source}  (answered at commit {run.source_commit or 'unknown'})",
+        f"  judged        {metrics.answers} answers, {metrics.units} units "
+        f"({metrics.branches_required} branches + {metrics.forbidden_items} forbidden)",
+    ]
+    if run.weak:
+        lines.append("  !! WEAKENED JUDGE PROMPT — these numbers measure a judge built to fail the")
+        lines.append("     control. Never quote them as a result.")
+    if run.dirty_provenance:
+        lines.append(
+            "  !! the answers were produced from an UNCOMMITTED tree, so this table cannot"
+        )
+        lines.append("     be reproduced from a commit. Said out loud rather than rounded off.")
+    if run.partial:
+        lines.append(
+            f"  !! PARTIAL RUN — {metrics.answers} of {run.available} answers judged. This is"
+        )
+        lines.append(
+            "     NOT a result and no number below may be quoted: a metric over a reduced N"
+        )
+        lines.append("     is the output this project says destroys it.")
+
+    lines.append("")
+    # A partial run cannot publish, whatever the agreement figure says. The two
+    # gates are independent and both have to hold.
+    publishable = publishable and not run.partial
+    if publishable:
+        assert agreement is not None  # narrowed by `publishable`
+        lines.append("  PUBLISHED")
+        lines.append(
+            f"    groundedness      {_ratio(metrics.groundedness)}   supported "
+            f"{metrics.branches_supported} / stated {metrics.branches_stated} branches"
+        )
+        lines.append(
+            f"    branch coverage   {metrics.branch_coverage:.3f}   stated "
+            f"{metrics.branches_stated} / required {metrics.branches_required} branches"
+        )
+        lines.append(
+            f"    judge agreement   {agreement:.3f}   at or above the {AGREEMENT_FLOOR:.2f} floor"
+        )
+        lines.append(
+            "    Never quote groundedness without both companions. It is gameable by saying"
+        )
+        lines.append(
+            "    less and branch coverage is gameable by saying everything; only the pair is"
+        )
+        lines.append("    a metric.")
+    else:
+        lines.append("  PUBLISHED   nothing. Groundedness is WITHHELD.")
+        if agreement is None:
+            lines.append(
+                "    Judge-human agreement is NOT MEASURED — it is tracer slice 5's work and"
+            )
+            lines.append(
+                "    does not exist yet. D11: groundedness may never appear without it, so"
+            )
+            lines.append(
+                "    there is no publishable answer-layer number in this run. An unvalidated"
+            )
+            lines.append("    judge is a second opinion with extra steps.")
+        else:
+            lines.append(f"    Judge-human agreement is {agreement:.3f}, below the pre-registered")
+            lines.append(
+                f"    {AGREEMENT_FLOOR:.2f} floor. At that level the judge carries ~15% label"
+            )
+            lines.append(
+                "    noise, so a 0.05 difference in groundedness is not distinguishable from"
+            )
+            lines.append("    the judge disagreeing with itself.")
+
+    lines.append("")
+    lines.append("  DIAGNOSTIC — computed, not published. Do not quote these on their own.")
+    lines.append(
+        f"    groundedness      {_ratio(metrics.groundedness)}   supported "
+        f"{metrics.branches_supported} / stated {metrics.branches_stated} branches"
+    )
+    lines.append(
+        f"    branch coverage   {metrics.branch_coverage:.3f}   stated "
+        f"{metrics.branches_stated} / required {metrics.branches_required} branches"
+    )
+    lines.append(
+        f"    over-claim rate   {metrics.over_claim_rate:.3f}   "
+        f"{len(metrics.answers_over_claiming)} of {metrics.answers} answers assert a "
+        "forbidden claim"
+    )
+    lines.append(
+        f"    forbidden items   {metrics.forbidden_asserted} of {metrics.forbidden_items} "
+        "asserted (per item, not per answer)"
+    )
+    lines.append(
+        f"    refused           {metrics.refused} of {metrics.answers} answerable questions; "
+        "each scores 0 on branch coverage"
+    )
+    lines.append(
+        "    No interval is printed for any of these. Units cluster within an answer, so a"
+    )
+    lines.append(
+        "    naive binomial interval would overstate the precision -- the same class of error"
+    )
+    lines.append("    as the +/-0.18 slice 3 retracted. A cluster-aware one arrives with tracer 5.")
+
+    lines.append("")
+    lines.append("  THE JUDGE'S OWN BEHAVIOUR — watched, because it is under validation")
+    if metrics.judge_fabrications:
+        lines.append(
+            f"    DEFECT — quoted words the answer does not contain, on "
+            f"{len(metrics.judge_fabrications)}: {', '.join(metrics.judge_fabrications)}"
+        )
+        lines.append(
+            "    This is the judge agreeing a claim is present because it ought to be, and it"
+        )
+        lines.append(
+            "    would corrupt the metric. Caught by string search, with no human in the loop."
+        )
+    if metrics.judge_splices:
+        lines.append(
+            f"    splices — quote not contiguous, every word present, on "
+            f"{len(metrics.judge_splices)}: {', '.join(metrics.judge_splices)}"
+        )
+        lines.append(
+            "    NOT a defect. The judge joined fragments from different parts of the answer,"
+        )
+        lines.append(
+            "    so the claim really is stated. Reported apart from the line above because"
+        )
+        lines.append(
+            "    pooling them would inflate the count that matters -- measured, not assumed:"
+        )
+        lines.append(
+            "    the first full run flagged 9 answers and the first one inspected was a splice."
+        )
+    if not metrics.judge_fabrications and not metrics.judge_splices:
+        lines.append(
+            "    quote check       every `stated` and `asserted` verdict quoted the answer verbatim"
+        )
+    lines.append(
+        f"    incoherent        {run.incoherent_verdicts} verdict(s) normalised "
+        "(`supported` without `stated`, or a branch read out of a refusal)"
+    )
+    if run.json_validation_retries:
+        lines.append(
+            f"    json retries      {run.json_validation_retries} generation(s) rejected as "
+            "invalid JSON and retried"
+        )
+    lines.append(
+        f"  cost          ${run.cost_usd:.4f} measured at the gateway over {run.calls} calls, "
+        f"{run.tokens} tokens (ceiling {run.ceiling})"
+    )
+    return "\n".join(lines)
+
+
+def format_judged_detail(run: JudgeRun) -> str:
+    """Every judged answer, unit by unit, with the judge's own quote.
+
+    A judged metric that cannot be read back claim by claim is a number with no
+    defence. This is also the view tracer slice 5's hand labelling is done
+    against, so it prints the quote rather than summarising it.
+    """
+    lines = ["judged answers — unit by unit"]
+    checks = {one.question_id: one for one in run.checks}
+    for judgement in run.judged:
+        one = judgement.judged
+        lines.append("")
+        state = "REFUSED" if one.refused else f"stated {one.stated}/{one.required_branches}"
+        lines.append(
+            f"  {one.question_id}  {state}  supported {one.supported}  "
+            f"over-claims {one.over_claims}"
+        )
+        cited = checks.get(one.question_id)
+        if cited is not None and cited.invalid:
+            lines.append(f"    unresolvable citations: {', '.join(cited.invalid)}")
+        for verdict in one.branches:
+            mark = "-" if not verdict.stated else ("OK " if verdict.supported else "UNSUPPORTED")
+            lines.append(f"    B{verdict.index} {mark:<12} {verdict.quote[:110] or '(not stated)'}")
+            if verdict.stated and not verdict.quote_found:
+                lines.append("        ^ the judge's quote is NOT in the answer text")
+        for over_claim in one.forbidden:
+            if over_claim.asserted:
+                lines.append(f"    F{over_claim.index} OVER-CLAIM  {over_claim.quote[:110]}")
+                if not over_claim.quote_found:
+                    lines.append("        ^ the judge's quote is NOT in the answer text")
+    return "\n".join(lines)
+
+
+def format_control(run: ControlRun) -> str:
+    """The known-bad control. A floor at 8/8, and it says so when it fails.
+
+    `AC10` requires this seen red, so the failure output has to be worth reading:
+    every missed case names the verdict that was expected, the verdict that came
+    back, and the authored reason the case exists.
+    """
+    verdict = "PASS" if run.passed else "FAIL"
+    lines = [
+        f"known-bad control — judge {run.judge_model}{'  [WEAKENED PROMPT]' if run.weak else ''}",
+        f"  {verdict}  {run.caught}/{run.total} authored bad answers caught",
+        "  This is a FLOOR, not a proportion. A judge that catches three of the four",
+        "  failure shapes cannot be trusted on the fourth, so 7/8 is not 0.875 -- it is a",
+        "  judge with a known blind spot and a number that would hide it.",
+        "",
+    ]
+    for outcome in run.outcomes:
+        case = outcome.case
+        lines.append(
+            f"  {'CAUGHT' if outcome.caught else 'MISSED'}  {case.id:<30} {case.shape:<22} "
+            f"({case.question_id})"
+        )
+        for expectation in case.must_catch:
+            lines.append(f"    expected {expectation.render()}")
+        for failure in outcome.failures:
+            lines.append(f"    FAILED   {failure}")
+        if not outcome.caught and case.why:
+            lines.append(
+                textwrap.fill(
+                    case.why,
+                    width=WIDTH - 6,
+                    initial_indent="    why: ",
+                    subsequent_indent="         ",
+                )
+            )
+    lines.append("")
+    lines.append(
+        f"  cost  ${run.cost_usd:.4f} measured at the gateway over {run.total} calls, "
+        f"{run.tokens} tokens"
+    )
+    if run.json_validation_retries:
+        lines.append(
+            f"  NOTE  {run.json_validation_retries} generation(s) rejected as invalid JSON "
+            "and retried"
+        )
     return "\n".join(lines)

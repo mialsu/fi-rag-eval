@@ -643,8 +643,13 @@ Four of the five carried here at shaping time have been answered. What remains i
   |---|---|---|
   | Groundedness | branches **stated** | excluded entirely |
   | Branch coverage | branches **required** | excluded entirely |
-  | Over-claim | **forbidden** items | **included** |
+  | Over-claim | **forbidden** items | ~~**included**~~ **EXCLUDED — corrected 28 Aug 2026, tracer 4** |
   | Refusal precision / recall | see D5 | the population |
+
+  **The over-claim row was wrong and could not have been implemented.** `golden.RefusalQuestion`
+  has no `forbidden` field, so there is nothing to score over a refusal question — and it would be
+  redundant if there were: for a refusal case, asserting any substantive answer *is* the failure that
+  refusal recall already measures. Over-claim is computed over the **50 answerable questions**.
 
   *Why this reading:* the project already rejected the alternative's shape one layer down.
   `metrics.py`'s docstring refuses per-chunk recall as a headline because it *"awards partial credit
@@ -662,8 +667,11 @@ Four of the five carried here at shaping time have been answered. What remains i
   stating one well-supported branch of five scores 1.0. That is exactly why D11 makes **branch
   coverage a load-bearing mandatory companion rather than a diagnostic**, and why a wrongly-refused
   answerable question scores **0 on branch coverage**. Cowardice is punished there, not by
-  distorting groundedness into something it cannot compute. A refusal emitting any citation is a
-  defect, checked arithmetically.
+  distorting groundedness into something it cannot compute. ~~A refusal emitting any citation is a
+  defect, checked arithmetically.~~ **AMENDED 28 Aug 2026, on measured evidence — see the spec
+  delta below and ADR-0010 decision 4.** The rule fired twice in tracer slice 3 and both times it
+  labelled the *better* refusal as worse. It is now two checks: citing an address **outside** the
+  retrieved set is a defect, citing one **inside** it is a counted diagnostic.
 
 
 - ~~**The monthly cap figure at Groq.**~~ **$25/month, set by the Owner on 27 Aug 2026.** ~370 runs.
@@ -1085,3 +1093,229 @@ count. **Seen red on the full-run path:** `--token-ceiling 1` stopped the run af
 
 _None yet. Anything the build teaches that contradicts the above lands here, dated, rather than
 being quietly edited into the text as though it always said that._
+
+---
+
+## Tracer slice 4 — measured result (28 Aug 2026)
+
+`The judge built, 199 units judged in 50 calls three times over, the 8/8 control passed and seen
+red, and judge self-consistency measured because a 20-minute-apart re-run disagreed with itself.
+Cost $0.2790 for the measurements reported here, $0.3084 including two confirmation re-runs of
+the control — the cheapest tracer in this slice by an order of magnitude.`
+
+### AC verdicts
+
+A verdict per criterion; the tracer's is the **worst** among them.
+
+| # | Verdict | Evidence |
+|---|---|---|
+| AC9 | **MET** | `citations.py` is pure arithmetic — no judge, no network, no floor. Unit-tested (`TestCitationAddressValidity`). Measured over 50 answers: **58 citations, address validity 1.000, 0 unparseable, 0 outside the context, 0 foreign.** |
+| AC10 | **MET, seen red** | **8/8 caught**, exit 0. Weakened prompt: **4/8, exit 1** — and it failed on exactly the citation-support shapes while still catching every over-claim. |
+| AC12 | **MET, seen red, in all four states** | Agreement `None` → withheld; 0.80 → withheld naming the floor; 0.85 → published with both companions; partial run → withheld regardless. Three by unit test, the 0.80 case also live via `--stub-agreement`. |
+| AC3 (judge half) | **MET, seen red** | The judge's envelope is a hard error on seven malformed shapes, on a missing verdict, on a non-boolean, and on `stated` with no quote. A bad *verdict* is data. |
+| AC4 | **PARTIAL** | All **50** answered questions judged, N=50 on the table, 199 units. Still PARTIAL: the metrics exist but **nothing is published**, which is D11 working, not a gap. Closed by tracer 5. |
+| AC11 | **NOT MET — not this tracer** | Judge–human agreement is tracer 5's. The *arithmetic* and its cluster-aware interval are built and tested (`metrics.unit_agreement`, `cluster_robust_interval`) and were used to measure judge self-consistency. |
+| AC17 | **MET** | Every figure read from the gateway's `response_cost`. Gateway spend $1.4261 → $1.7051. |
+| AC2, AC6 | carried MET from tracers 2–3 | The judge goes through the same boundary and the same budget. |
+
+**Tracer verdict: PARTIAL**, on AC4/AC11, neither of which this tracer claimed to close.
+
+### The numbers
+
+`fi-rag-eval judge eval/runs/answers-tracer3-4b75dfd.json`, judge `openai/gpt-oss-120b`,
+50 of 50 answered questions, **199 units in 50 calls**, exit 0.
+
+```
+citation address validity — arithmetic only, no judge, no network, no floor
+  answers            50 judged, 45 cited anything
+  citations          58 emitted
+  resolve            1.000   58 name a chunk this question actually retrieved
+  clean answers      1.000   every citation resolves
+  unparseable        0     outside context  0     FOREIGN authority  0
+
+answer layer — lemma-reasm/0, answerer qwen/qwen3.6-27b, judge openai/gpt-oss-120b
+  PUBLISHED   nothing. Groundedness is WITHHELD (agreement NOT MEASURED).
+  DIAGNOSTIC — computed, not published:
+    groundedness      1.000   supported 59 / stated 59 branches
+    branch coverage   0.472   stated 59 / required 125 branches
+    over-claim rate   0.020   1 of 50 answers assert a forbidden claim
+    refused           7 of 50; each scores 0 on branch coverage
+  cost  $0.0699 measured at the gateway over 50 calls, 310467 tokens
+```
+
+Three full runs over the identical input, which is itself the headline finding below:
+
+| run | stated | supported | groundedness | branch coverage | non-contiguous quotes | cost |
+|---|---|---|---|---|---|---|
+| 1 | 59 | 58 | 0.983 | 0.472 | 9 answers | $0.0699 |
+| A | 59 | 59 | 1.000 | 0.472 | 2 answers | $0.0684 |
+| B | 60 | 60 | 1.000 | 0.480 | 2 answers (both splices, 0 fabrications) | $0.0671 |
+
+### The finding nobody registered: the judge disagrees with itself
+
+**Judge self-consistency = 0.975 [0.95, 1.00] over D3's 199 units, 50 questions, cluster-robust.**
+Branch units 120/125 = 0.960. Forbidden items 74/74 = 1.000.
+
+Found by accident: the same question re-judged twenty minutes later returned `stated 3/3` where it
+had returned `stated 2/3`. `temperature=0` becomes `1e-8` at Groq (ADR-0008) — recorded for the
+*answerer* in tracer 2, and never reasoned about for the *judge*, which goes through the same
+boundary.
+
+Why it matters and why it is not fatal: **self-consistency is a ceiling on judge–human
+agreement** — two judge runs that differ cannot both match a human — so D11's 0.85 floor was about
+to be applied to a number whose maximum was unknown. It is now known, and at 0.975 it is
+comfortably clear of the floor. Tracer 5's construction is unaffected; only the *reading* of its
+headline changes, which must be reported against 0.975 rather than against 1.0. `CONTEXT.md` gains
+**Judge self-consistency** as a term, and `REVIEW-DEBT.md` carries the open item.
+
+The forbidden 1.000 should not be read as strength: **73 of the 74 forbidden items were unanimous
+negatives in both runs**, and a verdict class with almost no positives is consistent for free.
+
+### Prediction 5's nominated statistic cannot answer prediction 5 — but the substance holds
+
+Prediction 5 — *"answer failures are dominated by retrieval, not generation"* — is **the prediction
+that decides slice 6**, and it was registered over **groundedness**, split by whether the complete
+required set was retrieved.
+
+| stratum | questions | branch coverage | groundedness |
+|---|---|---|---|
+| complete retrieval | 41 | **0.574** (58/101) | 1.000 |
+| incomplete retrieval | 9 | **0.042** (1/24) | 1.000 |
+| complete, and answered rather than refused | 39 | 0.598 (58/97) | 1.000 |
+| incomplete, and answered rather than refused | 4 | 0.111 (1/9) | 1.000 |
+
+**Groundedness is 1.000 in both strata, so the statistic prediction 5 named has zero variance and
+cannot discriminate.** The prediction as written is neither confirmed nor refuted; it is **void**.
+
+**Branch coverage answers it unambiguously: 0.574 against 0.042, a 13.7x gap, and 0.598 against
+0.111 with refusals excluded.** Answer failures track what retrieval delivered.
+
+This is the third time in this project that a pre-registered *statistic* was wrong while the
+question behind it was answerable — after slice 3's ±0.18 and D5's ±0.13. **The decision rule for
+slice 6 therefore fires for the reranker, but on substituted evidence, and that substitution is the
+Owner's to accept.** It is raised as an open question rather than acted on.
+
+### Prediction 4 is CONFIRMED, and it is the reason groundedness is dead here
+
+Prediction 4: *"branch coverage < groundedness."* Measured **0.472 against 1.000**. Confirmed as
+decisively as a prediction can be — and *degenerately*, because groundedness is pinned at its
+ceiling.
+
+The mechanism: groundedness' denominator is branches **stated**, and `qwen/qwen3.6-27b` does not
+state a branch it cannot cite. It drops the branch instead. So **groundedness measures a failure
+mode this answerer does not have**, and every bit of the answer layer's signal is in the companion
+metric. D11's *"gameable by saying less"* is not a hypothetical risk here; it is the observed
+behaviour, and the pairing rule that was written to contain it is necessary but — on this
+evidence — not sufficient. Open question below.
+
+### Prediction 1 is REFUTED, on a subject that no longer exists
+
+Prediction 1 fixed *"`gpt-oss-20b` groundedness lands 0.55–0.80 at claim level"*. `gpt-oss-20b` was
+disqualified as the answerer in tracer 1, so the prediction's subject is gone. Scored against the
+answerer that replaced it, **0.983–1.000 is far above the band: refuted.** Recorded rather than
+quietly dropped, because a prediction whose subject changes is exactly the kind that gets forgotten.
+
+### Prediction 2 has a hint, and it points the wrong way
+
+Prediction 2: *"agreement clears 0.85 at claim level — but agreement on `forbidden` items is lower
+than on required claims. If over-claim agreement is the higher of the two, the judge prompt is
+probably collapsing the two questions into one."*
+
+Judge–human agreement does not exist yet, so this is **not scored.** But self-consistency is the
+closest available proxy and it puts forbidden items *higher* (1.000 against 0.960) — the pattern
+prediction 2 named as a warning sign. The benign explanation is available and probably correct: 73
+of 74 forbidden items are unanimous negatives, so there is nothing there to be inconsistent about.
+**Both readings are recorded so that tracer 5 cannot claim either as a surprise.**
+
+The red proof points the same way and is stronger evidence: the weakened judge lost **all four
+citation-support cases and none of the four over-claim cases.** Over-claim detection survived a
+prompt written to be credulous; citation support did not. So the two questions are *not* collapsed
+— they are separately readable, and the harder of the two is `supported`.
+
+### The quote check earned its place, and its first number overstated the problem
+
+The judge is required to quote the words that state each claim, and the quote is checked against the
+answer text. `stated` with no quote is a hard error; a quote that is not in the text is recorded.
+
+**The first run flagged 9 of 50 answers, and the first one inspected was not a fabrication.** On
+`kompostoinnin-aloittaminen` the judge had joined `- Biojäte:` from the head of a bullet to a
+sentence three clauses later: every word present, claim genuinely stated, quote merely not
+contiguous. So the contiguity check alone conflates a **splice** with an **invention**, and one
+count for both would have published an 18% judge-fabrication rate that was mostly untidy quoting.
+
+Fixed inside the tracer: `quote_words_present` splits them by multiset word containment, and the
+two are reported apart. Run B — the first run with the split — reports **2 splices and 0
+fabrications.** The check stays, because it catches the failure that matters with no human in the
+loop, and because 9-then-2-then-2 on identical input was one of the two signals that exposed the
+non-determinism above.
+
+### The control is a real test, not a disapproval detector
+
+8/8 caught. Three of the eight required `stated: true` **alongside** `supported: false`, so a judge
+that marked everything unsupported would have failed them. Under the weakened prompt exactly those
+shapes broke:
+
+```
+MISSED  kb-ls-wrong-citation      FAILED  branch 1 supported=false but the judge said true
+MISSED  kb-ls-cross-authority     FAILED  branch 1 supported=false but the judge said true
+MISSED  kb-pir-wrong-citation     FAILED  branch 1 supported=false but the judge said true
+MISSED  kb-pir-cross-authority    FAILED  branch 1 supported=false but the judge said true
+                                  FAILED  branch 2 supported=false but the judge said true
+CAUGHT  all four fabricated-claim / flattened-conditional cases
+```
+
+The weakening that did the damage is *"say whether it looks properly cited"* replacing *"is the
+claim carried by the text of an excerpt the ANSWER cites for it"*. That is not a strawman; it is
+what a judge prompt written without adversarial intent reads like.
+
+### Cost: measured, and the cheap surprise
+
+**$0.2790 for the measurements reported here** — three full 50-call runs, two 8-call controls and
+four probes; **$0.3084** including two further control runs that re-confirmed 8/8 on the shipped
+and then the committed code. Gateway spend $1.4261 -> $1.7345 of the $25 monthly ceiling.
+Per judge call **$0.0014** and ~6,200 tokens, against the answerer's measured $0.0118 and 7,476.
+
+So the judge is **8.4x cheaper per call than the answerer**, and a full answer-plus-judge cycle is
+**$0.7553 + $0.0699 = $0.8252**, ~30 runs inside the $25/month ceiling. ADR-0008's estimate had the
+judge at roughly the answerer's cost (110K tokens for 50 judge calls against 110K for 50 answers);
+it is measured at 310K for the pair of phases and the *judge's share is 18%, not 50%*. Prediction 6
+is already refuted on the answer phase and nothing here rescues it. **No figure above was
+predicted.**
+
+### Spec deltas from this slice
+
+1. **"A refusal emitting any citation is a defect, checked arithmetically" is AMENDED** (line ~665,
+   inside the resolved groundedness entry). It fired twice in tracer 3 and both times labelled the
+   *better* refusal as worse. Now two checks: outside the retrieved set is a defect, inside it is a
+   counted diagnostic. **No published number moved** — recall 0.857 and precision 0.632 come from
+   the `refused` field alone. ADR-0010 decision 4; `REVIEW-DEBT.md` entry closed.
+2. **D3's "199 units" does not define agreement on a branch.** A branch unit carries two
+   judgements (`stated`, `supported`); a forbidden item carries one. **Resolved here as the strict
+   reading — a branch agrees only when both fields agree** — giving 0.975 over 199. The per-field
+   reading (0.969 over 324) is rejected: `parse_verdicts` couples the two fields by construction, so
+   324 is not 324 independent observations.
+3. **Prediction 5's statistic is void and its substance is answered by branch coverage.** The slice
+   6 decision rule keys on prediction 5, so the substitution is flagged for the Owner rather than
+   applied.
+4. **D11's pairing rule is necessary and not sufficient**, because groundedness saturates at 1.000
+   on this answerer. Open question below; not decided here.
+5. **The over-claim denominator table in the "Answered since shaping" entry says refusal questions
+   are *included* in over-claim.** They cannot be: `golden.RefusalQuestion` has no `forbidden`
+   field, so there is nothing to score. It is also redundant — for a refusal question, asserting any
+   substantive answer *is* the failure refusal recall already measures. **Corrected: over-claim is
+   over the 50 answerable questions.**
+
+### Open questions this tracer adds (both the Owner's)
+
+- **Should the published answer-layer headline move from groundedness to branch coverage?**
+  Measured: groundedness 1.000 / 0.983, identical across both retrieval strata, no variance.
+  Branch coverage 0.472, and 0.574-against-0.042 across the strata. D11 considered branch coverage
+  as the headline and rejected it for being judge-dependent — but groundedness is judge-dependent in
+  exactly the same way, so that argument does not separate them. *Recommendation:* **publish branch
+  coverage as the headline with groundedness beside it**, inverting D11's pair while keeping the
+  rule that neither appears alone. A headline of 1.000 that is identical whether retrieval worked or
+  not tells a reader nothing, and will be quoted anyway.
+- **Does the slice 6 decision rule fire on substituted evidence?** Prediction 5 is void as written
+  and its substance holds decisively on branch coverage. *Recommendation:* **yes, treat the rule as
+  fired for the reranker**, and require slice 6's spec to pre-register its fix size against branch
+  coverage rather than groundedness — plus the 6-discordant-question bar, which is unchanged.

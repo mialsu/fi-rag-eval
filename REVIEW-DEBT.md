@@ -54,7 +54,20 @@ ledger is worse than none, because sessions trust it.
 - **Why it matters now rather than later:** the judge is asked about citations too (tracer 4), so a
   definition that is wrong here will be wrong there, and the frozen agreement sample (tracer 5) will
   be hand-labelled against whichever definition stands.
-- **Disposition:** open. Decide before tracer 4 builds the judge prompt.
+- **Disposition:** **CLOSED 28 Aug 2026 — the rule was WRONG and is narrowed, not kept.** Decided
+  before the judge prompt was written, which is why this entry demanded it. ADR-0010 decision 4
+  splits the one check in two: citing an address **outside** the retrieved set stays a defect (the
+  half that was always unambiguous — a refusal asserting the context does not answer the question
+  while pointing outside that context contradicts itself), and citing a chunk it **did** retrieve
+  becomes a counted diagnostic. The deciding argument is this project's own definition of Citation
+  (`CONTEXT.md:40`): both observed cases are *correct* citations whose claims happen not to be
+  answers, so the rule labelled the more auditable refusal as the worse one and pressured the
+  answerer toward output nobody can check.
+  **No published number moved.** Recall 0.857 and precision 0.632 are computed from the `refused`
+  field alone. Only the reported line changed (`metrics.py` `refusals_citing_context` /
+  `refusals_citing_outside`, `report.py` `format_refusals`), plus one new arithmetic check that
+  currently fires zero times. A change to a *definition*, logged as a spec delta — never a
+  correction applied to a result.
 
 ## 2026-08-28 (slice 5, tracer 3) — `json_validate_failed` is now retried, and tracer 2's diagnosis of it was incomplete
 
@@ -759,3 +772,97 @@ ledger is worse than none, because sessions trust it.
   anti-pattern, and it survived being written, reviewed and reasoned about — right up until
   someone tried to watch it fail. The lesson is the entry, not the bug.
 - **Disposition:** **CLOSED 28 Aug 2026 (slice 5, tracer 2)**, by ADR-0009 and a red proof.
+
+## 2026-08-28 (slice 5, tracer 4) — the judge is NON-DETERMINISTIC, and nobody had priced that in
+
+- **What:** three judge runs over the *identical* frozen answer file returned different verdicts.
+  Aggregate branch coverage was stable at 0.472 (59/125) in two of them, but `supported` moved by
+  one branch and the non-contiguous-quote count moved from **9 answers to 2**. On one question
+  (`biojatteen-kerays-jarjestaminen`) the same judge said `stated 2/3` and then `stated 3/3`
+  twenty minutes later.
+- **Where:** `src/fi_rag_eval/answer.py` `_complete_once` sets `temperature=0`, which Groq rewrites
+  to `1e-8` (ADR-0008). The judge goes through the same boundary as the answerer, so it inherits
+  the same non-determinism — which was recorded for the *answerer* and never reasoned about for the
+  *judge*.
+- **What green tests do NOT prove here:** nothing in `make gate` makes a live model call, so no test
+  can see this. The unit tests pin the arithmetic given a verdict; they cannot pin the verdict.
+- **Why it matters:** judge–human agreement (tracer slice 5, D11's publishability gate at ≥0.85)
+  is measured against *one* judge run. If the judge disagrees with **itself**, that
+  self-consistency is a **ceiling** on any agreement it can reach — two runs that differ cannot
+  both match a human. `CONTEXT.md` now carries **Judge self-consistency** as a term for it.
+- **MEASURED, so the ceiling is a number rather than a worry: 0.975 [0.95, 1.00] over D3's 199
+  units, 50 questions, cluster-robust.** Branch units 120/125 = 0.960; forbidden items 74/74 =
+  1.000 — and that 1.000 is consistent *for free*, because 73 of the 74 were unanimous negatives in
+  both runs. **The ceiling is therefore well clear of the 0.85 floor and does not threaten tracer
+  slice 5's construction — only the reading of its headline**, which must be reported against 0.975
+  rather than against 1.0. Computed with the shipped `metrics.unit_agreement`, the same function
+  tracer slice 5 will use against hand labels.
+- **Not fixed, and the options are not equal:** re-running the judge N times and taking a majority
+  would raise consistency and multiply cost by N; caching a verdict per unit would make the harness
+  deterministic and freeze in whatever the first run happened to say. Both are real designs and
+  neither is a tracer-4 decision.
+- **A definitional gap this measurement exposed, which tracer slice 5 must close:** D3 says
+  agreement is published over 199 units, but a **branch** unit carries *two* judgements (`stated`
+  and `supported`) while a forbidden item carries one. So "199 units" does not by itself say what
+  agreement on a branch means. Scored strictly — a branch agrees only when both fields do — the
+  figure is 0.975 over 199. Scored per field it is 0.969 over 324, and that denominator is
+  misleading anyway, because `parse_verdicts` forces `supported` false whenever `stated` is false,
+  so the two fields are coupled by construction and every one of the five observed flips moved
+  both. **The strict 199-unit reading is the one to publish**; it is stated here so tracer slice 5
+  finds a decision rather than a choice.
+- **Disposition:** open. The number exists; what remains is that tracer slice 5 must report its
+  agreement figure against 0.975 rather than against 1.0, and must not re-derive the unit
+  definition.
+
+## 2026-08-28 (slice 5, tracer 4) — groundedness saturates at 1.000, so the published metric carries no information
+
+- **What:** measured over all 50 answers, groundedness is **1.000 (59/59)** in one run and **0.983
+  (58/59)** in another. Split by whether retrieval was complete, it is **1.000 in both strata**.
+  Branch coverage over the same runs is **0.472**.
+- **Where:** `CONTEXT.md:47` and `SPEC-slice-5` D11, which make groundedness *the published
+  answer-layer number* with branch coverage as its mandatory companion.
+- **Why it happens:** the denominator is branches **stated**, and `qwen/qwen3.6-27b` does not state
+  a branch it cannot cite. It drops branches instead. So the metric measures a failure mode this
+  answerer does not have, and every bit of the signal is in the companion.
+- **What green tests do NOT prove here:** the arithmetic is right and tested. A metric can be
+  correctly computed and still be uninformative, and no test detects that.
+- **Consequence for D11, stated plainly:** a README row reading *"groundedness 1.000, branch
+  coverage 0.472"* invites the first number to be quoted and the second ignored — which is the
+  exact failure the recall/leakage rule exists to prevent, one layer up. The pairing rule is
+  necessary and, on this evidence, not sufficient.
+- **Disposition:** open, and it is the **Owner's**: whether the published answer-layer headline
+  should move from groundedness to branch coverage. D11 already considered and rejected branch
+  coverage as the headline, on the ground that it is judge-dependent — but so is groundedness, and
+  that argument does not separate them. Raised as an open question in the spec rather than decided.
+
+## 2026-08-28 (slice 5, tracer 4) — judge self-consistency has no command, only a script
+
+- **What:** the number in the measured-result section was produced by
+  `$CLAUDE_JOB_DIR/tmp/consistency.py`, a throwaway script over two `judge --out` files. The
+  *arithmetic* is shipped and tested (`metrics.unit_agreement`, `metrics.cluster_robust_interval`),
+  but nothing in the CLI computes it.
+- **Where:** `src/fi_rag_eval/metrics.py` (`unit_agreement`); no caller in `src/fi_rag_eval/cli.py`.
+- **Why it was left:** tracer slice 5 computes judge–human agreement with the same function and
+  will need a surface for it. Building that surface now, before there are human labels to shape it,
+  risks designing it twice.
+- **Reproduction, so the number is not stranded:** two runs of
+  `fi-rag-eval judge <run.json> --out <file>` and `unit_agreement` over the two files, keyed on
+  `(question_id, unit, index, field)`.
+- **Disposition:** open. Tracer slice 5 gives it a command, or explains why it should not have one.
+
+## 2026-08-28 (slice 5, tracer 4) — the judged metrics are computed over a gitignored, dirty-tree artifact
+
+- **What:** every judged number in this tracer describes
+  `eval/runs/answers-tracer3-4b75dfd.json`, which is **gitignored** and whose own `commit` field
+  reads **`4b75dfd-dirty`**. So the answer layer's numbers are not reproducible from a clean clone,
+  and their provenance is a tree rather than a commit.
+- **Where:** `.gitignore` (`eval/runs/`); the run file's `commit` field; `judging.RecordedRun`.
+- **Why it was accepted:** re-answering costs $0.76 and ~50 minutes for input that already exists,
+  and ADR-0010's first argument is that a judge prompt cannot be developed against an input that
+  moves. The answers are also the ones already published in tracer slice 3's result, so the two
+  halves of the answer layer describe the same 64 answers.
+- **How it is not hidden:** `judge` prints a `!!` line naming the dirty provenance on every table,
+  and a drift check re-retrieves all 50 contexts and refuses the run if the corpus has moved.
+- **Disposition:** open. Tracer slice 5's frozen sample is the deliberate committed copy that
+  partly repays this, and it should be re-frozen from a **clean commit** rather than inheriting
+  `-dirty`.
