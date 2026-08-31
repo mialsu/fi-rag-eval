@@ -25,6 +25,7 @@ from fi_rag_eval.answer import (
     TokenBudget,
     answer_question,
 )
+from fi_rag_eval.ask import AskError, ask, municipalities
 from fi_rag_eval.chunking import ChunkingError
 from fi_rag_eval.evaluate import (
     DEFAULT_K,
@@ -62,6 +63,7 @@ from fi_rag_eval.report import (
     compare,
     format_address_validity,
     format_agreement,
+    format_asked,
     format_control,
     format_grid,
     format_ingest,
@@ -82,6 +84,7 @@ DEFAULT_BASELINE = Path("eval/baseline.json")
 
 HANDLED = (
     AnswerError,
+    AskError,
     JudgingError,
     LabellingError,
     ManifestError,
@@ -287,6 +290,29 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_LABELS,
         help=f"where your labels are written, after every single unit (default: {DEFAULT_LABELS})",
+    )
+
+    ask_parser = subparsers.add_parser(
+        "ask",
+        help="answer ANY question inside one municipality's jurisdiction. Spends money "
+        "per call; refuses for free when it cannot retrieve.",
+    )
+    ask_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    ask_parser.add_argument("--k", type=int, default=DEFAULT_K)
+    ask_parser.add_argument("--model", default=ANSWERER)
+    ask_parser.add_argument("--no-reasoning", action="store_true")
+    ask_parser.add_argument("--token-ceiling", type=int, default=None)
+    ask_parser.add_argument(
+        "--municipality",
+        default=None,
+        help="REQUIRED. There is no default and there must not be: with no jurisdiction "
+        "there is no authority whose rules an answer could come from (AC14).",
+    )
+    ask_parser.add_argument("question", nargs="?", help="the question, in Finnish")
+    ask_parser.add_argument(
+        "--list-municipalities",
+        action="store_true",
+        help="print the municipalities this corpus can answer for, and exit",
     )
 
     refusals_parser = subparsers.add_parser(
@@ -841,6 +867,40 @@ def _label(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ask(args: argparse.Namespace) -> int:
+    """One arbitrary question, end to end, with the price on it."""
+    manifest = load_manifest(args.manifest)
+    if args.list_municipalities:
+        for name in municipalities(manifest):
+            print(name)
+        return 0
+    if not args.question:
+        raise AskError("say what to ask, or pass --list-municipalities")
+    if args.municipality is None:
+        raise AskError(
+            "--municipality is required. This harness does not pick a jurisdiction for "
+            "you: answering from the wrong authority's rules is the failure the whole "
+            "design exists to make structurally impossible. "
+            "See --list-municipalities."
+        )
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    budget = TokenBudget(**({} if args.token_ceiling is None else {"ceiling": args.token_ceiling}))
+    with db.connect() as conn:
+        asked = ask(
+            conn,
+            manifest=manifest,
+            question=args.question,
+            municipality=args.municipality,
+            k=args.k,
+            morphology=morphology,
+            model=args.model,
+            reasoning=not args.no_reasoning,
+            budget=budget,
+        )
+    print(format_asked(asked))
+    return 0
+
+
 def _refusals(args: argparse.Namespace) -> int:
     """Refusal metrics from a file on disk, and nothing else.
 
@@ -936,6 +996,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "label": _label,
         "agreement": _agreement,
         "refusals": _refusals,
+        "ask": _ask,
     }
     try:
         return handlers[args.command](args)

@@ -22,6 +22,7 @@ from typing import Any
 
 from fi_rag_eval.analyse import PROBE_WORDS, Analyser
 from fi_rag_eval.answering import AnswerRun
+from fi_rag_eval.ask import Asked
 from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
@@ -1123,4 +1124,39 @@ def format_offline_refusals(run: OfflineRefusalRun) -> str:
             "  not a commit. These answers are not reproducible from a clean clone; the file"
         )
         lines.append("  that holds them is committed instead (ADR-0011).")
+    return "\n".join(lines)
+
+
+def format_asked(asked: Asked) -> str:
+    """One arbitrary question's answer, for a terminal.
+
+    Prints the retrieved addresses even when the answer refuses. On the harness's
+    own surfaces that is a diagnostic; here it is the demo's whole argument -- a
+    reader can see *what the system was given* and check the refusal was honest
+    rather than lazy. ADR-0010 made the same call for refusal citations: the more
+    auditable refusal is the better one.
+    """
+    lines = [
+        f"question      {asked.question}",
+        f"jurisdiction  {asked.municipality} -> {asked.authority_name} "
+        f"({asked.authority_key}, cell {asked.cell})",
+        "",
+        f"retrieved top-{len(asked.hits)}:",
+    ]
+    lines.extend(f"  {hit.position}. {hit.address}  {hit.citation}" for hit in asked.hits)
+    lines.append("")
+    lines.append("REFUSED" if asked.refused else "ANSWER")
+    lines.append("")
+    for paragraph in asked.answer.text.split("\n"):
+        lines.append(f"  {paragraph}")
+    lines.append("")
+    lines.append(f"citations     {list(asked.answer.citations) or '(none)'}")
+    usage = asked.answer.usage
+    lines.append(
+        f"cost          ${usage.cost_usd:.4f} measured at the gateway  "
+        f"({usage.total_tokens} tokens, {usage.reasoning_tokens} of them reasoning)"
+    )
+    lines.append(
+        "              Measured, never estimated -- read back from the provider's own response."
+    )
     return "\n".join(lines)

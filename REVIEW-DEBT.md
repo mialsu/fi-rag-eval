@@ -14,6 +14,31 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 — the authority filter was never proven on its own, because the DATES were separating the authorities
+
+- **What:** `db.search` filters on `authority_key` **and** `effective_date`. This corpus's two
+  authorities have different dates (Lounais-Suomi 2024-08-01, Pirkanmaa 2021-07-01), so the **date
+  alone** fully separates them. Deleting the `authority_key` term left the entire suite green —
+  found by trying to watch the new `ask` jurisdiction tests fail and discovering they could not.
+  `CLAUDE.md` recorded the isolation assertion as *"seen red by deleting the WHERE clause"*, which is
+  true and removes **both** terms at once, so it never told them apart.
+- **Where:** `src/fi_rag_eval/db.py:search`;
+  `tests/test_ask.py:TestTheAUTHORITYTermIsLoadBearingOnItsOwn`.
+- **Fixed, not merely confessed.** A test now plants one authority's chunk under the *other's*
+  effective date, so the dates are useless as a separator and only `authority_key` can exclude it.
+  It first asserts the planted chunk **is** retrievable as its own authority, so the test cannot pass
+  because the row failed to index. Seen red with the authority term deleted and the date term intact.
+- **What green tests do NOT prove here:** that the *other* jurisdiction assertions in this project
+  are proven the same way. `evaluate`'s 50x12 isolation check and slice 5 tracer 3's refusal
+  measurement both run against this corpus, where the dates separate — so they are **correct but not
+  independently attributed**, and they will stay that way until an authority has two editions.
+  ADR-0006 anticipates exactly that: on the day a second edition of either document is ingested the
+  dates stop separating and the authority term becomes load-bearing in paths that never tested it.
+  **This is the "a gate that cannot go red" pattern found in a guard the project calls its #1
+  defence.**
+- **Disposition:** open — one path fixed and proven; the audit of the remaining jurisdiction
+  assertions is not done. Do it before ingesting a second edition, not after.
+
 ## 2026-08-31 — a golden label was WRONG for two slices, and the detector guarding it could not have caught it
 
 - **What:** `ooc-autonrenkaiden-vastaanotto` asserted that `rengas` appears in neither authority
