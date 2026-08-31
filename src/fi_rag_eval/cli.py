@@ -1,5 +1,5 @@
-"""The command-line surface: ``ingest``, ``eval``, ``answer``, ``judge``, ``label``
-and ``agreement``.
+"""The command-line surface: ``ingest``, ``eval``, ``answer``, ``judge``, ``label``,
+``agreement``, ``refusals``, ``ask`` and ``serve``.
 
 Exit codes are a feature, not an afterthought -- CI reads them. Zero means the
 run completed and every metric held. Anything else means the table on stdout,
@@ -75,6 +75,7 @@ from fi_rag_eval.report import (
     format_refusals,
     git_commit,
 )
+from fi_rag_eval.serve import create_app
 
 DEFAULT_MANIFEST = Path("corpus/manifest.yaml")
 DEFAULT_GOLDEN = Path("corpus/golden")
@@ -313,6 +314,23 @@ def _parser() -> argparse.ArgumentParser:
         "--list-municipalities",
         action="store_true",
         help="print the municipalities this corpus can answer for, and exit",
+    )
+
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="serve the demo page on localhost. Spends money per answered question; "
+        "there is NO access gate yet (SPEC-mvp-demo tracer 3 adds one).",
+    )
+    serve_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    serve_parser.add_argument("--k", type=int, default=DEFAULT_K)
+    serve_parser.add_argument("--model", default=ANSWERER)
+    serve_parser.add_argument("--port", type=int, default=8080)
+    serve_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="loopback by DEFAULT, and deliberately: until tracer 3 lands a token gate, "
+        "anyone who can reach this port can spend real money through it. Binding "
+        "0.0.0.0 is an explicit keystroke.",
     )
 
     refusals_parser = subparsers.add_parser(
@@ -875,13 +893,17 @@ def _ask(args: argparse.Namespace) -> int:
             print(name)
         return 0
     if not args.question:
-        raise AskError("say what to ask, or pass --list-municipalities")
+        raise AskError(
+            "say what to ask, or pass --list-municipalities",
+            finnish="Kysymys puuttuu.",
+        )
     if args.municipality is None:
         raise AskError(
             "--municipality is required. This harness does not pick a jurisdiction for "
             "you: answering from the wrong authority's rules is the failure the whole "
             "design exists to make structurally impossible. "
-            "See --list-municipalities."
+            "See --list-municipalities.",
+            finnish="Kunta on annettava: --municipality.",
         )
     morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
     budget = TokenBudget(**({} if args.token_ceiling is None else {"ceiling": args.token_ceiling}))
@@ -898,6 +920,45 @@ def _ask(args: argparse.Namespace) -> int:
             budget=budget,
         )
     print(format_asked(asked))
+    return 0
+
+
+def _serve(args: argparse.Namespace) -> int:
+    """Run the demo page. Blocks until interrupted.
+
+    Opens the analyser once, here, rather than per request: it is the same
+    dictionary load the whole harness shares, and an absent `voikko-fi` must fail
+    at startup rather than on a stranger's first question. There is no fallback --
+    the published cell is lemmatising, and a silently degraded analyser behind a
+    demo would show a pipeline nobody measured.
+
+    Deliberately does NOT check the database or the gateway before binding. Both
+    are per-request concerns and both render as a labelled page (503 / 502); a
+    startup probe would only move the same failure earlier while making the
+    process refuse to start for something that may be back in a second.
+    """
+    import uvicorn
+
+    manifest = load_manifest(args.manifest)
+    morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    app = create_app(
+        manifest=manifest,
+        morphology=morphology,
+        k=args.k,
+        model=args.model,
+    )
+    print(
+        f"fi-rag-eval serve: http://{args.host}:{args.port}  "
+        f"cell {PUBLISHED.name}, k={args.k}, model {args.model}",
+        file=sys.stderr,
+    )
+    if args.host != "127.0.0.1":
+        print(
+            f"fi-rag-eval serve: bound to {args.host}, NOT loopback. There is no access "
+            "gate on this surface yet, so every reachable client can spend through it.",
+            file=sys.stderr,
+        )
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning", access_log=False)
     return 0
 
 
@@ -997,6 +1058,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "agreement": _agreement,
         "refusals": _refusals,
         "ask": _ask,
+        "serve": _serve,
     }
     try:
         return handlers[args.command](args)

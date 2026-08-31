@@ -14,6 +14,145 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 (MVP tracer 2) — the demo surface has NO access gate, and `--host` only warns
+
+- **What:** `fi-rag-eval serve` binds loopback by default and prints a warning when told to bind
+  anything else — it does not **refuse**. There is no token, no rate limit, no daily ceiling and no
+  per-visitor cap. Every answered question spends real money at Groq (measured this tracer:
+  **$0.0161** for one), so any client that can reach the port can spend.
+- **Where:** `src/fi_rag_eval/serve.py:create_app`; `src/fi_rag_eval/cli.py:_serve`; `Makefile:serve`.
+- **What green tests do NOT prove here:** 472 green tests say nothing about who may ask. The only
+  thing standing between this surface and an unbounded bill today is that it is bound to
+  `127.0.0.1` **and that nobody has passed `--host 0.0.0.0`**. The gateway's `$25/30d` virtual-key
+  budget is a backstop that stops the spend, not the requests.
+- **Disposition:** open — closed by tracer 3 (`SPEC-mvp-demo` AD12–AD19). **This surface must not
+  be exposed, deployed, or bound off-loopback until then.**
+
+## 2026-08-31 (MVP tracer 2) — a "free" refusal costs one Postgres connection, not zero
+
+- **What:** `TestEveryRefusalIsFree` proves no **model call** is made — that is the money claim, and
+  it is asserted by an answerer that raises. It does **not** mean the request is free of everything:
+  `serve` opens the connection and then calls `ask.ask`, which owns the empty-question,
+  jurisdiction, no-lexeme and no-hit guards. So an empty POST opens and closes one local Postgres
+  connection before refusing.
+- **Where:** `src/fi_rag_eval/serve.py` (the `run` closure); `src/fi_rag_eval/ask.py:ask`.
+- **Why it was not "fixed":** duplicating the guards in `serve` would ship a second copy of each
+  refusal message, which is the drift this whole tracer is built to avoid. Recorded instead.
+- **What green tests do NOT prove here:** that an unauthenticated flood cannot exhaust the
+  connection pool. Postgres is free; connections are not infinite.
+- **Disposition:** open — tracer 3's token check lands **in front** of all of this, which closes the
+  amplification without duplicating a guard. Re-read this entry then.
+
+## 2026-08-31 (MVP tracer 2) — HTTP 400 conflates "you asked wrong" with "the corpus has nothing"
+
+- **What:** All five `AskError` paths render at **400**. Four are genuinely the caller's input. The
+  fifth — nothing retrieved — is a *content* refusal whose own message says *"This is a refusal, not
+  an error"*, and 400 labels it a client error.
+- **Where:** `src/fi_rag_eval/serve.py` (the `except AskError` branch).
+- **Why it was not fixed:** distinguishing them needs either a reason code on `AskError` or matching
+  on its message. The latter is a defect this project has already confessed once (the gateway
+  budget); the former is real work that belongs with tracer 3's status codes.
+- **What green tests do NOT prove here:** nothing reads this status code today. It will matter the
+  moment anything monitors the endpoint, because a refusal will look like a bad request.
+- **Disposition:** open.
+
+## 2026-08-31 (MVP tracer 2) — the demo produces NO per-query ops record, so `DESIGN.md:35` is unmet here
+
+- **What:** `serve.log` records *what failed*, never *what was asked*. There is no latency, token,
+  cost or retrieved-id log line per query — the structured logging `DESIGN.md:35` specifies.
+- **Where:** `src/fi_rag_eval/serve.py:log`.
+- **Why:** deliberate, and it **sidesteps rather than resolves** the tension `CLAUDE.md` flags:
+  `DESIGN.md:35` wants per-query logging, `DESIGN.md:74` forbids personal data, and a resident's real
+  question can itself be personal data. That is the Owner's call and it is not made
+  (`SPEC-mvp-demo`, open question 1). Logging nothing is the only choice that cannot be wrong.
+- **What green tests do NOT prove here:** that this surface is observable at all. p95 latency and
+  cost per query — two metrics `DESIGN.md` promises — are not being collected by it.
+- **Disposition:** open — **blocks deploy**, not building.
+
+## 2026-08-31 (MVP tracer 2) — the answering path is serialised by a single lock
+
+- **What:** One `threading.Lock` around the whole `ask.ask` call. Two simultaneous questions are
+  answered one after the other, each taking ~14–50s.
+- **Where:** `src/fi_rag_eval/serve.py:create_app`.
+- **Why:** `libvoikko`'s thread-safety is unspecified and one `Morphology` is shared, which is the
+  reason it appeared; **bounded in-flight spend** is the reason it stays. `GET /` does not take it.
+- **What green tests do NOT prove here:** the tests make one request at a time. Nothing measures
+  what a second concurrent visitor experiences, and nothing proves the lock is not held across an
+  exception.
+- **Disposition:** accepted for a demo. Re-examine if the daily ceiling is ever raised past a rate
+  one visitor can saturate.
+
+## 2026-08-31 (MVP tracer 2) — uvicorn itself is exercised only by hand
+
+- **What:** every automated test uses Starlette's in-process `TestClient`. No test starts the ASGI
+  server, and `make gate` makes no HTTP request over a socket. The one real end-to-end run was
+  manual (evidence in `SPEC-mvp-demo`).
+- **Where:** `tests/test_serve.py`; `Makefile:serve` is not in `gate`.
+- **What green tests do NOT prove here:** that `fi-rag-eval serve` starts, binds, opens the
+  analyser, and serves — nor that it exits non-zero when it cannot. A green gate is compatible with
+  a `serve` command that fails on startup. This is the same standing gap as *"no automated test makes
+  a live model call"*, one layer out.
+- **Disposition:** open — cheapest closer is a subprocess smoke test at tracer 4, where the container
+  needs one anyway.
+
+## 2026-08-31 (MVP tracer 2) — the `Asker` protocol is looser than it looks
+
+- **What:** `create_app(asker=...)` is typed as a `Protocol` written out to match `ask.ask` exactly,
+  and mypy **does** reject a mismatched signature (watched: adding one parameter produced two errors).
+  But a stub declared `(conn, **kwargs: object) -> Asked` satisfies it — found because a
+  `# type: ignore` on exactly that turned out to be unused.
+- **Where:** `src/fi_rag_eval/serve.py:Asker`; `tests/test_serve.py`.
+- **What green tests do NOT prove here:** that every injected asker has `ask.ask`'s real signature.
+  The protocol pins the **default** (asserted by identity, AD6) and catches an incompatible named
+  parameter; it does not stop a catch-all from passing.
+- **Disposition:** accepted — the identity assertion on the default is what the reuse guarantee
+  actually rests on, and that one cannot be satisfied by a catch-all.
+
+## 2026-08-31 (MVP tracer 2) — two Finnish copy defects shipped past the whole test suite and were caught by READING the page
+
+- **What:** the first live run rendered **"jätehuoltolautakuntan"** (the genitive of `lautakunta` is
+  `lautakunnan` — consonant gradation, the exact hazard this project runs voikko for) and printed
+  Sastamala's coverage detail as **English prose inside a Finnish sentence**, with a doubled
+  "only … only" inherited from the manifest. 470 tests were green through both.
+- **Where:** `src/fi_rag_eval/ask.py` (the no-hits refusal); `src/fi_rag_eval/manifest.py` and
+  `corpus/manifest.yaml` (the partial-coverage detail).
+- **Fixed, not merely confessed.** The authority name is no longer inflected at all — it is quoted in
+  the nominative — and the manifest now carries the authority's **own Finnish** from `1 §`
+  (`Mouhijärven ja Suodenniemen osalta`), which both messages quote verbatim. Two tests pin the
+  specific wrong forms and were **seen red**.
+- **What green tests do NOT prove here:** that the rest of the Finnish is good Finnish. Only these
+  two defects are pinned. There is **no** test that any other `AskError.finnish` string, or any
+  string in `demo.html`, is grammatical — that needs a reader, and this project has one Finnish
+  speaker. The same single-annotator limitation already confessed for the hand labels applies to the
+  copy.
+- **Disposition:** open, as a standing limitation of the copy rather than a task.
+
+## 2026-08-31 (MVP tracer 2) — a manifest DATA string was changed for a copy reason
+
+- **What:** `corpus/manifest.yaml`'s `partial_municipalities` value for Sastamala changed from an
+  English paraphrase to the document's own Finnish. `tests/test_jurisdiction.py`'s assertion moved
+  with it.
+- **Where:** `corpus/manifest.yaml:86-91`; `tests/test_jurisdiction.py:175`.
+- **What green tests do NOT prove here:** nothing measured depends on this string — it feeds one
+  refusal message and Sastamala is excluded from `municipalities()` either way, so no published
+  number can move. Recorded because **a corpus data file was edited during a surface tracer**, which
+  is the shape of a change that should never pass unremarked in this repository.
+- **Disposition:** accepted, and stated so it is visible.
+
+## 2026-08-31 (MVP tracer 2) — the seen-red harness could not itself go red
+
+- **What:** the first sweep that broke nine gates on purpose reported **all nine as still green**. The
+  gates were fine; the *detector* was broken — it grepped `pytest`'s last three lines for
+  `"N failed"`, and with a warning present those lines are the warnings footer. Re-run against
+  `pytest`'s **exit code**, all nine went red and an intact-tree control stayed green.
+- **Where:** session-local shell, not committed.
+- **What green tests do NOT prove here:** that any *other* "seen red" claim in this repository was
+  verified by a mechanism that had itself been checked. This one now carries a control run; the
+  earlier ones in `REVIEW-DEBT.md` and the specs were done by hand and by eye.
+- **Disposition:** open — a real instance of *"a gate you haven't watched fail is not a gate"*
+  applying to the watching apparatus. Worth one `verify` helper in the repo rather than ad-hoc shell,
+  next time a tracer needs a sweep.
+
 ## 2026-08-31 — the authority filter was never proven on its own, because the DATES were separating the authorities
 
 - **What:** `db.search` filters on `authority_key` **and** `effective_date`. This corpus's two

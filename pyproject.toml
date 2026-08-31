@@ -25,6 +25,15 @@ dependencies = [
   "tenacity>=8.0",
   "psycopg[binary]>=3.2",
   "PyYAML>=6.0",
+  # The demo surface (SPEC-mvp-demo, tracer 2). Starlette rather than FastAPI:
+  # FastAPI's value is typed request/response models and generated OpenAPI for a
+  # JSON API, and this surface has one form POST and returns HTML. Its only hard
+  # dependency, `anyio`, is already here transitively via httpx, so the marginal
+  # install is the framework itself.
+  "starlette>=0.42",
+  # The ASGI server. Plain, not `[standard]`: uvloop/httptools/websockets/watchfiles
+  # buy throughput and reload for a page whose slowest step is a ~30s model call.
+  "uvicorn>=0.34",
 ]
 
 [build-system]
@@ -35,7 +44,16 @@ build-backend = "hatchling.build"
 packages = ["src/fi_rag_eval"]
 
 [dependency-groups]
-dev = ["ruff>=0.15", "mypy>=1.19", "pytest>=8.4", "types-PyYAML>=6.0"]
+dev = [
+  "ruff>=0.15",
+  "mypy>=1.19",
+  "pytest>=8.4",
+  "types-PyYAML>=6.0",
+  # Starlette's TestClient is httpx-backed. httpx is already present transitively
+  # (litellm), and depending on a transitive dependency is depending on someone
+  # else's decision not to drop it -- the same reasoning as `python-dotenv` above.
+  "httpx>=0.27",
+]
 
 [project.scripts]
 fi-rag-eval = "fi_rag_eval.cli:main"

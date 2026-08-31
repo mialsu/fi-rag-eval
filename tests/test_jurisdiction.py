@@ -172,7 +172,10 @@ def test_a_partially_covered_municipality_refuses_and_says_why(
     """
     with pytest.raises(ManifestError, match="covered only in part"):
         manifest.resolve_municipality(municipality)
-    with pytest.raises(ManifestError, match="Mouhijärvi and Suodenniemi"):
+    # The manifest now carries the document's own Finnish rather than an English
+    # paraphrase, because that string is quoted to a resident (SPEC-mvp-demo,
+    # tracer 2). The fact under test is unchanged: the refusal names the areas.
+    with pytest.raises(ManifestError, match="Mouhijärven ja Suodenniemen"):
         manifest.resolve_municipality(municipality)
 
 

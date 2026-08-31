@@ -11,10 +11,10 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (31 Aug 2026)
 
-**Slices 1–4 are built, and slice 5 is four tracers in: the measurement spine, an honest golden
-set, a lemmatising analyser measured as a grid, a second authority, an answering boundary with a
-scored refusal population, and now a judge that passes an 8/8 known-bad control and publishes
-nothing.** Two authorities are ingested into Postgres and
+**Slices 1–4 are built, slice 5 is four tracers in, and the MVP demo is two tracers in: the
+measurement spine, an honest golden set, a lemmatising analyser measured as a grid, a second
+authority, an answering boundary with a scored refusal population, a judge that passes an 8/8
+known-bad control and publishes nothing, and now a WATCHABLE demo page — with no access gate.** Two authorities are ingested into Postgres and
 retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
 chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
 — 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
@@ -176,6 +176,67 @@ regresses. Nothing else exists.
   correct but not independently attributed for the same reason** — audit them **before** ingesting a
   second edition (ADR-0006 anticipates one), not after. `REVIEW-DEBT.md`.
 
+- **THERE IS A WATCHABLE DEMO PAGE NOW, AND IT HAS NO ACCESS GATE (31 Aug 2026, MVP tracer 2).**
+  `fi-rag-eval serve` / `make serve` → Starlette + uvicorn on `127.0.0.1:8080`: `GET /` renders one
+  server-rendered HTML file (no build step, no `node_modules`), `POST /ask` answers. It **calls
+  `ask.ask`** and re-implements no retrieval — enforced twice, by the injected asker's default being
+  `ask.ask` **by identity** and by an AST check that `serve.py` never names `db.search`,
+  `cell_query_lexemes`, `or_tsquery`, `snowball_stopwords` or `chunk_bodies` (and that `ask.py` names
+  all five, so the list cannot go stale). **Exercised live: HTTP 200 in 14s, $0.0161, 8420 tokens,
+  all five conditional branches of Turku's tyhjennysväli stated and cited to `#26`.** Nine gates
+  seen red on purpose with an intact-tree control.
+  **`REVIEW-DEBT.md` first: there is no token, no rate limit and no daily ceiling. Do not bind it
+  off-loopback, expose it, or deploy it until tracer 3.**
+- **The question travels in a POST body, never a URL, and nothing logs it.** A GET would put a
+  resident's words in uvicorn's access log, the browser history and every proxy between. `GET /ask`
+  is a **405**. The server logs what *failed*, never what was asked — which means
+  `DESIGN.md:35`'s per-query ops record does **not exist** on this surface, deliberately, because the
+  `DESIGN.md:35` / `DESIGN.md:74` privacy tension is still the Owner's unmade call. Logging nothing
+  is the only choice that cannot be wrong. **It blocks deploy, not building.**
+- **The *kunta* dropdown opens on NOTHING selected, and that is the load-bearing part of the form.**
+  A `<select>` defaulting to its first entry would make the harness pick a jurisdiction — the one
+  thing `manifest.resolve_municipality` exists to refuse. Asserted.
+- **`db.connect`'s error message embeds the database URL WITH CREDENTIALS, and it was being rendered
+  on the page.** Found by asking what `str(exc)` actually contains. `db.DatabaseError` and
+  `AnswerError` messages now never reach the page; a test plants `s3cr3t-p4ss` in one and asserts its
+  absence from the response. Only `AskError` is rendered — it is written for the asker.
+- **`AskError` NOW CARRIES TWO TEXTS AND BOTH ARE REQUIRED.** `str(exc)` is the maintainer's English
+  (what the CLI prints and what 470 tests match on); `.finnish` is what a resident reads. Required
+  rather than defaulted, so mypy names a raise site that forgets the half a stranger sees. The four
+  `resolve_municipality` refusals carry their own Finnish on `ManifestError`; no reason code, no
+  matching on a message.
+- **TWO FINNISH COPY DEFECTS SHIPPED PAST 470 GREEN TESTS AND WERE CAUGHT BY READING THE PAGE.**
+  (1) `"jätehuoltolautakuntan"` — a hand-rolled genitive; `lautakunta` → `lautakunnan`, consonant
+  gradation, the exact hazard this project runs voikko for. The authority name is no longer inflected
+  at all. (2) Sastamala's coverage detail was **English prose inside a Finnish sentence**, with a
+  doubled "only … only" from the manifest. `corpus/manifest.yaml` now carries the authority's **own
+  Finnish** from `1 §` (`Mouhijärven ja Suodenniemen osalta`), quoted verbatim by both messages —
+  a corpus data file edited during a surface tracer, recorded rather than left silent. **No test
+  proves any *other* Finnish string is grammatical.**
+- **`python-multipart` was REJECTED; the form parser is stdlib.** Starlette 1.6's `request.form()`
+  asserts on it for *any* content type, and a file-upload parser has no business behind a public
+  surface. The body is streamed against an 8 KiB cap (**413**, so a chunked body with no
+  `Content-Length` cannot grow unbounded) and parsed with `parse_qsl`. A multipart body yields none
+  of the named fields — asserted, because `parse_qsl` does not reject one, it produces a junk key.
+  Questions over 500 characters are refused **before** the connection and the answerer: the prompt
+  carries the question verbatim, so length is spend.
+- **A "free" refusal is free of the MODEL, not of everything.** `serve` opens the connection and then
+  calls `ask.ask`, which owns the guards — so an empty POST costs one local Postgres connection.
+  Never duplicated in `serve`: a second copy of each guard means a second refusal message. Tracer 3's
+  token check lands in front of it all.
+- **The answering path is serialised by one lock, and that is a spend control.** `libvoikko`'s
+  thread-safety is unspecified and one `Morphology` is shared, which is why the lock appeared;
+  **bounded in-flight spend** is why it stays. `GET /` never takes it.
+- **THE CAP ARITHMETIC FOR TRACER 3 DOES NOT CLOSE, AND IT IS THE OWNER'S MONEY.** Measured cost per
+  answered question is **$0.0084–$0.0177** on this path. At the decided **200 queries/day** that is
+  **$1.70–$4.20/day**, so the **$25/month** ceiling (ADR-0008) is exhausted in **6–15 days of a
+  saturated daily cap** and the gateway's virtual key starts returning 429 mid-demo. Raised before
+  the caps were built; the numbers are the Owner's to revisit.
+- **uvicorn itself is exercised only by hand.** Every test uses Starlette's in-process `TestClient`,
+  and `make gate` makes no request over a socket — so **a green gate is compatible with a `serve`
+  command that fails on startup**. Same standing gap as "no automated test makes a live model call",
+  one layer out.
+
 - **A GOLDEN LABEL WAS WRONG FOR TWO SLICES, AND THE DETECTOR GUARDING IT COULD NOT HAVE CAUGHT IT
   (31 Aug 2026).** `ooc-autonrenkaiden-vastaanotto` claimed `rengas` appears in neither authority
   *"missään muodossa"*. Both `2 §` definitions **enumerate `renkaat`**, and `12 §` says where
@@ -271,7 +332,8 @@ regresses. Nothing else exists.
   a hand-made claim in `absence_source`; the lexeme only keeps it from rotting. Re-derive the whole
   population from the clause lists at the N≈85 tranche.
 - **Not built:** embeddings, pgvector, reranking, **the 168 hand labels and therefore judge–human
-  agreement**, the answer-metric floor gate, a third authority, CI, Docker, Cloud Run.
+  agreement**, the answer-metric floor gate, a third authority, **the demo's OTP gate and every one of
+  its caps (MVP tracer 3)**, CI, Docker, Cloud Run.
   `make docker-build` still exits non-zero on purpose — do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
@@ -309,7 +371,9 @@ Run them all with `make gate`. Every one below has been run, and has been proven
   `make gate` makes a live model call** — a green gate is compatible with an answering path that
   401s on its first real request (confessed in `REVIEW-DEBT.md`).
   Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`. Anything that answers additionally
-  needs `make services-up` and a filled `.env`. **Neither `fi-rag-eval answer --all` nor `fi-rag-eval judge` is
+  needs `make services-up` and a filled `.env`. **`make serve` is not in any gate either**, and no
+  test starts the ASGI server — the demo's tests all use Starlette's in-process `TestClient`, so a
+  green gate says nothing about whether `fi-rag-eval serve` binds. **Neither `fi-rag-eval answer --all` nor `fi-rag-eval judge` is
   part of any gate**: the answer phase takes ~50 minutes and ~$0.76, the judge ~7 minutes and
   ~$0.07, and both are run deliberately by a human. No test in `make gate` calls the judge either.
 

@@ -84,7 +84,11 @@ authorities:
       - Virrat
       - Ylöjärvi
     partial_municipalities:
-      Sastamala: the former Mouhijärvi and Suodenniemi areas only (1 § SOVELTAMISALA)
+      # The document's OWN words, verbatim from 1 § SOVELTAMISALA, because this string
+      # is quoted to a resident in Finnish and paraphrasing it in English then
+      # translating it back is two chances to lose the nuance. ADR-0002 (amended)
+      # and CONTEXT.md quote the same fragment.
+      Sastamala: Mouhijärven ja Suodenniemen osalta (1 § SOVELTAMISALA)
     sources:
       - filename: pirkanmaa.pdf
         title: Kunnalliset jätehuoltomääräykset

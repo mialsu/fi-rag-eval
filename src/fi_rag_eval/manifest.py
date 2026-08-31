@@ -20,7 +20,21 @@ SUPPORTED_VERSION = 1
 
 
 class ManifestError(ValueError):
-    """The manifest is missing, malformed, or disagrees with itself."""
+    """The manifest is missing, malformed, or disagrees with itself.
+
+    Carries an optional **Finnish** sentence beside the English one. Almost every
+    `ManifestError` is a maintainer-facing parse failure that stops the process at
+    startup, and those leave `finnish` as `None`. The four raised by
+    `resolve_municipality` are different: they are the only ones a *resident* can
+    provoke, and `CLAUDE.md`'s definition of done requires the copy they read to be
+    in their own language. The two texts live at the same raise site so the nuance
+    -- Sastamala's partial coverage in particular -- cannot drift between them, and
+    so the demo surface never has to recover a reason by matching on a message.
+    """
+
+    def __init__(self, message: str, *, finnish: str | None = None) -> None:
+        super().__init__(message)
+        self.finnish = finnish
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +138,13 @@ class Manifest:
                 "The harness refuses rather than picking one: every answer is bound to "
                 "the jurisdiction it was asked about, and a defaulted jurisdiction is "
                 "the cross-municipality answer the hard filter exists to prevent "
-                "(DESIGN.md:15,67), wearing a correct-looking citation."
+                "(DESIGN.md:15,67), wearing a correct-looking citation.",
+                finnish=(
+                    "Kuntaa ei ole valittu, joten ei ole viranomaista, jonka määräyksistä "
+                    "vastaus voisi tulla. Kunta on valittava itse: jos järjestelmä "
+                    "valitsisi sen puolestasi, vastaus voisi tulla väärän viranomaisen "
+                    "määräyksistä oikean näköisen viittauksen kanssa."
+                ),
             )
         folded = municipality.casefold()
         matches = [
@@ -138,21 +158,41 @@ class Manifest:
                 if kunta.casefold() == folded
             ]
             if partial:
-                detail = "; ".join(f"{a.key} covers only {part}" for a, part in partial)
+                # The part is quoted rather than paraphrased: it is the authority's
+                # own Finnish, and it is rendered verbatim to a resident below.
+                detail = "; ".join(f'{a.key} covers only "{part}"' for a, part in partial)
+                suomeksi = "; ".join(f"{a.name} kattaa kunnasta vain {part}" for a, part in partial)
                 raise ManifestError(
                     f"the municipality {municipality!r} is covered only in part: {detail}. "
                     "These regulations bind part of the kunta and not the rest, so the "
                     "harness refuses rather than answering a resident from rules that may "
                     "not bind them. A municipality does not always resolve to exactly one "
-                    "authority (ADR-0002, amended)."
+                    "authority (ADR-0002, amended).",
+                    finnish=(
+                        f"Kunta {municipality} kuuluu tämän aineiston piiriin vain "
+                        "osittain, joten nämä määräykset sitovat osaa kunnasta eivätkä "
+                        "muuta osaa. Järjestelmä kieltäytyy vastaamasta sen sijaan, että "
+                        "se vastaisi määräyksistä, jotka eivät ehkä sido sinua. "
+                        f"Osittainen kattavuus: {suomeksi}."
+                    ),
                 )
             raise ManifestError(
-                f"no authority in the manifest covers the municipality {municipality!r}"
+                f"no authority in the manifest covers the municipality {municipality!r}",
+                finnish=(
+                    f"Kuntaa {municipality} ei ole tässä aineistossa. Valitse kunta "
+                    "valikosta -- aineisto kattaa vain kahden jätehuoltoviranomaisen "
+                    "alueen."
+                ),
             )
         if len(matches) > 1:
             raise ManifestError(
                 f"municipality {municipality!r} is claimed by "
-                f"{[a.key for a in matches]}; a municipality has exactly one authority"
+                f"{[a.key for a in matches]}; a municipality has exactly one authority",
+                finnish=(
+                    f"Kunnalle {municipality} löytyy aineistosta useampi kuin yksi "
+                    "viranomainen, joten oikeaa ei voi valita. Tämä on virhe "
+                    "aineistossa, ei kysymyksessä."
+                ),
             )
         return matches[0]
 

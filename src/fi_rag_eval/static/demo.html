@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Jätehuoltomääräykset — kysy, ja näe mistä vastaus tulee</title>
+<style>
+  :root {
+    --ink: #16181d; --dim: #5d636e; --line: #d9dce2; --bg: #fbfbfc;
+    --card: #ffffff; --accent: #1b4d3e; --warn: #8a4b12; --code: #f2f3f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6e8ec; --dim: #9aa1ad; --line: #333842; --bg: #14161a;
+      --card: #1b1e24; --accent: #7fc4ab; --warn: #d99a5b; --code: #22262d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 5rem; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.4rem; line-height: 1.3; margin: 0 0 .35rem; letter-spacing: -.01em; }
+  .lede { color: var(--dim); margin: 0 0 2rem; font-size: .95rem; }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; }
+  label { display: block; font-size: .8rem; font-weight: 600; letter-spacing: .04em;
+          text-transform: uppercase; color: var(--dim); margin-bottom: .4rem; }
+  textarea, select {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 7px; padding: .6rem .7rem;
+  }
+  textarea { resize: vertical; min-height: 4.5rem; }
+  .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; margin-top: 1rem; }
+  .row > div { flex: 1 1 14rem; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; padding: .62rem 1.4rem;
+    border: 1px solid var(--accent); border-radius: 7px; background: var(--accent);
+    color: var(--card);
+  }
+  button[disabled] { cursor: progress; opacity: .65; }
+  #odota { color: var(--dim); font-size: .9rem; margin: .9rem 0 0; }
+  .hint { color: var(--dim); font-size: .82rem; margin: .55rem 0 0; }
+  section { margin-top: 2rem; background: var(--card); border: 1px solid var(--line);
+            border-radius: 10px; padding: 1.25rem; }
+  .meta { font-size: .82rem; color: var(--dim); margin: 0 0 1rem; }
+  .verdict { font-size: .78rem; font-weight: 700; letter-spacing: .1em;
+             display: inline-block; padding: .2rem .55rem; border-radius: 4px;
+             border: 1px solid currentColor; }
+  .verdict.vastaus { color: var(--accent); }
+  .verdict.ei { color: var(--warn); }
+  .body { margin: 1rem 0 0; white-space: pre-wrap; }
+  ol.otteet { margin: .4rem 0 0; padding-left: 1.4rem; font-size: .88rem; }
+  ol.otteet li { margin-bottom: .3rem; }
+  code, .addr { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: .84em; background: var(--code); padding: .1rem .3rem;
+                border-radius: 3px; }
+  h2 { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+       color: var(--dim); margin: 1.5rem 0 .2rem; }
+  h2:first-of-type { margin-top: 0; }
+  .price { font-size: .82rem; color: var(--dim); margin: 1.4rem 0 0;
+           border-top: 1px solid var(--line); padding-top: .8rem; }
+  footer { max-width: 46rem; margin: 2.5rem auto 0; color: var(--dim); font-size: .82rem; }
+  footer p { margin: .5rem 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Jätehuoltomääräykset — kysy, ja näe mistä vastaus tulee</h1>
+  <p class="lede">
+    Vastaus haetaan sen jätehuoltoviranomaisen omista määräyksistä, joka vastaa valitun
+    kunnan jätehuollosta. Jokainen väite on viitattu pykälään, ja jos otteet eivät riitä
+    vastaamiseen, järjestelmä kieltäytyy vastaamasta. Kieltäytyminen on suunniteltu vastaus,
+    ei virhe.
+  </p>
+
+  <form method="post" action="{{ACTION}}">
+    <div>
+      <label for="kysymys">Kysymys</label>
+      <textarea id="kysymys" name="kysymys" placeholder="Kuinka usein sekajäteastia on tyhjennettävä?">{{QUESTION}}</textarea>
+    </div>
+    <div class="row">
+      <div>
+        <label for="kunta">Kunta</label>
+        <select id="kunta" name="kunta">{{OPTIONS}}</select>
+      </div>
+      <div style="flex: 0 0 auto;">
+        <button id="kysy" type="submit">Kysy</button>
+      </div>
+    </div>
+    <p class="hint">
+      Kunta ratkaisee, kenen määräyksistä vastaus haetaan. Järjestelmä ei valitse sitä
+      puolestasi: väärän viranomaisen määräyksistä annettu vastaus on tämän työn pahin
+      virhe, ja se estetään rakenteellisesti.
+    </p>
+    <p id="odota" hidden>Haetaan vastausta… tämä kestää tavallisesti 20–50 sekuntia.</p>
+  </form>
+
+  {{RESULT}}
+</main>
+
+<footer>
+  <p>
+    Haku on sama kuin mittausharnessissa — sama analysaattori ja sama järjestys
+    (<code>{{CELL}}</code>) kuin julkaistuissa luvuissa. Demon takana ei ole toista hakua.
+  </p>
+  <p>
+    Aineisto: kahden jätehuoltoviranomaisen julkiset jätehuoltomääräykset. Kysymyksiä ei
+    tallenneta.
+  </p>
+</footer>
+
+<script>
+  // Six lines, no build step: a ~30 s wait with a live button looks broken.
+  // The disable is deferred to the next tick because disabling a submit button
+  // inside its own submit handler cancels the submission in some browsers.
+  var f = document.querySelector('form');
+  if (f) f.addEventListener('submit', function () {
+    var b = document.getElementById('kysy');
+    document.getElementById('odota').hidden = false;
+    setTimeout(function () { b.disabled = true; b.textContent = 'Haetaan…'; }, 0);
+  });
+</script>
+</body>
+</html>

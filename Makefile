@@ -3,7 +3,8 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
-        ingest label agreement refusals db-up db-down services-up services-down docker-build clean
+        ingest label agreement refusals serve db-up db-down services-up services-down \
+        docker-build clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
@@ -69,6 +70,11 @@ agreement: ## Judge-human agreement over the hand labels. VERDICTS=<judge --out 
 	  echo "Produce one with: uv run fi-rag-eval judge <run.json> --out <file>" >&2; \
 	  exit 1; }
 	uv run fi-rag-eval agreement $(VERDICTS)
+
+serve: ingest ## Serve the demo page on http://127.0.0.1:8080. SPENDS per answered question.
+	@echo "serve: loopback only, and there is NO access gate on this surface yet."
+	@echo "       Each answered question costs ~\$$0.01-0.02 at the gateway. Ctrl-C to stop."
+	uv run fi-rag-eval serve
 
 docker-build: ## Container image (a /ship-time gate, not a per-commit one)
 	@echo "docker-build: NOT IMPLEMENTED -- no Dockerfile until the service exists (M3)." >&2

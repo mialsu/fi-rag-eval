@@ -60,7 +60,25 @@ ever" forbids and `DESIGN.md:35`'s structured logging would otherwise invite.
 
 
 class AskError(RuntimeError):
-    """The question cannot be answered, and no model call was made."""
+    """The question cannot be answered, and no model call was made.
+
+    Carries **two** texts, and both are required. `str(exc)` is English and is
+    what the CLI prints and what the test suite matches on -- a maintainer's
+    message, naming the design decision behind the refusal. `finnish` is the
+    sentence a resident reads on the demo page, because `CLAUDE.md`'s definition of
+    done requires the copy to be in the user's language and the whole surface is
+    otherwise Finnish.
+
+    Required rather than defaulted, so a new raise site cannot forget the half a
+    stranger will actually see: mypy names the omission. They sit together at each
+    raise site rather than being mapped from a reason code, and nothing has to
+    recover a reason by matching on a message -- which this project has already
+    confessed once as a defect (`REVIEW-DEBT.md`, the gateway budget).
+    """
+
+    def __init__(self, message: str, *, finnish: str) -> None:
+        super().__init__(message)
+        self.finnish = finnish
 
 
 class Answerer(Protocol):
@@ -136,7 +154,10 @@ def ask(
     """Answer one unlabelled question inside one municipality's jurisdiction."""
     text = question.strip()
     if not text:
-        raise AskError("no question was asked")
+        raise AskError(
+            "no question was asked",
+            finnish="Kysymys puuttuu. Kirjoita kysymys omin sanoin.",
+        )
 
     # Resolved FIRST, so an unknown or absent municipality costs nothing. The
     # harness must never pick one on the asker's behalf: with no jurisdiction
@@ -144,11 +165,21 @@ def ask(
     try:
         authority = manifest.resolve_municipality(municipality)
     except ManifestError as exc:
-        raise AskError(str(exc)) from exc
+        # `resolve_municipality` supplies its own Finnish for all four of its
+        # refusals; the fallback covers a manifest error that is really a
+        # maintainer's problem and should never reach a resident at all.
+        raise AskError(
+            str(exc),
+            finnish=exc.finnish or "Kuntaa ei voitu ratkaista, joten vastausta ei haettu.",
+        ) from exc
     if len(authority.sources) != 1:
         raise AskError(
             f"authority {authority.key!r} has {len(authority.sources)} document versions, "
-            "so a question must say which edition it is asked against."
+            "so a question must say which edition it is asked against.",
+            finnish=(
+                "Tämän viranomaisen määräyksistä on aineistossa useampi voimassa ollut "
+                "versio, joten kysymyksessä olisi kerrottava, mitä versiota se koskee."
+            ),
         )
     effective_date = authority.sources[0].effective_date
 
@@ -163,7 +194,12 @@ def ask(
     if not lexemes:
         raise AskError(
             "that question normalises to no searchable words, so there is nothing to "
-            "retrieve. Try naming the thing you are asking about."
+            "retrieve. Try naming the thing you are asking about.",
+            finnish=(
+                "Kysymyksestä ei löytynyt yhtään hakusanaa, joten haettavaa ei ole. "
+                "Nimeä se asia, jota kysymys koskee -- esimerkiksi jäteastia, "
+                "biojäte tai tyhjennysväli."
+            ),
         )
 
     hits = db.search(
@@ -178,7 +214,18 @@ def ask(
     if not hits:
         raise AskError(
             f"nothing in {authority.name}'s regulations matched that question, so there "
-            "is no context to answer from. This is a refusal, not an error."
+            "is no context to answer from. This is a refusal, not an error.",
+            # The authority's name is NOT inflected. `f"{name}n"` produced
+            # "jätehuoltolautakuntan" on the first live run -- the genitive of
+            # `lautakunta` is `lautakunnan`, consonant gradation and all. Guessing
+            # Finnish inflection is exactly what this project uses voikko for, and
+            # a demo is not the place to hand-roll a second morphology. So the name
+            # stays in the nominative, in parentheses.
+            finnish=(
+                "Näissä jätehuoltomääräyksissä ei ole kohtaa, joka vastaisi tätä "
+                "kysymystä, joten otteita, joiden perusteella vastata, ei ole. "
+                f"Tämä on kieltäytyminen, ei virhe. Viranomainen: {authority.name}."
+            ),
         )
     assert_one_authority(hits, authority.key, ASK_ID)
 
