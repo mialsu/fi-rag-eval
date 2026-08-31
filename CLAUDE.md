@@ -9,7 +9,7 @@ Domain profile: **cli-tools**, with a `/ship`-only deploy check grafted from `we
 project-specific eval-integrity layer. The choice and its rejected alternatives are recorded in
 `docs/adr/0001-domain-profile-cli-tools-hybrid.md` — read it before assuming a stock profile.
 
-## Where this stands (28 Aug 2026)
+## Where this stands (31 Aug 2026)
 
 **Slices 1–4 are built, and slice 5 is four tracers in: the measurement spine, an honest golden
 set, a lemmatising analyser measured as a grid, a second authority, an answering boundary with a
@@ -104,19 +104,30 @@ regresses. Nothing else exists.
   floor, so it changes the *reading*, not the plan. **Tracer 4 first published 0.975 and that figure
   is superseded**: it pooled in the 31 forced units (below), which is the inflation ADR-0011 exists
   to exclude.
+- **THE PUBLISHED ANSWER-LAYER HEADLINE IS BRANCH COVERAGE (31 Aug 2026, ADR-0012).** D11's pair
+  is INVERTED on the Owner's decision: branch coverage leads, groundedness is printed beside it, and
+  the pairing rule, the 0.85 agreement floor and the withholding below it are all unchanged — the
+  withheld block now names both figures, since both are judge-dependent. The *order* is the
+  decision, and a test asserts it: the first number under `PUBLISHED` is the one copied into a
+  README. Another test asserts the two names appear an equal number of times on every rendering
+  path, so no branch can emit a lone figure. **Still nothing is published** — the floor gates both
+  and agreement does not exist yet.
 - **GROUNDEDNESS SATURATES AT 1.000 AND CARRIES NO INFORMATION.** It is identical (1.000) whether
   retrieval was complete or not, because the denominator is branches *stated* and `qwen/qwen3.6-27b`
   never states a branch it cannot cite — it drops the branch instead. All the signal is in **branch
   coverage 0.472**. D11's "never publish groundedness without branch coverage beside it" is
-  necessary and, on this evidence, **not sufficient**: whether the headline should move to branch
-  coverage is an open question and is the Owner's.
+  necessary and, on this evidence, **not sufficient** — which is why the headline moved (above).
 - **Prediction 5 — the prediction that decides slice 6 — is VOID as written, and its substance
   holds.** It was registered over groundedness, which has zero variance here. Branch coverage
   answers it decisively: **0.574 with complete retrieval against 0.042 without** (0.598 vs 0.111
   excluding refusals). Answer failures track retrieval. This is the **third** pre-registered
   statistic in this project to be the wrong one while its question was answerable. The slice-6
-  decision rule therefore fires for the reranker **on substituted evidence**, which is the Owner's
-  to accept.
+  decision rule **FIRES for the reranker on substituted evidence, accepted by the Owner on
+  31 Aug 2026** (ADR-0012 decision 5). Slice 6 must pre-register its fix size against **branch
+  coverage**; the 6-discordant-question bar is unchanged. Recorded as a substitution, never as
+  prediction 5 having been scored. **The pattern is now nameable: this project keeps registering a
+  statistic before knowing whether it has variance on the population it will be measured over.**
+  Slice 6 registers its statistic *and* the evidence that it varies.
 - **The known-bad control is real and was seen red.** 8 authored bad answers
   (`corpus/control/known-bad.yaml`), 4 shapes x 2 authorities, each naming the unit verdict that
   must catch it. `judge --control` = **8/8, exit 0**; `--weak-prompt` = **4/8, exit 1** — and it
@@ -131,15 +142,48 @@ regresses. Nothing else exists.
 - **A citation on a refusal is no longer "any citation is a defect" (ADR-0010).** Citing an address
   **outside** the retrieved set is a defect; citing a chunk it **did** retrieve is a counted
   diagnostic. The old rule labelled the more auditable refusal as the worse one. **No published
-  number moved** — refusal recall 0.857 and precision 0.632 come from the `refused` field alone.
+  number moved** — refusal recall and precision come from the `refused` field alone.
 - **The judge phase is not in `make eval` either**, for the same reason the answer phase is not.
   `judge` needs `make services-up`, a filled `.env`, and a run file under `eval/runs/`, which is
   **gitignored** — so the judged numbers are not reproducible from a clean clone. The **control**
   is, deliberately: it needs no run file. The run this project has is stamped `4b75dfd-dirty`, and
   every judged table prints a `!!` line saying so.
+- **A GOLDEN LABEL WAS WRONG FOR TWO SLICES, AND THE DETECTOR GUARDING IT COULD NOT HAVE CAUGHT IT
+  (31 Aug 2026).** `ooc-autonrenkaiden-vastaanotto` claimed `rengas` appears in neither authority
+  *"missään muodossa"*. Both `2 §` definitions **enumerate `renkaat`**, and `12 §` says where
+  producer-responsibility waste goes — so the corpus answered the question outright, from two chunks
+  the retriever returned, and the answerer's correct answer was scored as a **missed refusal**. The
+  entry is REMOVED (14 → 13) with a tombstone forbidding its return as a refusal. Why it survived:
+  `ILIKE '%rengas%'` cannot see `renkaat` — consonant gradation against a check on the nominative
+  singular. **A lemma-aware check now runs beside the substring one, both must pass, and it was seen
+  red on this exact case with the substring check returning `[]` next to it.** Multi-word needles
+  require *adjacency*, and the detector uses `lemma-baseform`, never the published cell —
+  `lemma-reasm` decomposes `lisäjäte` into `jäte`. **The detector also moved into `make eval`**; it
+  had been reachable only through a ~$0.76, ~50-minute networked command.
+- **`ooc-romuajoneuvon-toimituspaikka` has the SAME defect from the SAME sentence and the label was
+  KEPT.** `romuautot` is in that enumeration, so "where do I deliver it" is answerable; the
+  deregistration half is not. The Owner kept it and the false `label_source: "Ei lähdepykälää"` was
+  corrected in place. **`romuauto` vs `romuajoneuvo` is a different compound, so neither check can
+  ever see it** — the `sakokaivo` case, recorded rather than papered over. Read `REVIEW-DEBT.md`:
+  the prior of "one wrong label in this population" is no longer zero.
+- **Refusal metrics now RECOMPUTE OFFLINE from a committed file (`make refusals`).** No database, no
+  gateway, no spend. Measured 31 Aug 2026 over the frozen sample: **recall 0.923 [0.67, 0.99] n=13,
+  precision 0.632 [0.41, 0.81] n=19, precision\* 0.857 [0.60, 0.96] n=14, out-of-corpus 1.000 n=7,
+  out-of-jurisdiction 0.833 n=6.** Recall moved because the *set* changed, not because the answerer
+  improved — **anyone quoting the rise as progress is quoting a re-labelling**, and at n=13 a 95%
+  interval is still roughly ±0.26. Precision did **not** move, because its denominator is every
+  refusal *emitted* and the tyre question was answered rather than refused. **The published
+  0.857 n=14 stands as what the tracer-3 configuration produced over the set as it then was.**
+- **Refusal precision has a second reading, `precision*` (Owner, 31 Aug 2026).** Same numerator,
+  denominator excluding refusals of answerable questions whose retrieval was incomplete — the
+  answerer refused 5 of 9 with incomplete retrieval and 2 of 41 with complete (Fisher p=0.0011), so
+  `precision` charges it for retrieval's failures. **Printed beside `precision`, never instead**, with
+  every excused question named, and NOT COMPUTED at all when completeness is unknown for any
+  answerable question.
 - **The answering boundary and the refusal population exist (tracers 2–3).** `fi-rag-eval answer <id>` answers one question; `fi-rag-eval answer --all`
-  answers **all 64** — 50 answerable + 14 refusal — through `qwen/qwen3.6-27b` on a LiteLLM gateway,
-  and prints refusal precision/recall as arithmetic with Wilson intervals. Measured 28 Aug 2026:
+  answers **all 63** — 50 answerable + 13 refusal — through `qwen/qwen3.6-27b` on a LiteLLM gateway,
+  and prints refusal precision/recall as arithmetic with Wilson intervals. Measured 28 Aug 2026 over
+  the then-14 refusal set:
   **refusal recall 0.857 [0.60, 0.96] n=14; precision 0.632 [0.41, 0.81] n=19; out-of-corpus 0.875,
   out-of-jurisdiction 0.833. $0.7553 for 64 calls, 478,438 tokens, ~50 minutes.** Still absent:
   groundedness, branch coverage, over-claim, citation support, judge–human agreement — all of which
@@ -194,6 +238,10 @@ regresses. Nothing else exists.
   `(x·168+31)/199 = 0.85` gives **x = 0.827** — a judge agreeing on only 0.827 of the real units
   would clear D11's floor. Excluded, printed on every table, and it cuts the labelling from 199 to
   168 units.
+- **The lemma detector cannot see a synonym under a different compound, and one is still in the
+  set.** Neither check will ever catch `romuauto` for `romuajoneuvo`. Every entry ultimately rests on
+  a hand-made claim in `absence_source`; the lexeme only keeps it from rotting. Re-derive the whole
+  population from the clause lists at the N≈85 tranche.
 - **Not built:** embeddings, pgvector, reranking, **the 168 hand labels and therefore judge–human
   agreement**, the answer-metric floor gate, a third authority, CI, Docker, Cloud Run.
   `make docker-build` still exits non-zero on purpose — do not "fix" it.
@@ -274,10 +322,15 @@ possible output, because everything else is trusted against it.
 - **Prove the regression gate goes red.** Break something on purpose — drop a chunk, downgrade the
   reranker, swap the model — and confirm CI actually fails. A gate never seen red is decoration.
 - **Keep a held-out slice** the tuning never touches, or the numbers stop predicting real quality.
-- **Never re-label a golden entry because the answer improved.** Two of the 14 refusal labels are
-  contestable and both happen to be the two the answerer got "wrong" — re-labelling either would
-  raise refusal recall toward 1.0. A re-label is a change to the **set**, followed by a
-  **re-measurement**; it is never a correction applied to a published result.
+- **Never re-label a golden entry because the answer improved.** Still the rule, and it survived its
+  first real test on 31 Aug 2026 — `ooc-autonrenkaiden-vastaanotto` was removed not because the
+  answerer "got it right" but because the corpus was **read** and the entry's own `absence_source`
+  was **false**. Check the corpus, not the score. The tell that it was done honestly: the same sweep
+  found `ooc-romuajoneuvon-toimituspaikka` has the same defect, and re-labelling *that* one would
+  have **lowered** recall — a re-label pass that only ever moves the number up is chasing the number.
+  A re-label remains a change to the **set**, followed by a **re-measurement**, reported as such;
+  it is never a correction applied to a published result. `make refusals` now makes that
+  re-measurement free, which removes the last practical excuse for not doing it.
 - Trust the arithmetic over the model: `recall@k` and MRR involve no judge, so when the two layers
   disagree, retrieval metrics win the argument.
 

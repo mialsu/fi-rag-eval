@@ -14,6 +14,84 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 — a golden label was WRONG for two slices, and the detector guarding it could not have caught it
+
+- **What:** `ooc-autonrenkaiden-vastaanotto` asserted that `rengas` appears in neither authority
+  *"missään muodossa"*. Both `2 §` definitions enumerate `renkaat`, and `12 §` says where
+  producer-responsibility waste goes. The corpus answered the question outright. The answerer
+  answered it correctly and was scored as having **missed a refusal** — the failure direction that
+  makes a good answerer look worse. The entry is removed (14 → 13) and a lemma-aware check now runs
+  beside the substring one.
+- **Where:** `corpus/golden/refusals.yaml` (tombstone); `src/fi_rag_eval/db.py`
+  (`chunks_matching_lemmas`, `lemma_tsquery`); `src/fi_rag_eval/evaluate.py`
+  (`ABSENCE_ANALYSER`, `needle_lemmas`, `_present`).
+- **What green tests do NOT prove here:** **that the other twelve labels are right.** The sweep that
+  found this one cleared eleven and corrected one, but it could only look for what a *lemma* check
+  can see. It provably cannot see a synonym under a different compound —
+  **`ooc-romuajoneuvon-toimituspaikka` is the standing example and it is still in the set**:
+  `romuautot` is in the same enumeration, so half that question is answerable from the corpus, and
+  neither check will ever say so. The Owner kept the label (its second half — deregistration,
+  romutustodistus — genuinely is not in the documents) and the false `label_source` was corrected in
+  place. Every remaining entry rests on a hand-made claim in `absence_source`; the lexeme only keeps
+  it from rotting. **The prior of "one wrong label in this population" is no longer zero, and the
+  only reason this one surfaced is that the answerer challenged it.** Labels a compliant answerer
+  never challenges are still never checked.
+- **A second gap this exposed:** the detector had been reachable **only** through `fi-rag-eval
+  answer` — a ~$0.76, ~50-minute, network-dependent command. A gate nobody runs before a commit is
+  not a gate, and this one was not run between 27 and 31 August. It is now in `make eval`.
+- **Disposition:** open — the invisible-synonym class is accepted for now and named here. Revisit
+  when the N≈85 tranche re-authors the population, which is the natural moment to re-derive every
+  `absence_source` from the clause lists rather than to spot-check it.
+
+## 2026-08-31 — precision* and the D11 inversion were both built without going through shaping
+
+- **What:** Two changes landed on the Owner's live decision rather than through
+  `/grill-with-docs` → `/to-spec` → go. (1) **`precision*`**, the restricted refusal-precision
+  reading — which the spec's own open-questions entry had explicitly called *"a metric the spec never
+  shaped, and inventing one mid-tracer is scope-filling"*. (2) **D11's inversion** (ADR-0012), a
+  post-hoc change to a pre-registered publication decision, made after seeing the data that motivated
+  it.
+- **Where:** `src/fi_rag_eval/metrics.py` (`restricted_precision`, `excused`);
+  `src/fi_rag_eval/report.py` (`_restricted_precision_lines`, `format_judged`);
+  `docs/adr/0012-*.md`; `specs/SPEC-slice-5-answering-and-judge.md` (D11 amendment banner).
+- **What green tests do NOT prove here:** that either was the right *shape*. The tests pin the
+  arithmetic and the ordering; they cannot pin that a second precision denominator is a metric worth
+  having rather than one more number to quote selectively. On D11: changing a pre-registered decision
+  after seeing the data is the exact shape this project exists to refuse. The mitigations are
+  recorded in ADR-0012 and are real but partial — the change moves *which* metric leads rather than a
+  threshold, a population or a value, and it makes the reported figure **worse-looking** (0.472 rather
+  than 1.000). An auditor should still count this as a spec delta and treat the next such change with
+  more suspicion, not less.
+- **Disposition:** open — accepted by the Owner, recorded rather than fixed.
+
+## 2026-08-31 — the inverted judged table has been seen only in tests, never in a live run
+
+- **What:** `format_judged` now leads with branch coverage, and three tests assert it (including the
+  ordering and the never-alone rule). **No live `fi-rag-eval judge` run has rendered it**, because
+  that costs ~$0.07 and ~7 minutes and needs `make services-up` plus a filled `.env`, and no spend
+  was authorised for it.
+- **Where:** `src/fi_rag_eval/report.py:format_judged`; `tests/test_judge.py`
+  (`TestD11IsEnforcedWhereTheTableIsRendered`).
+- **What green tests do NOT prove here:** that the real table reads well — column alignment against
+  real values, and whether the `<- THE HEADLINE` marker sits where a reader's eye lands. The
+  *arithmetic* is unaffected: no metric changed, only the order and the wording.
+- **Disposition:** open — clears itself on the next judge run, which tracer 5 needs anyway.
+
+## 2026-08-31 — the refusal population is smaller, so its intervals are wider
+
+- **What:** Removing one entry took the refusal population from 14 to 13. Recall reads
+  **0.923 [0.67, 0.99]** where it read 0.857 [0.60, 0.96]. The point estimate rose; the interval did
+  not narrow, and at n=13 a 95% interval is roughly ±0.26.
+- **Where:** `src/fi_rag_eval/judging.py:score_refusals_offline`;
+  `src/fi_rag_eval/report.py:format_offline_refusals`.
+- **What green tests do NOT prove here:** that 0.923 means anything more than 0.857 did. It does
+  not. Both are floors and directions, never published numbers, and the *reason* the number moved is
+  that the set changed — not that the answerer improved. Anyone quoting the rise as progress is
+  quoting a re-labelling. The frozen sample still holds the removed question's answer, real and paid
+  for, excluded by name on every table.
+- **Disposition:** open — resolves at the N≈85 tranche, which is the only thing that buys a
+  narrower interval here.
+
 ## 2026-08-28 (slice 5, tracer 3) — two of the fourteen refusal labels are contestable, and they are the two misses
 
 - **What:** The run answered 2 of 14 refusal questions instead of refusing, and on inspection both
