@@ -141,9 +141,7 @@ class Manifest:
                 "(DESIGN.md:15,67), wearing a correct-looking citation.",
                 finnish=(
                     "Kuntaa ei ole valittu, joten ei ole viranomaista, jonka määräyksistä "
-                    "vastaus voisi tulla. Kunta on valittava itse: jos järjestelmä "
-                    "valitsisi sen puolestasi, vastaus voisi tulla väärän viranomaisen "
-                    "määräyksistä oikean näköisen viittauksen kanssa."
+                    "vastaus voisi tulla. Valitse kunta valikosta."
                 ),
             )
         folded = municipality.casefold()
@@ -171,9 +169,7 @@ class Manifest:
                     finnish=(
                         f"Kunta {municipality} kuuluu tämän aineiston piiriin vain "
                         "osittain, joten nämä määräykset sitovat osaa kunnasta eivätkä "
-                        "muuta osaa. Järjestelmä kieltäytyy vastaamasta sen sijaan, että "
-                        "se vastaisi määräyksistä, jotka eivät ehkä sido sinua. "
-                        f"Osittainen kattavuus: {suomeksi}."
+                        f"muuta osaa. Osittainen kattavuus: {suomeksi}."
                     ),
                 )
             raise ManifestError(

@@ -541,7 +541,7 @@ class TestItAnswers:
         assert "VASTAUS" in body
         assert "Neljän viikon välein" in body
         assert "lounais-suomi@2024-08-01#26" in body
-        assert "$0.0000" in body and "mitattu gatewaylla" in body
+        assert "$0.0000" in body and "mitattu, ei arvioitu" in body
         # Five retrieved addresses, each with its citation, on the page.
         assert body.count('<span class="addr">lounais-suomi@2024-08-01#') >= 5
 
@@ -680,7 +680,44 @@ class TestTheCopyIsInTheAskersLanguage:
             data={"kysymys": "fotosynteesi kloroplasti mitokondrio", "kunta": "Turku"},
         )
         assert "jätehuoltolautakuntan" not in response.text
-        assert "Lounais-Suomen jätehuoltolautakunta" in response.text
+
+    def test_the_authority_name_is_rendered_UNINFLECTED_where_it_appears(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        """The positive half, moved 31 Aug 2026 after the refusal stopped naming it.
+
+        The no-hits refusal used to end `Viranomainen: Lounais-Suomen
+        jätehuoltolautakunta.` -- bolted on precisely because I was dodging the
+        genitive that had already bitten once. The Owner's copy pass deleted it, so
+        the *negative* assertion above still guards that path while the name itself
+        is now only on an answered page. Asserting it there keeps both halves alive
+        instead of quietly dropping the one that proves the name is rendered at all.
+        """
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=morphology,
+                    store_connect=store_opener(store_url),
+                    answerer=canned("vastaus", refused=False),  # type: ignore[arg-type]
+                )
+            ),
+            a_link(store),
+        )
+        response = client.post(
+            "/ask",
+            data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": "Turku"},
+        )
+        assert "Turku &rarr; Lounais-Suomen jätehuoltolautakunta" in response.text
+        assert "jätehuoltolautakuntan" not in response.text
+        assert "jätehuoltolautakunnan" not in response.text, (
+            "even the CORRECT genitive means something is inflecting the name"
+        )
 
     def test_the_finnish_refusal_carries_no_english_prose(self, live_client: TokenClient) -> None:
         """Sastamala's coverage detail was English inside a Finnish sentence.

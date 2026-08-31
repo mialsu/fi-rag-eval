@@ -223,8 +223,7 @@ def ask(
             # stays in the nominative, in parentheses.
             finnish=(
                 "Näissä jätehuoltomääräyksissä ei ole kohtaa, joka vastaisi tätä "
-                "kysymystä, joten otteita, joiden perusteella vastata, ei ole. "
-                f"Tämä on kieltäytyminen, ei virhe. Viranomainen: {authority.name}."
+                "kysymystä. Tämä on kieltäytyminen, ei virhe."
             ),
         )
     assert_one_authority(hits, authority.key, ASK_ID)

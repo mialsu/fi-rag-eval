@@ -260,7 +260,7 @@ def answer_block(asked: Asked) -> Html:
         f"<h2>Vastaus</h2>{verdict}"
         f'<p class="body">{esc(asked.answer.text).text}</p>{note}'
         f"<h2>Viittaukset</h2><p>{citations}</p>"
-        f'<p class="price">Hinta ${usage.cost_usd:.4f} &mdash; mitattu gatewaylla, ei arvioitu '
+        f'<p class="price">Hinta ${usage.cost_usd:.4f} &mdash; mitattu, ei arvioitu '
         f"({usage.total_tokens} tokenia, joista {usage.reasoning_tokens} päättelyä).</p>"
         "</section>"
     )
@@ -289,8 +289,7 @@ def gate_block(token: access.Token, *, now: datetime) -> Html:
         '<p class="gate">Tällä linkillä on <strong>'
         f"{token.remaining}</strong> kysymystä jäljellä "
         f"{token.query_limit}:stä, ja se on voimassa vielä noin "
-        f"<strong>{hours} h</strong>. Jokainen vastaus muodostetaan oikeasti, "
-        "joten linkki on näyte eikä jatkuva palvelu.</p>"
+        f"<strong>{hours} h</strong>.</p>"
     )
 
 
@@ -430,9 +429,8 @@ def log(line: str) -> None:
 
 
 LANDING = (
-    "Tähän demoon pääsee vain henkilökohtaisella linkillä. Jokainen vastaus "
-    "muodostetaan oikeasti ja maksaa, joten kysymysmäärä on rajattu linkkiä ja "
-    "vuorokautta kohden. Jos sinulle on luvattu linkki, käytä sitä."
+    "Tähän demoon pääsee vain henkilökohtaisella linkillä. "
+    "Jos sinulle on luvattu linkki, käytä sitä."
 )
 
 

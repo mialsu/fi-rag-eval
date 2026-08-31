@@ -40,10 +40,26 @@ ledger is worse than none, because sessions trust it.
   that must be present. **It cannot check grammar, register, or whether a sentence makes sense**, and
   nothing automated can. Chunk addresses are deliberately exempt: they are the citation a reader
   checks, which is the demo's whole argument.
-- **Also unreviewed, and listed so it is not forgotten:** the Owner rewrote the heading, the lede and
-  the hint themselves in the working tree. Every remaining Finnish string I wrote — the five
-  `AskError.finnish` messages, the four `ManifestError` ones, the `Denied` messages in `access.py`,
-  the gate and refusal lines in `serve.py` — has **not** been read by a Finnish speaker.
+- **A full pass followed, 31 Aug 2026.** All 23 user-facing Finnish strings were printed with their
+  triggers and read by the Owner. **Six were cut, and five of those cuts were pure deletions** — the
+  safest edit available to someone who cannot judge the prose, because a deleted sentence cannot be
+  written badly. What went: the `DESIGN.md` jurisdiction argument from the no-*kunta* refusal; our
+  reasoning from the Sastamala refusal; a convoluted clause and a bolted-on `Viranomainen: X.` from
+  the no-hits refusal; the cost model from the landing page and the gate line; and **`mitattu
+  gatewaylla`**, which is `mittausharnessissa` again — an English word given a Finnish case ending.
+- **One test moved rather than loosened.** Deleting the bolted-on authority name broke the *positive*
+  half of the inflection guard. Rather than drop it, it moved to an answered page where the name is
+  still rendered, and now also asserts the **correct** genitive is absent — because even a right
+  `jätehuoltolautakunnan` would mean something is inflecting the name again.
+- **Still unread by a Finnish speaker:** the remaining `Denied` messages in `access.py` (revoked,
+  expired, used-up, daily, monthly), `UNAVAILABLE_BODY` and the gateway-failure text in `serve.py`,
+  and the refusal heading/hint. The Owner reviewed the *list* but only flagged six; the rest are
+  **unflagged, not endorsed**.
+- **My inspection script was itself a second source of truth.** It printed the 23 strings from
+  hardcoded copies rather than from the code, so after the fixes it reported one string as unchanged
+  when the code had changed. Caught by checking the source. Same family as the seen-red harness that
+  could not go red: **the tool that checks the work needs checking too.** It lived in a scratch
+  directory and is not committed.
 - **Disposition:** open. The footer is fixed; the class of defect is not closed and cannot be closed
   by a test.
 
