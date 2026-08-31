@@ -150,11 +150,19 @@ refusals:
     kind: out-of-jurisdiction
     phrasing: authored
     municipality: Ylöjärvi
-    absent_lexeme: tieyhteyttä
+    absent_lexeme: saari
     absence_source: >-
-      Pirkanmaan määräyksissä ei ole yhtään mainintaa tieyhteydettömistä
-      kiinteistöistä tai saarista; sanaa "tieyhteyttä" ei esiinny asiakirjassa.
-      Lounais-Suomessa saaristo on oma erikseen säädetty tilanteensa.
+      Pirkanmaan määräyksissä ei ole yhtään mainintaa saarista eikä
+      tieyhteydettömistä kiinteistöistä. Lounais-Suomessa saaristo on oma
+      erikseen säädetty tilanteensa (15 §, 16 §, 38 §).
+      LEKSEEMI VAIHDETTU 31.8.2026, "tieyhteyttä" -> "saari". Vanha lekseemi ei
+      ollut poissa: Pirkanmaan 36 § sanoo "Tieyhteyden kiinteistölle ja
+      lietesäiliölle tulee olla kulkukelpoinen", eli sana esiintyy
+      liittymäkulusta puhuttaessa, ei saarista. Vanha lekseemi läpäisi
+      tarkistuksen vain siksi, että ILIKE-haku ei näe muotoa "Tieyhteyden"
+      hakusanalla "tieyhteyttä". MERKINNÄN LUOKITUSTA EI MUUTETTU -- kysymys on
+      edelleen out-of-jurisdiction ja oikea vastaus on kieltäytyminen; vaihdettu
+      lekseemi on TIUKEMPI kuin vanha, ei löysempi.
     answerable_from: lounais-suomi@2024-08-01#15
     label_source: >-
       Lounais-Suomi 15 §: "Kunta ei järjestä erilliskerättävien jätteiden
@@ -242,19 +250,44 @@ refusals:
       Ei lähdepykälää: kysymystä ei voi vastata näistä jätehuoltomääräyksistä
       lainkaan. Oikea vastaus on kieltäytyminen ja jätetaksaan ohjaaminen.
 
-  - id: ooc-autonrenkaiden-vastaanotto
-    question: Mihin vanhat autonrenkaat pitää toimittaa?
-    kind: out-of-corpus
-    phrasing: authored
-    municipality: Salo
-    absent_lexeme: rengas
-    absence_source: >-
-      Renkaat kuuluvat tuottajavastuun piiriin, ja niiden vastaanotto järjestetään
-      tuottajayhteisön verkostossa. Sanaa "rengas" ei esiinny kummankaan
-      viranomaisen tekstissä missään muodossa.
-    label_source: >-
-      Ei lähdepykälää. Molemmat asiakirjat mainitsevat tuottajavastuun yleisesti
-      mutta eivät säädä renkaiden vastaanotosta.
+  # ==========================================================================
+  # ooc-autonrenkaiden-vastaanotto WAS HERE. REMOVED 31 Aug 2026, by the Owner.
+  # ==========================================================================
+  #
+  # "Mihin vanhat autonrenkaat pitää toimittaa?", labelled out-of-corpus on the
+  # claim that the word "rengas" appears in neither authority's text "missään
+  # muodossa". THAT CLAIM WAS FALSE. Both authorities' 2 § definition of
+  # tuottajavastuunalainen jäte enumerates it:
+  #
+  #     "Tuottajavastuunalaisia jätteitä ovat moottorikäyttöisten ajoneuvojen
+  #      RENKAAT, romuautot, sähkö- ja elektroniikkaromu, paristot ja akut,
+  #      keräyspaperi sekä pakkaukset."
+  #
+  # and 12 § says where such waste goes: "tuottajien osoittamiin
+  # vastaanottopaikkoihin". The corpus answers the question outright, from two
+  # chunks the retriever actually returned, using no premise from outside it.
+  # The answerer answered it and was scored as a missed refusal. The ANSWER was
+  # right; the LABEL was wrong.
+  #
+  # Why the drift detector did not catch it: `rengas` is not a substring of
+  # `renkaat` -- Finnish consonant gradation, against an ILIKE match on the
+  # nominative singular. That hole is closed by the lemma-aware second check
+  # added the same day; see db.chunks_containing and its lemma sibling.
+  #
+  # Why REMOVED and not promoted to the answerable set: promotion needs
+  # hand-written required_branches and chunk labels, takes N from 50 to 51, and
+  # invalidates eval/baseline.json -- a retrieval re-record to repair a refusal
+  # label. Removal costs one question and touches nothing gated. The refusal
+  # population is therefore 13, not 14, from this date.
+  #
+  # DO NOT re-add this question as a refusal entry. If it comes back it comes
+  # back in the answerable set, with branches, with the baseline re-recorded.
+  # The published refusal recall of 0.857 (n=14) STANDS as what the tracer-3
+  # configuration produced over the set as it then was; the figure measured over
+  # 13 is a measurement of a CHANGED SET and is reported as such, never as a
+  # correction applied to a published result. See REVIEW-DEBT.md, 31 Aug 2026.
+  #
+  # ==========================================================================
 
   - id: ooc-tavarat-uudelleenkayttoon
     question: Mihin voin viedä käyttökelpoiset tavarat kirpputorille uudelleenkäyttöön?
@@ -292,8 +325,20 @@ refusals:
     absence_source: >-
       Romuajoneuvot kuuluvat tuottajavastuun piiriin ja niiden vastaanotosta
       säädetään erikseen. Sanaa "romuajoneuvo" ei esiinny kummassakaan
-      asiakirjassa.
-    label_source: Ei lähdepykälää.
+      asiakirjassa. HUOM 31.8.2026: 2 § luettelee kuitenkin
+      tuottajavastuunalaisiksi jätteiksi "romuautot", ja 12 § kertoo, minne
+      tuottajavastuunalaiset jätteet toimitetaan. Kysymyksen ensimmäinen
+      puolisko ("mihin toimittaa") on siis vastattavissa korpuksesta -- samalla
+      virkkeellä, joka kumosi renkaita koskevan merkinnän. Lekseemi
+      "romuajoneuvo" ei tavoita tätä, koska "romuauto" on eri yhdyssana eikä
+      saman sanan taivutusmuoto: tämä on sakokaivo/saostussäiliö-tapaus, jota
+      yksikään lekseemitarkistus ei havaitse.
+    label_source: >-
+      Ei yhtä lähdepykälää koko kysymykselle. 2 § ja 12 § kattavat
+      toimituspaikan, mutta rekisteristä poisto ja romutustodistus eivät kuulu
+      jätehuoltomääräyksiin lainkaan, joten kieltäytyminen on edelleen
+      puolustettavissa. Merkintä SÄILYTETÄÄN Omistajan päätöksellä 31.8.2026 --
+      päätös tehtiin sen jälkeen kun 2 §:n luettelo oli luettu, ei ennen.
 
   - id: ooc-hevosenlannan-kaytto
     question: Saako hevosenlantaa levittää omalle pellolle lannoitteeksi?

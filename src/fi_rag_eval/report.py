@@ -557,7 +557,7 @@ def format_refusals(run: AnswerRun) -> str:
         "  Intervals are Wilson 95%, not the +/-0.13 the spec quotes -- that figure is one"
     )
     lines.append(
-        "  standard error. At n=14 a 95% interval is roughly +/-0.25, which is why refusal"
+        "  standard error. At n=13 a 95% interval is roughly +/-0.26, which is why refusal"
     )
     lines.append("  recall is reported as a floor and a direction, never as a published number.")
     if metrics.missed:

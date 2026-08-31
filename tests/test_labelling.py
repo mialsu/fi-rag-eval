@@ -426,7 +426,29 @@ class TestTheShippedSampleIsUsable:
 
         run = load_run(labelling.DEFAULT_SAMPLE)
         assert len(run.answerable) == 50
+        # FOURTEEN, against a golden set that now holds THIRTEEN. The sample is
+        # frozen (ADR-0011) and the golden set moved under it on 31 Aug 2026 when
+        # `ooc-autonrenkaiden-vastaanotto` was removed. Asserted as a mismatch
+        # rather than quietly reconciled: the extra answer is real, it was paid
+        # for, and any scorer reading this file has to decide what to do with it.
         assert len(run.refusals) == 14
+
+    def test_the_frozen_sample_holds_one_answer_the_golden_set_no_longer_asks(
+        self, golden: GoldenSet
+    ) -> None:
+        """The drift ADR-0011 makes inevitable, named rather than discovered later.
+
+        A frozen sample and a living golden set diverge the first time an entry
+        moves. Naming the divergent id here means a scorer that silently pooled it
+        back in would fail this test rather than publish a number over 14.
+        """
+        from fi_rag_eval.judging import load_run
+
+        run = load_run(labelling.DEFAULT_SAMPLE)
+        asked = {r.id for r in golden.refusals}
+        answered = {a.question_id for a in run.refusals}
+        assert answered - asked == {"ooc-autonrenkaiden-vastaanotto"}
+        assert not asked - answered
 
     def test_the_frozen_sample_states_its_own_provenance(self) -> None:
         import json

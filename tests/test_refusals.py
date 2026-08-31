@@ -18,12 +18,14 @@ import psycopg
 import pytest
 import yaml
 
+from fi_rag_eval import db
 from fi_rag_eval.addressing import ChunkAddress
-from fi_rag_eval.analyse import Morphology
+from fi_rag_eval.analyse import Analyser, Morphology
 from fi_rag_eval.answer import TOKEN_CEILING, Answer, AnswerError, TokenBudget, Usage, ceiling_for
 from fi_rag_eval.answering import AnswerRun, ScoredAnswer
 from fi_rag_eval.cli import main
 from fi_rag_eval.evaluate import (
+    ABSENCE_ANALYSER,
     PUBLISHED,
     EvaluationError,
     assert_refusal_absences,
@@ -86,13 +88,30 @@ def entry(**overrides: object) -> dict[str, object]:
 
 
 class TestTheCommittedSet:
-    """The 14 real entries, as shipped."""
+    """The 13 real entries, as shipped.
 
-    def test_the_population_is_fourteen_split_eight_and_six(self, golden: GoldenSet) -> None:
-        assert len(golden.refusals) == 14
+    Fourteen until 31 Aug 2026, when `ooc-autonrenkaiden-vastaanotto` was removed:
+    both authorities' 2 § enumerate `renkaat` as producer-responsibility waste and
+    12 § says where such waste goes, so the corpus answered the question outright
+    and the refusal label was wrong. See the tombstone in `refusals.yaml`.
+    """
+
+    def test_the_population_is_thirteen_split_seven_and_six(self, golden: GoldenSet) -> None:
+        assert len(golden.refusals) == 13
         kinds = [r.kind for r in golden.refusals]
-        assert kinds.count(RefusalKind.OUT_OF_CORPUS) == 8
+        assert kinds.count(RefusalKind.OUT_OF_CORPUS) == 7
         assert kinds.count(RefusalKind.OUT_OF_JURISDICTION) == 6
+
+    def test_the_removed_tyre_question_has_not_come_back(self, golden: GoldenSet) -> None:
+        """It is removable only once; re-adding it would silently restore the defect.
+
+        Its answer was correct and was scored as a missed refusal, which is the
+        failure direction that makes a good answerer look worse. If this question
+        ever returns it returns to the ANSWERABLE set, with branches and a
+        re-recorded baseline -- never here.
+        """
+        assert not any(r.id == "ooc-autonrenkaiden-vastaanotto" for r in golden.refusals)
+        assert not any(r.absent_lexeme == "rengas" for r in golden.refusals)
 
     def test_the_answerable_population_is_untouched_at_fifty(self, golden: GoldenSet) -> None:
         """`len(golden)` is the retrieval headline's N and must not have moved."""
@@ -551,6 +570,84 @@ class TestAgainstTheCorpus:
         with pytest.raises(EvaluationError, match="is NOT absent from"):
             assert_refusal_absences(corpus, manifest=manifest, refusals=[covered])
 
+    def test_the_lemma_check_catches_what_the_SUBSTRING_check_provably_cannot(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        morphology: Morphology,
+    ) -> None:
+        """The tyre case, kept as a permanent red.
+
+        `ooc-autonrenkaiden-vastaanotto` shipped for two slices claiming the word
+        `rengas` appears in neither authority "missään muodossa". Both 2 §
+        definitions enumerate `renkaat`. The substring detector could not see it --
+        Finnish consonant gradation means `rengas` is not a substring of `renkaat`
+        -- and the answerer was scored as having missed a refusal for giving the
+        right answer.
+
+        The first two assertions are the *diagnosis*, not decoration: if the
+        substring check ever starts finding it, this test is passing for a
+        different reason than the one it was written for.
+        """
+        assert db.chunks_containing(corpus, authority_key="lounais-suomi", needle="rengas") == []
+        assert db.chunks_containing(corpus, authority_key="pirkanmaa", needle="rengas") == []
+
+        tyre = RefusalQuestion(
+            id="pretend-tyres-are-absent",
+            question="Mihin vanhat autonrenkaat pitää toimittaa?",
+            kind=RefusalKind.OUT_OF_CORPUS,
+            phrasing=Phrasing.AUTHORED,
+            phrasing_source=None,
+            municipality="Salo",
+            absent_lexeme="rengas",
+            absence_source="the claim this test exists to falsify",
+            answerable_from=None,
+            label_source="none",
+        )
+        with pytest.raises(EvaluationError, match="is NOT absent from"):
+            assert_refusal_absences(
+                corpus, manifest=manifest, refusals=[tyre], morphology=morphology
+            )
+
+    def test_a_multi_word_needle_needs_ADJACENCY_and_not_merely_both_words(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        golden: GoldenSet,
+        morphology: Morphology,
+    ) -> None:
+        """`toissijainen jatehuoltopalvelu` is a phrase needle for exactly this reason.
+
+        Lounais-Suomi 1 SS carries `toissijaiselle jatehuoltovastuulle kuuluviin
+        jatehuoltopalveluihin`: both lemmas, in one chunk, three tokens apart. A
+        bag-of-lemmas absence check would fire on it and go red for an entry whose
+        label is sound and whose author had already anticipated this.
+        """
+        entry = next(
+            r for r in golden.refusals if r.absent_lexeme == "toissijainen jätehuoltopalvelu"
+        )
+        both_words_present = db.chunks_matching_lemmas(
+            corpus,
+            authority_key="lounais-suomi",
+            tsquery="'toissijainen' & 'jätehuoltopalvelu'",
+            analyser=ABSENCE_ANALYSER,
+        )
+        assert both_words_present, "the premise of this test has changed"
+        assert_refusal_absences(corpus, manifest=manifest, refusals=[entry], morphology=morphology)
+
+    def test_the_absence_analyser_does_not_decompose_compounds(
+        self, morphology: Morphology
+    ) -> None:
+        """Why the detector is not on the published cell's analyser.
+
+        `lemma-reasm` reads `lisajate` as `lisa` + `jate` as well as whole, and
+        `jate` is in almost every chunk of a waste corpus -- so a reassembling
+        absence check would go red on every compound needle in the population.
+        """
+        assert morphology.lexemes("lisäjäte", ABSENCE_ANALYSER) == ("lisäjäte",)
+        assert "jäte" in morphology.lexemes("lisäjäte", Analyser.LEMMA_REASM)
+        assert morphology.lexemes("renkaat", ABSENCE_ANALYSER) == ("rengas",)
+
     def test_an_out_of_jurisdiction_claim_goes_RED_when_the_answer_is_not_there_either(
         self, corpus: psycopg.Connection[tuple[object, ...]], manifest: Manifest
     ) -> None:
@@ -612,7 +709,7 @@ class TestAgainstTheCorpus:
             morphology=morphology,
             stopwords=stopwords,
         )
-        assert len(retrieved) == 14
+        assert len(retrieved) == 13
         for one in retrieved:
             assert one.hits, one.refusal.id
             assert {hit.authority_key for hit in one.hits} == {one.authority_key}

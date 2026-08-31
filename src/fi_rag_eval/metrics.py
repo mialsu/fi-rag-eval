@@ -314,11 +314,12 @@ class AnswerOutcome:
 class Interval:
     """A Wilson score interval for a proportion, and the n it was computed at.
 
-    Wilson rather than Wald because Wald is unusable at these counts: at 14
-    questions it runs past 0 and 1, and at a perfect 14/14 it reports a width of
+    Wilson rather than Wald because Wald is unusable at these counts: at 13
+    questions it runs past 0 and 1, and at a perfect 13/13 it reports a width of
     zero, which would publish certainty this population cannot buy.
 
-    **This corrects D5.** The spec quotes "±0.13" for refusal recall at R=14, which
+    **This corrects D5.** The spec quotes "±0.13" for refusal recall at R=14 -- the
+    population was 14 when D5 was written and is 13 since 31 Aug 2026 -- which
     is one standard error (sqrt(0.25/14) = 0.134), not an interval. The 95%
     interval at 7/14 is roughly [0.25, 0.75]. This project has already been burned
     once by an interval that was the wrong statistic -- the ±0.18 slice 3 used --

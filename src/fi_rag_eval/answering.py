@@ -9,7 +9,7 @@ on the **published cell only** (`lemma-reasm/0`): 12 cells x 64 questions would 
 Three rules the module exists to hold.
 
 **The two populations are used together and never merged.** Refusal precision's
-denominator is every refusal the system emitted, which spans all 64 questions, so
+denominator is every refusal the system emitted, which spans all 63 questions, so
 both populations have to be in scope at once. They stay separate types the whole
 way through -- `Question` and `RefusalQuestion` in, `AnswerOutcome` and
 `RefusalOutcome` out -- so the arithmetic that must not pool them cannot.

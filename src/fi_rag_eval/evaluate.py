@@ -267,11 +267,71 @@ class RefusalRetrieval:
     hits: tuple[db.Hit, ...]
 
 
+ABSENCE_ANALYSER = Analyser.LEMMA_BASEFORM
+"""The analyser the refusal drift detector lemmatises with, and NOT the published cell's.
+
+`lemma-reasm` decomposes compounds: it reads `lisajate` as `lisa` + `jate` as well
+as whole, and `jate` occurs in almost every chunk of a waste-regulation corpus. A
+reassembling absence check would therefore fire on every compound needle in the
+population and go red for entries whose labels are sound. `lemma-baseform` gives
+one lemma per word with no decomposition, which is exactly what "is this WORD
+present, in any inflected form" needs.
+
+Deliberately independent of `evaluate.PUBLISHED`: the absence claim is a fact
+about the corpus, not about the cell under measurement, and it must not start
+reading differently because the published cell moved.
+"""
+
+
+def needle_lemmas(needle: str, morphology: Morphology) -> tuple[tuple[str, ...], ...]:
+    """One tuple of candidate lemmas per word of the needle, in order.
+
+    Every reading is kept rather than the first: voikko's ordering is not a
+    confidence ranking, so picking one would silently decide a morphological
+    question in a check whose whole job is to not be silently wrong.
+    """
+    words = morphology.words(needle)
+    if not words:
+        raise EvaluationError(
+            f"{needle!r} tokenises to no words, so its absence cannot be checked at all"
+        )
+    readings = tuple(
+        morphology.lexemes(word, ABSENCE_ANALYSER) or (word.casefold(),) for word in words
+    )
+    return readings
+
+
+def _present(
+    conn: psycopg.Connection[tuple[object, ...]],
+    *,
+    authority_key: str,
+    refusal: RefusalQuestion,
+    tsquery: str,
+) -> list[str]:
+    """Chunks of this authority carrying the needle, by EITHER check.
+
+    Two independent detectors, unioned. The substring match cannot be weakened by
+    a change to the analyser; the lemma match can see `renkaat` when the needle is
+    `rengas`, which the substring match provably cannot. Neither alone is enough
+    and neither is a proof of absence -- see `db.chunks_matching_lemmas`.
+    """
+    hits = set(
+        db.chunks_containing(conn, authority_key=authority_key, needle=refusal.absent_lexeme)
+    )
+    hits |= set(
+        db.chunks_matching_lemmas(
+            conn, authority_key=authority_key, tsquery=tsquery, analyser=ABSENCE_ANALYSER
+        )
+    )
+    return sorted(hits)
+
+
 def assert_refusal_absences(
     conn: psycopg.Connection[tuple[object, ...]],
     *,
     manifest: Manifest,
     refusals: Sequence[RefusalQuestion],
+    morphology: Morphology | None = None,
 ) -> None:
     """Check every refusal question's central claim against the corpus, per run.
 
@@ -299,10 +359,12 @@ def assert_refusal_absences(
             "another jurisdiction; if that chunk does not exist, the claim is not."
         )
 
+    morphology = morphology or Morphology.open()
     every_authority = [a.key for a in manifest.authorities]
     for refusal in refusals:
         asked = manifest.resolve_municipality(refusal.municipality).key
-        present = db.chunks_containing(conn, authority_key=asked, needle=refusal.absent_lexeme)
+        tsquery = db.lemma_tsquery(needle_lemmas(refusal.absent_lexeme, morphology))
+        present = _present(conn, authority_key=asked, refusal=refusal, tsquery=tsquery)
         if present:
             raise EvaluationError(
                 f"{refusal.id}: {refusal.absent_lexeme!r} is NOT absent from {asked!r} -- "
@@ -322,9 +384,7 @@ def assert_refusal_absences(
                     "claims the hard kind of refusal while carrying no evidence that the "
                     "question is answerable anywhere."
                 )
-            if not db.chunks_containing(
-                conn, authority_key=elsewhere, needle=refusal.absent_lexeme
-            ):
+            if not _present(conn, authority_key=elsewhere, refusal=refusal, tsquery=tsquery):
                 raise EvaluationError(
                     f"{refusal.id}: {refusal.absent_lexeme!r} is absent from {asked!r} but "
                     f"ALSO absent from {elsewhere!r}, where this entry claims the answer "
@@ -333,7 +393,7 @@ def assert_refusal_absences(
                 )
             continue
         covered = {
-            key: db.chunks_containing(conn, authority_key=key, needle=refusal.absent_lexeme)
+            key: _present(conn, authority_key=key, refusal=refusal, tsquery=tsquery)
             for key in every_authority
         }
         elsewhere_hits = {key: hits for key, hits in covered.items() if hits}

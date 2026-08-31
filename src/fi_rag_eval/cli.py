@@ -30,6 +30,7 @@ from fi_rag_eval.evaluate import (
     DEFAULT_K,
     PUBLISHED,
     EvaluationError,
+    assert_refusal_absences,
     evaluate,
     evaluate_grid,
 )
@@ -140,9 +141,9 @@ def _parser() -> argparse.ArgumentParser:
     answer_parser.add_argument(
         "--all",
         action="store_true",
-        help="answer BOTH populations -- 50 answerable and 14 refusal questions -- and "
+        help="answer BOTH populations -- 50 answerable and 13 refusal questions -- and "
         "print refusal precision/recall. This spends real money: budget the measured "
-        "per-answer cost times 64",
+        "per-answer cost times 63",
     )
     answer_parser.add_argument(
         "--municipality",
@@ -347,6 +348,15 @@ def _eval(args: argparse.Namespace) -> int:
         # so an eval against a corpus loaded by an older ingest would score the
         # lemma cells against an empty index and call it a retrieval failure.
         db.assert_lemma_vectors_populated(conn)
+        # The refusal population's drift detector, run in the OFFLINE gate rather
+        # than only in the answer phase. It was reachable only through
+        # `fi-rag-eval answer` until 31 Aug 2026, which put the guard on the
+        # refusal labels behind a ~$0.76, ~50-minute, network-dependent command --
+        # a gate nobody runs before a commit is not a gate. It costs one query per
+        # entry and calls no model.
+        assert_refusal_absences(
+            conn, manifest=manifest, refusals=golden.refusals, morphology=morphology
+        )
         lexemes = db.lexeme_counts(conn)
         grid = evaluate_grid(
             conn, manifest=manifest, golden=golden, k=args.k, morphology=morphology

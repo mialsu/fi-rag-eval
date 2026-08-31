@@ -605,3 +605,60 @@ def lexeme_counts(conn: psycopg.Connection[tuple[object, ...]]) -> dict[Analyser
     if row is None or row[0] is None:
         raise DatabaseError("the corpus is empty, so it has no lexeme counts")
     return {analyser: int(str(row[index])) for index, analyser in enumerate(Analyser)}
+
+
+def lemma_tsquery(readings: Sequence[Sequence[str]]) -> str:
+    """A tsquery matching this sequence of words, adjacently, on a lemma column.
+
+    One inner sequence per word of the needle, holding that word's candidate
+    lemmas -- voikko often offers several and picking one would silently decide a
+    morphological question. Alternatives are OR-ed inside a word and the words are
+    joined by `<->`, so a multi-word needle matches only where the lemmas appear
+    **adjacent and in order**.
+
+    Adjacency is not decoration. `toissijainen jätehuoltopalvelu` is a refusal
+    entry's needle precisely *because* `toissijainen` and `jätehuoltopalvelu` both
+    occur separately in the authority that does not regulate the service; a
+    bag-of-lemmas test would fire on that entry and go red for an entry whose
+    label is sound.
+    """
+    if not readings or any(not word for word in readings):
+        raise ValueError("every word of the needle must contribute at least one lemma")
+    return " <-> ".join(
+        "(" + " | ".join(f"'{lexeme}'" for lexeme in word) + ")" for word in readings
+    )
+
+
+def chunks_matching_lemmas(
+    conn: psycopg.Connection[tuple[object, ...]],
+    *,
+    authority_key: str,
+    tsquery: str,
+    analyser: Analyser,
+) -> list[str]:
+    """Addresses of this authority's chunks matching a lemma tsquery.
+
+    The lemma-aware half of the refusal population's drift detector, and the half
+    `chunks_containing`'s `ILIKE` cannot do: Finnish consonant gradation means the
+    nominative singular is frequently not a substring of its own inflected forms.
+    `rengas` is not a substring of `renkaat`, and that gap let a refusal question
+    stand for two slices against a corpus that enumerates the word (31 Aug 2026).
+
+    The two checks run **together and both must pass**, rather than this one
+    replacing the substring test. `chunks_containing`'s docstring argues that
+    matching raw text cannot be weakened by a change to the analyser, and that
+    argument is still right; it is simply not sufficient in a language that
+    inflects. Neither check is a proof of absence -- a synonym under another
+    compound (`romuauto` for `romuajoneuvo`) defeats both, which is why the
+    absence claim stays hand-made and `absence_source` records how.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL(
+                "SELECT address FROM chunk, CAST(%s AS tsquery) AS query "
+                "WHERE authority_key = %s AND {column} @@ query "
+                "ORDER BY clause, sub_key NULLS FIRST"
+            ).format(column=sql.Identifier(analyser.column)),
+            (tsquery, authority_key),
+        )
+        return [str(row[0]) for row in cur.fetchall()]
