@@ -148,6 +148,34 @@ regresses. Nothing else exists.
   **gitignored** — so the judged numbers are not reproducible from a clean clone. The **control**
   is, deliberately: it needs no run file. The run this project has is stamped `4b75dfd-dirty`, and
   every judged table prints a `!!` line saying so.
+- **THERE IS A PRODUCT SURFACE NOW: `fi-rag-eval ask "<kysymys>" --municipality <kunta>` (31 Aug
+  2026).** Until this, nothing in the package could answer a question nobody had labelled — `answer`
+  takes a golden question **id**. `ask.py` **reuses** the harness's retrieval (published cell,
+  `evaluate.cell_query_lexemes`, `db.search`, stopwords asked of Postgres per word) rather than
+  re-implementing it, because a second retrieval behind a demo would drift from every published
+  number and both would still look fine. **Exercised live, 3 real calls, $0.0350 total:**
+  - Turku *"Kuinka usein sekajäteastia on tyhjennettävä?"* → all **four** conditional branches
+    stated, cited to `#26`, nothing flattened. $0.0177.
+  - **Tampere, identical question → a genuinely different correct answer** (4/8 weeks against
+    Lounais-Suomi's 4/8/16), different clauses, forked vocabulary (`keräysväline`/`jäteastia`).
+    $0.0089. This is the jurisdiction fork visible in a product for the first time.
+  - Turku *"Paljonko … tyhjennys maksaa?"* → **REFUSED** while holding 5 plausible retrieved
+    chunks, naming what the excerpts *do* cover. $0.0084.
+- **Every refusal on the `ask` path is FREE, and that is asserted, not intended.** Empty question,
+  unknown municipality, partially-covered municipality (Sastamala, reaching a person for the first
+  time), a question that normalises to no lexemes, a search that returns nothing — all refuse before
+  any model call. The answerer is an injected `Protocol` and the tests pass one that **raises** if
+  called, so "costs nothing" is a test failure rather than a comment. Seen red.
+- **THE AUTHORITY FILTER WAS NEVER PROVEN ON ITS OWN, and now is.** `db.search` filters on
+  `authority_key` **and** `effective_date`, and this corpus's authorities have different dates
+  (2024-08-01, 2021-07-01) — so the **date alone** separated them and deleting the `authority_key`
+  term left the entire suite green. The isolation check recorded above as *"seen red by deleting the
+  WHERE clause"* removes **both** terms, so it never told them apart. A test now plants one
+  authority's chunk under the *other's* date, making the dates useless as a separator; seen red with
+  only the authority term deleted. **`evaluate`'s 50×12 check and tracer 3's refusal measurement are
+  correct but not independently attributed for the same reason** — audit them **before** ingesting a
+  second edition (ADR-0006 anticipates one), not after. `REVIEW-DEBT.md`.
+
 - **A GOLDEN LABEL WAS WRONG FOR TWO SLICES, AND THE DETECTOR GUARDING IT COULD NOT HAVE CAUGHT IT
   (31 Aug 2026).** `ooc-autonrenkaiden-vastaanotto` claimed `rengas` appears in neither authority
   *"missään muodossa"*. Both `2 §` definitions **enumerate `renkaat`**, and `12 §` says where
