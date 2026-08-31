@@ -14,6 +14,39 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 (MVP tracer 2, follow-up) — the footer was written for a code reviewer and shipped to a resident
+
+- **What:** the demo's footer read *"Haku on sama kuin **mittausharnessissa** — sama **analysaattori**
+  ja sama järjestys (`lemma-reasm/0`) kuin julkaistuissa luvuissa. Demon takana ei ole toista
+  hakua."* `mittausharness` is an invented compound around an English word with no Finnish currency;
+  `analysaattori` and `sama järjestys` are internal jargon; and the last sentence argues a point about
+  our *code* to someone who does not know a second retrieval was ever possible. **The Owner found it
+  by reading the page.** 518 green tests said nothing.
+- **Where:** `src/fi_rag_eval/static/demo.html` (footer); `src/fi_rag_eval/serve.py:answer_block`.
+- **This is the confessed risk landing.** The tracer-2 entry above says in as many words: *"There is
+  no test that any other `AskError.finnish` string, or any string in `demo.html`, is grammatical —
+  that needs a reader, and this project has one Finnish speaker."* It was right, and the prediction
+  came true within a day.
+- **Fixed, and a decision REVERSED.** The footer now speaks to the resident: what the answers are
+  based on, that each point carries the pykälä it came from, that **this is a sample and not official
+  advice** (a disclaimer that was missing entirely and matters most), and that questions are not
+  stored. `lemma-reasm/0` and the authority key `lounais-suomi` are **off the page** — they are raw
+  IDs on a surface, which `CLAUDE.md`'s definition of done forbids, and the cell still appears in the
+  `serve` startup banner where an operator looks for it. A test that asserted the **opposite** — that
+  the page names its cell, "a demo that hides its configuration is a demo of an unnamed pipeline" —
+  was inverted; that argument was about a reviewer reading the repository, not about a resident.
+- **What green tests STILL do NOT prove here:** that the Finnish is good. The new test pins the
+  specific words that were wrong (`harness`, `analysaattori`, the cell name) and the two sentences
+  that must be present. **It cannot check grammar, register, or whether a sentence makes sense**, and
+  nothing automated can. Chunk addresses are deliberately exempt: they are the citation a reader
+  checks, which is the demo's whole argument.
+- **Also unreviewed, and listed so it is not forgotten:** the Owner rewrote the heading, the lede and
+  the hint themselves in the working tree. Every remaining Finnish string I wrote — the five
+  `AskError.finnish` messages, the four `ManifestError` ones, the `Denied` messages in `access.py`,
+  the gate and refusal lines in `serve.py` — has **not** been read by a Finnish speaker.
+- **Disposition:** open. The footer is fixed; the class of defect is not closed and cannot be closed
+  by a test.
+
 ## 2026-08-31 (MVP tracer 4) — `make docker-build` needs `--network=host` on this machine
 
 - **What:** the build fetches the corpus PDFs, and a container on Docker's bridge here **cannot open a

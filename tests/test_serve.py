@@ -231,10 +231,44 @@ class TestThePage:
         body = pure_client.get("/").text
         assert '<option value="" selected>' in body
 
-    def test_it_names_the_cell_it_retrieves_in(self, pure_client: TokenClient) -> None:
-        """A demo that hides its configuration is a demo of an unnamed pipeline."""
-        assert PUBLISHED.name in pure_client.get("/").text
+    def test_no_internal_identifier_reaches_the_page(self, pure_client: TokenClient) -> None:
+        """REVERSED on the Owner's instruction, 31 Aug 2026.
+
+        This test previously asserted the OPPOSITE -- that the page names its cell,
+        on the ground that "a demo that hides its configuration is a demo of an
+        unnamed pipeline". That argument was about a reviewer reading the
+        repository, and it put `lemma-reasm/0` in front of a resident.
+        `CLAUDE.md`'s definition of done forbids raw IDs on a surface, so the cell
+        and the authority key are gone from the page and stay in the `serve`
+        startup banner, where an operator looks for them.
+
+        Chunk addresses are deliberately NOT covered: they are the citation a
+        reader checks, which is the demo's whole argument.
+        """
+        body = pure_client.get("/").text
         assert PUBLISHED.name == "lemma-reasm/0"
+        assert PUBLISHED.name not in body
+        for internal in ("lemma-reasm", "snowball", "lemma-baseform", "ts_rank"):
+            assert internal not in body, f"internal identifier {internal!r} on the page"
+
+    def test_the_footer_speaks_finnish_and_not_jargon(self, pure_client: TokenClient) -> None:
+        """The enforcer for the defect the Owner found by READING the page.
+
+        The footer used to say `mittausharnessissa` -- an invented compound around
+        an English word with no Finnish currency -- plus `analysaattori` and the
+        cell name, all of it written for a code reviewer and set in a resident's
+        page. 518 green tests said nothing about it, because none of them could.
+
+        This cannot check that the Finnish is GOOD; nothing automated can, and
+        `REVIEW-DEBT.md` says so. It pins the specific words that were wrong, so
+        they cannot come back unnoticed.
+        """
+        body = pure_client.get("/").text
+        for jargon in ("harness", "analysaattori", "normalisointi", "cell", "retrieval"):
+            assert jargon not in body.lower(), f"jargon {jargon!r} is back on the page"
+        # And the thing the footer must say, because a resident could act on this.
+        assert "ei virallinen neuvo" in body
+        assert "Kysymyksiä ei tallenneta" in body
 
 
 # ---------------------------------------------------------------------------
@@ -502,8 +536,8 @@ class TestItAnswers:
         assert response.status_code == 200
         body = response.text
         assert "Lounais-Suomen jätehuoltolautakunta" in body
-        assert "(lounais-suomi)" in body
-        assert PUBLISHED.name in body
+        assert "(lounais-suomi)" not in body, "the authority KEY is an internal id"
+        assert PUBLISHED.name not in body, "the cell is an internal id"
         assert "VASTAUS" in body
         assert "Neljän viikon välein" in body
         assert "lounais-suomi@2024-08-01#26" in body

@@ -398,3 +398,24 @@ $ docker compose run --rm demo eval
     the compose network the demo reaches its state database by service name. The port stays for a
     host-run `fi-rag-eval serve` and for `psql`, and ADR-0013's partial reversal of ADR-0009 stands
     for that reason alone now.
+
+---
+
+## Spec delta 11 — the page shows no internal identifier (31 Aug 2026, Owner)
+
+**AD2 is amended.** It required the page to render "the resolved authority and cell". The **cell** is
+removed: `lemma-reasm/0` is an internal identifier and `CLAUDE.md`'s definition of done forbids raw
+IDs on a surface. So is the authority **key** (`lounais-suomi`); the result header now reads
+`Turku → Lounais-Suomen jätehuoltolautakunta`, and the *kunta* on the left supplies the geography
+that Pirkanmaa's authority name lacks.
+
+The cell is not lost — it is printed in the `serve` startup banner, which is where an operator looks
+for it, and it is in the README, the specs and `eval/baseline.json`, which is where a reviewer does.
+
+A test asserted the **opposite** and has been inverted, with its old reasoning recorded in the
+docstring: *"a demo that hides its configuration is a demo of an unnamed pipeline"* was an argument
+about a reviewer reading the repository, applied by mistake to a resident's page.
+
+The footer was rewritten in the same change, after the Owner read it and could not understand it.
+See `REVIEW-DEBT.md`. **The Owner also rewrote the heading, the lede and the hint**; those are theirs,
+and no Finnish string elsewhere in this surface has been read by a Finnish speaker.

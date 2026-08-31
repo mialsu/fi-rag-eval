@@ -244,9 +244,18 @@ def answer_block(asked: Asked) -> Html:
     )
     return Html(
         "<section>"
+        # The kunta and the authority's NAME, and nothing else. The cell
+        # (`lemma-reasm/0`) and the authority KEY (`lounais-suomi`) are internal
+        # identifiers, and `CLAUDE.md`'s definition of done forbids raw IDs on a
+        # surface. The chunk addresses below stay, because those ARE the citation
+        # a reader checks. The cell still appears where an operator looks for it:
+        # the `serve` startup banner on stderr.
+        #
+        # Dropping the key costs nothing even for Pirkanmaa, whose authority name
+        # ("Alueellinen jätehuoltolautakunta") carries no geography -- the kunta
+        # on the left of the arrow supplies it.
         f'<p class="meta">{esc(asked.municipality).text} &rarr; '
-        f"{esc(asked.authority_name).text} ({esc(asked.authority_key).text}), "
-        f"haku {esc(asked.cell).text}</p>"
+        f"{esc(asked.authority_name).text}</p>"
         f"<h2>Haetut otteet (top-{len(asked.hits)})</h2>{excerpts(asked).text}"
         f"<h2>Vastaus</h2>{verdict}"
         f'<p class="body">{esc(asked.answer.text).text}</p>{note}'
@@ -297,7 +306,6 @@ def page(
     question: str = "",
     chosen: str = "",
     result: Html = NOTHING,
-    cell: Cell = PUBLISHED,
     action: str = "",
     gate: Html = NOTHING,
     form: bool = True,
@@ -309,7 +317,6 @@ def page(
             "QUESTION": esc(question),
             "OPTIONS": options(names, chosen),
             "RESULT": result,
-            "CELL": esc(cell.name),
             "GATE": gate,
             # No action and no form when there is no live token: a form that
             # cannot post is a dead control, and this project ships labelled
@@ -468,7 +475,6 @@ def create_app(
             page(
                 shell,
                 names=names,
-                cell=cell,
                 question=question,
                 gate=closed_block(message),
                 form=False,
@@ -515,7 +521,6 @@ def create_app(
             page(
                 shell,
                 names=names,
-                cell=cell,
                 action=ask_path(found.token),
                 gate=gate_block(found, now=now),
             )
@@ -551,7 +556,6 @@ def create_app(
                     names=names,
                     question=question,
                     chosen=municipality,
-                    cell=cell,
                     action=ask_path(token.token),
                     gate=Html(note),
                     result=result,
@@ -567,7 +571,6 @@ def create_app(
                     question=question,
                     municipality=municipality,
                     k=k,
-                    cell=cell,
                     morphology=morphology,
                     model=model,
                     budget=TokenBudget(),
