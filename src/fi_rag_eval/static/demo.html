@@ -63,6 +63,10 @@
            border-top: 1px solid var(--line); padding-top: .8rem; }
   footer { max-width: 46rem; margin: 2.5rem auto 0; color: var(--dim); font-size: .82rem; }
   footer p { margin: .5rem 0; }
+  .gate { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 1rem 1.25rem; margin-bottom: 1rem; font-size: .9rem; }
+  .gate strong { font-weight: 600; }
+  .gate.closed { border-color: var(--warn); color: var(--warn); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -76,7 +80,9 @@
     ei virhe.
   </p>
 
-  <form method="post" action="{{ACTION}}">
+  {{GATE}}
+
+  <form method="post" action="{{ACTION}}"{{FORM_HIDDEN}}>
     <div>
       <label for="kysymys">Kysymys</label>
       <textarea id="kysymys" name="kysymys" placeholder="Kuinka usein sekajäteastia on tyhjennettävä?">{{QUESTION}}</textarea>

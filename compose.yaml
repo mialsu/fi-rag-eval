@@ -42,10 +42,28 @@ services:
     # dropped and rebuilt by `create_schema` on every ingest, and tmpfs makes
     # that visible), while the proxy's spend ledger must survive, or the budget
     # resets to zero every `make db-down` and stops being a monthly cap.
+    #
+    # THE NAME NO LONGER DESCRIBES EVERYTHING IT HOLDS (ADR-0013). Since the demo
+    # gained an access gate, this container also holds the `demo` database: the
+    # tokens, the per-day counters and the monthly spend ceiling. That state has
+    # the SAME persistence requirement as the ledger -- a cap that forgets on
+    # restart is not a cap -- so by the rule above it belongs in this container
+    # and not in the corpus one, which is on tmpfs. Two separate databases, so
+    # nothing of ours ever touches LiteLLM's own migrations. Renaming the service
+    # to match was considered and rejected: it would change the gateway's
+    # DATABASE_URL host, and this container holds the ledger the $25 ceiling is
+    # enforced from. Better naming is not worth any risk to the enforcer.
     image: postgres:17-alpine
-    # No published port. Nothing outside this compose project has any business
-    # reading the spend ledger, and an unpublished port is one fewer collision
-    # on a machine already running four other projects' databases.
+    # PUBLISHED as of ADR-0013, and bound to 127.0.0.1 EXPLICITLY -- unlike the
+    # corpus database's "5434:5432", which binds every interface. This partially
+    # reverses the original decision here ("No published port. Nothing outside
+    # this compose project has any business reading the spend ledger"), and the
+    # reversal is stated rather than quietly made: with the demo's state in this
+    # container, `fi-rag-eval serve` is such a client, and it runs on the host
+    # until tracer 4 moves it into compose. 5435 deliberately: 5432, 5433 and
+    # 5434 are taken on this machine.
+    ports:
+      - "127.0.0.1:5435:5432"
     environment:
       POSTGRES_USER: litellm
       POSTGRES_PASSWORD: litellm

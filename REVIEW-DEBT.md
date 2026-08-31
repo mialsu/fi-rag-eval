@@ -14,6 +14,93 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 (MVP tracer 3) — the token is a BEARER capability, stored in the clear
+
+- **What:** anyone holding the link is the bearer. There is no way to tell one reviewer from another,
+  a forwarded link is a valid link, and the token is stored **unhashed** so `token --list` can
+  reprint one the Owner mislaid.
+- **Where:** `src/fi_rag_eval/access.py`; ADR-0013's rejected alternatives.
+- **Why accepted:** the capability is worth at most 10 answers (~$0.18 at the measured rate), the
+  store is loopback-only, and hashing would cost `--list` its one useful function. Recorded as a
+  deliberate weakening rather than left implicit.
+- **What green tests do NOT prove here:** that a leaked link was not used by someone else. Nothing
+  in the store distinguishes two users of one token, **by design** — `DESIGN.md:52` forbids anything
+  that would.
+- **Disposition:** accepted. Revisit if the demo is ever shown to more than a handful of reviewers.
+
+## 2026-08-31 (MVP tracer 3) — a gateway call the provider billed but we never measured is invisible to the monthly ceiling
+
+- **What:** the $10/month enforcer is computed from `Asked.cost_usd`, read back from the gateway's own
+  `response_cost`. When the call raises `AnswerError` the query is **refunded** and **no spend is
+  recorded** — so if the provider billed for a generation that then failed to reach us, that money is
+  outside our ceiling entirely.
+- **Where:** `src/fi_rag_eval/serve.py` (the `AnswerError` branch and the `else: refund` path).
+- **Why it is this way:** the alternative is charging a visitor's query for our own outage. That was
+  judged worse, because the query cap is a *fairness* control and the dollar cap is the *money* one.
+- **What green tests do NOT prove here:** that our recorded monthly spend equals the provider's. The
+  only enforcer covering the gap is the gateway's own `$25/30d` virtual key (ADR-0009), which is a
+  backstop and not a reconciliation.
+- **Disposition:** open. The honest closer is to read the gateway's own spend for the month rather
+  than accumulating our own — a real improvement, and it belongs with CI where the same question
+  arises for `answer --all`.
+
+## 2026-08-31 (MVP tracer 3) — the monthly ceiling can only stop the query AFTER the one that crossed it
+
+- **What:** spend is recorded once the answer exists, because the cost of a response is not knowable
+  before it does. So a $10.00 ceiling can be crossed by up to one answer (~$0.018). Measured
+  deliberately in a test: a $0.02 ceiling admitted **two** $0.0177 answers.
+- **Where:** `src/fi_rag_eval/access.py:record_spend`; `tests/test_access.py`.
+- **Disposition:** accepted, and it is the same guarantee `answer.TokenBudget` already states for the
+  token ceiling — "one call of overshoot, then nothing". Written down so nobody reads $10.00 as a
+  hard bound.
+
+## 2026-08-31 (MVP tracer 3) — there is no RATE limit, only a count
+
+- **What:** ten queries can arrive in ten seconds. The single answering lock serialises them, so they
+  are answered one after another rather than concurrently, but nothing spaces them out.
+- **Where:** `src/fi_rag_eval/access.py` (counts, not rates); `src/fi_rag_eval/serve.py` (the lock).
+- **What green tests do NOT prove here:** that a script holding a valid link cannot exhaust its ten
+  queries, and the day's 200, as fast as the model will answer. At ~10s per answer that is ~35
+  minutes of saturated spend for the day's whole allowance.
+- **Disposition:** open, accepted for a demo. The daily and monthly ceilings bound the damage in
+  money; the rate is unbounded within them.
+
+## 2026-08-31 (MVP tracer 3) — `--host` still only WARNS, it does not refuse
+
+- **What:** `fi-rag-eval serve --host 0.0.0.0` prints a warning and binds anyway.
+- **Where:** `src/fi_rag_eval/cli.py:_serve`.
+- **Why:** the token is now the gate, so binding wider is a deliberate act rather than an unguarded
+  one — which is a real change from tracer 2, where the bind address was the *only* protection.
+- **What green tests do NOT prove here:** that the surface is safe to expose. The logging tension
+  below still blocks any deploy, and no test starts the real server at all.
+- **Disposition:** open.
+
+## 2026-08-31 (MVP tracer 3) — tracer 2's HTTP assertions now run through a wrapper
+
+- **What:** `tests/test_serve.py` gained a `TokenClient` that rewrites `/` and `/ask` into
+  `/d/{token}` and `/d/{token}/ask`, so forty existing assertions about rendering, escaping and
+  refusals did not each grow a token parameter.
+- **Where:** `tests/test_serve.py:TokenClient`.
+- **What green tests do NOT prove here:** a wrapper that assumes the gate cannot also prove it. That
+  is why `TestNothingSpendsWithoutALiveToken` and `TestTheCapsBiteOnTheSurface` use the **raw** paths
+  with no wrapper. The risk that remains is a future test reaching for the wrapper when it should be
+  testing the gate.
+- **Disposition:** accepted, stated so the shape is visible to a reviewer.
+
+## 2026-08-31 (MVP tracer 3) — the test store is a SECOND database, so a real store is never exercised by tests
+
+- **What:** the cap tests run against `demo_test`, created and truncated by a fixture. The real `demo`
+  database is only ever touched by hand.
+- **Where:** `tests/conftest.py:DEMO_TEST_URL`.
+- **Why:** the tests exhaust tokens and drive the global counters to their ceilings. Doing that in the
+  real store would revoke links the Owner had handed out and burn the day's and the month's budget on
+  a test run.
+- **What green tests do NOT prove here:** that the *real* store's schema matches the tested one. They
+  are created by the same `create_schema`, so the risk is small, but nothing asserts it — a schema
+  migration would be the moment this bites.
+- **Disposition:** open — cheapest closer is an assertion at `serve` startup that the live store's
+  columns are the ones the code expects.
+
 ## 2026-08-31 (MVP tracer 2) — the demo surface has NO access gate, and `--host` only warns
 
 - **What:** `fi-rag-eval serve` binds loopback by default and prints a warning when told to bind

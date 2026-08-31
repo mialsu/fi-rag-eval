@@ -1,5 +1,5 @@
 """The command-line surface: ``ingest``, ``eval``, ``answer``, ``judge``, ``label``,
-``agreement``, ``refusals``, ``ask`` and ``serve``.
+``agreement``, ``refusals``, ``ask``, ``serve`` and ``token``.
 
 Exit codes are a feature, not an afterthought -- CI reads them. Zero means the
 run completed and every metric held. Anything else means the table on stdout,
@@ -12,11 +12,12 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from fi_rag_eval import answering, db, judging, labelling
+from fi_rag_eval import access, answering, db, judging, labelling
 from fi_rag_eval.analyse import AnalyserError, Morphology
 from fi_rag_eval.answer import (
     ANSWERER,
@@ -98,6 +99,7 @@ HANDLED = (
     BaselineError,
     AnalyserError,
     db.DatabaseError,
+    access.AccessError,
 )
 
 
@@ -328,9 +330,31 @@ def _parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--host",
         default="127.0.0.1",
-        help="loopback by DEFAULT, and deliberately: until tracer 3 lands a token gate, "
-        "anyone who can reach this port can spend real money through it. Binding "
-        "0.0.0.0 is an explicit keystroke.",
+        help="loopback by DEFAULT. The token gate (ADR-0013) is what decides who may "
+        "spend; the bind address decides who may reach the gate at all, and widening "
+        "it is an explicit keystroke.",
+    )
+    serve_parser.add_argument(
+        "--base-url",
+        default=None,
+        help="the origin to print in issued links (default: http://HOST:PORT)",
+    )
+
+    token_parser = subparsers.add_parser(
+        "token",
+        help="issue, list or revoke a demo access link (ADR-0013). Touches no model "
+        "and spends nothing.",
+    )
+    token_parser.add_argument("--issue", action="store_true", help="mint a new link and print it")
+    token_parser.add_argument("--list", action="store_true", help="every token, newest first")
+    token_parser.add_argument("--revoke", default=None, metavar="TOKEN")
+    token_parser.add_argument("--note", default="", help="who it was issued to, for your eyes")
+    token_parser.add_argument("--queries", type=int, default=access.QUERIES_PER_TOKEN)
+    token_parser.add_argument("--hours", type=int, default=24)
+    token_parser.add_argument(
+        "--base-url",
+        default="http://127.0.0.1:8080",
+        help="the origin the printed link points at",
     )
 
     refusals_parser = subparsers.add_parser(
@@ -941,24 +965,81 @@ def _serve(args: argparse.Namespace) -> int:
 
     manifest = load_manifest(args.manifest)
     morphology = Morphology.open() if PUBLISHED.analyser.lemmatising else None
+    # The database and its tables are created HERE, once, rather than per request:
+    # `ensure_database` has to connect to the server's `postgres` database and
+    # `CREATE DATABASE` outside a transaction, which is not a thing to do on the
+    # path a stranger's request takes. Per-request connections come from
+    # `access.connect`, which does neither.
+    access.create_schema(access.connect(access.ensure_database()))
     app = create_app(
         manifest=manifest,
         morphology=morphology,
         k=args.k,
         model=args.model,
     )
+    base = args.base_url or f"http://{args.host}:{args.port}"
     print(
-        f"fi-rag-eval serve: http://{args.host}:{args.port}  "
-        f"cell {PUBLISHED.name}, k={args.k}, model {args.model}",
+        f"fi-rag-eval serve: {base}  cell {PUBLISHED.name}, k={args.k}, model {args.model}",
+        file=sys.stderr,
+    )
+    print(
+        f"fi-rag-eval serve: gated. {access.QUERIES_PER_TOKEN} queries per link, "
+        f"{int(access.TOKEN_LIFETIME.total_seconds() // 3600)}h lifetime, "
+        f"{access.QUERIES_PER_DAY}/day, ${access.DOLLARS_PER_MONTH:.2f}/month measured. "
+        "Issue a link with `fi-rag-eval token --issue`.",
         file=sys.stderr,
     )
     if args.host != "127.0.0.1":
         print(
-            f"fi-rag-eval serve: bound to {args.host}, NOT loopback. There is no access "
-            "gate on this surface yet, so every reachable client can spend through it.",
+            f"fi-rag-eval serve: bound to {args.host}, NOT loopback. The token gate is "
+            "the only thing between a reachable client and real spend.",
             file=sys.stderr,
         )
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning", access_log=False)
+    return 0
+
+
+def _token(args: argparse.Namespace) -> int:
+    """Issue, list or revoke a demo link. No model, no corpus, no spend."""
+    chosen = [name for name in ("issue", "list", "revoke") if getattr(args, name)]
+    if len(chosen) != 1:
+        raise access.AccessError(
+            "say exactly one of --issue, --list or --revoke. There is no default: "
+            "minting a link and listing links are different acts."
+        )
+    conn = access.connect(access.ensure_database())
+    access.create_schema(conn)
+    with conn:
+        if args.revoke:
+            revoked = access.revoke(conn, args.revoke)
+            print(f"revoked {revoked.token} (used {revoked.queries_used}/{revoked.query_limit})")
+            return 0
+        if args.list:
+            found = access.tokens(conn)
+            if not found:
+                print("no tokens have been issued.")
+                return 0
+            print(f"{'token':<11} {'left':>5} {'spent':>9}  expires (UTC)        note")
+            for one in found:
+                state = "REVOKED" if one.revoked_at else one.expires_at.strftime("%Y-%m-%d %H:%M")
+                print(
+                    f"{one.token:<11} {one.remaining:>5} "
+                    f"${one.cost_usd:>8.4f}  {state:<20} {one.note}"
+                )
+            return 0
+        issued = access.issue(
+            conn,
+            note=args.note,
+            queries=args.queries,
+            lifetime=timedelta(hours=args.hours),
+        )
+        print(issued.link(args.base_url))
+        print(
+            f"{issued.query_limit} questions, expires {issued.expires_at.isoformat()} "
+            f"(in {args.hours}h). Anyone holding this link can ask -- it is a "
+            "capability, not a login (ADR-0013).",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -1059,6 +1140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "refusals": _refusals,
         "ask": _ask,
         "serve": _serve,
+        "token": _token,
     }
     try:
         return handlers[args.command](args)

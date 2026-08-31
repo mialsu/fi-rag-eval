@@ -54,6 +54,7 @@ import sys
 import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from importlib import resources
 from pathlib import Path
 from typing import Protocol
@@ -66,7 +67,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 from starlette.routing import Route
 
-from fi_rag_eval import db
+from fi_rag_eval import access, db
 from fi_rag_eval.analyse import Morphology
 from fi_rag_eval.answer import ANSWERER, AnswerError, TokenBudget, answer_question
 from fi_rag_eval.ask import Answerer, Asked, AskError, ask, municipalities
@@ -93,9 +94,18 @@ sending a chunked body without a `Content-Length` cannot make the server
 accumulate it. Comfortably above a 500-character question plus a *kunta*.
 """
 
-ASK_PATH = "/ask"
-"""Where the form posts. A slot rather than a literal in the template because
-tracer 3 moves it under a token (`/d/AB12-CD34/ask`)."""
+GATE_PATH = "/d/{token}"
+ASK_PATH = "/d/{token}/ask"
+"""Every path that can spend money carries a token (ADR-0013).
+
+There is deliberately **no** ungated `/ask`. Tracer 2 had one; leaving it in
+beside the gate is how an ungated path gets exposed by accident, and a route that
+does not exist cannot be reached by a forgotten link or a stale bookmark.
+"""
+
+
+def ask_path(token: str) -> str:
+    return ASK_PATH.format(token=token)
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +268,28 @@ def notice(heading: str, message: str, *, hint: str = "") -> Html:
     )
 
 
+def gate_block(token: access.Token, *, now: datetime) -> Html:
+    """What this link is still worth, stated before anything is asked.
+
+    A visitor who has two queries left should know that before spending one, not
+    after. The remaining count and the hours left are the only two facts the gate
+    exposes -- never the ceiling it sits under, and never anyone else's usage.
+    """
+    hours = max(0, int((token.expires_at - now).total_seconds() // 3600))
+    return Html(
+        '<p class="gate">Tällä linkillä on <strong>'
+        f"{token.remaining}</strong> kysymystä jäljellä "
+        f"{token.query_limit}:stä, ja se on voimassa vielä noin "
+        f"<strong>{hours} h</strong>. Jokainen vastaus muodostetaan oikeasti, "
+        "joten linkki on näyte eikä jatkuva palvelu.</p>"
+    )
+
+
+def closed_block(message: str) -> Html:
+    """The gate, shut. A labelled honest state -- never "coming soon"."""
+    return Html(f'<p class="gate closed">{esc(message).text}</p>')
+
+
 def page(
     template: str,
     *,
@@ -266,7 +298,9 @@ def page(
     chosen: str = "",
     result: Html = NOTHING,
     cell: Cell = PUBLISHED,
-    action: str = ASK_PATH,
+    action: str = "",
+    gate: Html = NOTHING,
+    form: bool = True,
 ) -> str:
     return render(
         template,
@@ -276,6 +310,11 @@ def page(
             "OPTIONS": options(names, chosen),
             "RESULT": result,
             "CELL": esc(cell.name),
+            "GATE": gate,
+            # No action and no form when there is no live token: a form that
+            # cannot post is a dead control, and this project ships labelled
+            # honest empty states or nothing.
+            "FORM_HIDDEN": NOTHING if form else Html(" hidden"),
         },
     )
 
@@ -351,6 +390,10 @@ class Asker(Protocol):
 
 
 Connect = Callable[[], psycopg.Connection[tuple[object, ...]]]
+StoreConnect = Callable[[], psycopg.Connection[tuple[object, ...]]]
+"""How the demo reaches its OWN state -- a different database from the corpus
+(ADR-0013), because the corpus one is on tmpfs and a token in it dies on the next
+restart."""
 
 UNAVAILABLE_HEADING = "Palvelu ei ole juuri nyt käytettävissä"
 UNAVAILABLE_BODY = (
@@ -379,10 +422,18 @@ def log(line: str) -> None:
     print(f"fi-rag-eval serve: {line}", file=sys.stderr, flush=True)
 
 
+LANDING = (
+    "Tähän demoon pääsee vain henkilökohtaisella linkillä. Jokainen vastaus "
+    "muodostetaan oikeasti ja maksaa, joten kysymysmäärä on rajattu linkkiä ja "
+    "vuorokautta kohden. Jos sinulle on luvattu linkki, käytä sitä."
+)
+
+
 def create_app(
     *,
     manifest: Manifest,
     morphology: Morphology | None,
+    store_connect: StoreConnect = access.connect,
     connect: Connect = db.connect,
     answerer: Answerer = answer_question,
     asker: Asker = ask,
@@ -390,12 +441,19 @@ def create_app(
     cell: Cell = PUBLISHED,
     model: str = ANSWERER,
     template: str | None = None,
+    clock: access.Clock = access.utc_now,
+    queries_per_day: int = access.QUERIES_PER_DAY,
+    dollars_per_month: float = access.DOLLARS_PER_MONTH,
 ) -> Starlette:
-    """The demo application.
+    """The demo application, gated (ADR-0013).
 
     The answerer defaults to the real, paid one. It is a parameter at all so a
-    test can inject one that **raises**, which is how every free-refusal claim in
-    this module is asserted rather than asserted about.
+    test can inject one that **raises**, which is how every claim in this module
+    about not spending is asserted rather than asserted about.
+
+    `clock` is injected so token expiry is tested without sleeping for a day, and
+    the two ceilings are parameters so a test can set them to 1 rather than
+    issuing 200 queries to watch the gate close.
     """
     shell = template if template is not None else load_template()
     names = municipalities(manifest)
@@ -404,14 +462,103 @@ def create_app(
     # reason it stays.
     lock = threading.Lock()
 
-    def blank() -> str:
-        return page(shell, names=names, cell=cell)
+    def landing(status: int, message: str, *, question: str = "") -> Response:
+        """The page with no usable form. Used for `/` and for a dead link."""
+        return HTMLResponse(
+            page(
+                shell,
+                names=names,
+                cell=cell,
+                question=question,
+                gate=closed_block(message),
+                form=False,
+            ),
+            status_code=status,
+        )
 
     def home(request: Request) -> Response:
-        return HTMLResponse(blank())
+        """No token, no form, and the store is never touched."""
+        return landing(200, LANDING)
 
-    def run(question: str, municipality: str) -> Response:
-        """Everything blocking: the connection, the analyser, the model call."""
+    def gate(request: Request) -> Response:
+        """`GET /d/{token}` -- render the form, or say why there is none.
+
+        Reads the token WITHOUT charging: rendering a page must not consume a
+        query, or a visitor who reloads has paid for the reload.
+        """
+        raw = request.path_params["token"]
+        now = clock()
+        try:
+            with store_connect() as store:
+                found = access.find(store, raw)
+        except access.AccessError as exc:
+            log(f"store unreachable: {exc}")
+            return landing(503, UNAVAILABLE_BODY)
+        if found is None:
+            log(f"gate: no such token {access.normalise(raw)!r}")
+            return landing(403, "Tämä linkki ei kelpaa.")
+        if found.revoked_at is not None:
+            return landing(403, "Tämä linkki on peruutettu, eikä sillä voi enää kysyä.")
+        if now >= found.expires_at:
+            return landing(
+                403,
+                "Tämän linkin voimassaolo on päättynyt. Linkki on voimassa "
+                "vuorokauden siitä, kun se luotiin.",
+            )
+        if found.remaining <= 0:
+            return landing(
+                403,
+                f"Tämän linkin {found.query_limit} kysymystä on käytetty. "
+                "Linkki on kertaluonteinen näyte, ei jatkuva palvelu.",
+            )
+        return HTMLResponse(
+            page(
+                shell,
+                names=names,
+                cell=cell,
+                action=ask_path(found.token),
+                gate=gate_block(found, now=now),
+            )
+        )
+
+    def run(token: access.Token, question: str, municipality: str) -> tuple[Response, float]:
+        """Everything blocking: the connection, the analyser, the model call.
+
+        Returns the page **and what it cost**, measured at the gateway. The cost
+        is returned rather than stashed on the response because the caller is what
+        holds the reservation, and every failure path here costs exactly 0.0 --
+        which is the fact the refund depends on.
+        """
+
+        def rendered(result: Html, status: int, *, refunded: bool) -> Response:
+            # `token` was read AFTER the reservation, so its remaining count
+            # already excludes this query. Subtracting again double-counts the
+            # reservation -- which it did, and the page said 2 left of 4 after one
+            # answer. A refund gives this one back, so that is the case that adds.
+            remaining = token.remaining + 1 if refunded else token.remaining
+            note = (
+                f'<p class="gate">Tällä linkillä on <strong>{remaining}</strong> '
+                f"kysymystä jäljellä {token.query_limit}:stä."
+                + (
+                    " Tämä kysymys ei kuluttanut kysymystä, koska vastausta ei muodostettu.</p>"
+                    if refunded
+                    else "</p>"
+                )
+            )
+            return HTMLResponse(
+                page(
+                    shell,
+                    names=names,
+                    question=question,
+                    chosen=municipality,
+                    cell=cell,
+                    action=ask_path(token.token),
+                    gate=Html(note),
+                    result=result,
+                ),
+                status_code=status,
+            )
+
         try:
             with lock, connect() as conn:
                 asked = asker(
@@ -432,103 +579,90 @@ def create_app(
             # by a resident, and `CLAUDE.md`'s definition of done requires their
             # language. The English still reaches stderr below.
             log(f"refused: {exc}")
-            return HTMLResponse(
-                page(
-                    shell,
-                    names=names,
-                    question=question,
-                    chosen=municipality,
-                    cell=cell,
-                    result=notice("Ei vastausta", exc.finnish),
-                ),
-                status_code=400,
-            )
+            return rendered(notice("Ei vastausta", exc.finnish), 400, refunded=True), 0.0
         except db.DatabaseError as exc:
             # The message is NEVER rendered. `db.connect` puts the database URL in
             # it, credentials and all, and this page is reachable by someone who
             # must not read it. Server-side only.
             log(f"database unreachable: {exc}")
-            return HTMLResponse(
-                page(
-                    shell,
-                    names=names,
-                    question=question,
-                    chosen=municipality,
-                    cell=cell,
-                    result=notice(UNAVAILABLE_HEADING, UNAVAILABLE_BODY),
-                ),
-                status_code=503,
-            )
+            return rendered(notice(UNAVAILABLE_HEADING, UNAVAILABLE_BODY), 503, refunded=True), 0.0
         except AnswerError as exc:
             # Same rule as above, for the same reason: a gateway error carries the
             # proxy's own URL and whatever the provider chose to say.
             log(f"answering failed: {exc}")
-            return HTMLResponse(
-                page(
-                    shell,
-                    names=names,
-                    question=question,
-                    chosen=municipality,
-                    cell=cell,
-                    result=notice(
+            return (
+                rendered(
+                    notice(
                         "Vastausta ei saatu",
                         "Vastauksen muodostaminen ei onnistunut. Tämä on tekninen "
                         "häiriö, ei kieltäytyminen -- yritä hetken kuluttua uudelleen.",
                     ),
+                    502,
+                    refunded=True,
                 ),
-                status_code=502,
+                0.0,
             )
-        return HTMLResponse(
-            page(
-                shell,
-                names=names,
-                question=question,
-                chosen=municipality,
-                cell=cell,
-                result=answer_block(asked),
-            )
-        )
+        return rendered(answer_block(asked), 200, refunded=False), asked.cost_usd
 
     async def ask_route(request: Request) -> Response:
+        raw = request.path_params["token"]
         body = await read_body(request, MAX_BODY_BYTES)
         if body is None:
-            return HTMLResponse(
-                page(
-                    shell,
-                    names=names,
-                    cell=cell,
-                    result=notice(
-                        "Ei vastausta",
-                        f"Pyyntö on liian suuri. Enintään {MAX_BODY_BYTES} tavua.",
-                    ),
-                ),
-                status_code=413,
-            )
+            return landing(413, f"Pyyntö on liian suuri. Enintään {MAX_BODY_BYTES} tavua.")
         fields = form_fields(body)
         question = fields.get("kysymys", "")
         municipality = fields.get("kunta", "")
         if len(question) > MAX_QUESTION_CHARS:
-            # Refused before the connection is even opened: the prompt carries the
-            # question verbatim, so length is spend.
-            return HTMLResponse(
-                page(
-                    shell,
-                    names=names,
-                    chosen=municipality,
-                    cell=cell,
-                    result=notice(
-                        "Ei vastausta",
-                        f"Kysymys on liian pitkä ({len(question)} merkkiä). "
-                        f"Enintään {MAX_QUESTION_CHARS} merkkiä.",
-                    ),
-                ),
-                status_code=400,
+            # Refused before the store, the connection and the answerer: the
+            # prompt carries the question verbatim, so length is spend. It also
+            # costs the visitor no query, because nothing was reserved.
+            return landing(
+                400,
+                f"Kysymys on liian pitkä ({len(question)} merkkiä). "
+                f"Enintään {MAX_QUESTION_CHARS} merkkiä.",
             )
-        return await run_in_threadpool(run, question, municipality)
+
+        def gated() -> Response:
+            try:
+                with store_connect() as store:
+                    try:
+                        reservation = access.reserve(
+                            store,
+                            raw,
+                            now=clock,
+                            queries_per_day=queries_per_day,
+                            dollars_per_month=dollars_per_month,
+                        )
+                    except access.Denied as denied:
+                        # NOTHING was reserved, so nothing is refunded, and the
+                        # answerer was never constructed let alone called.
+                        log(f"denied: {denied}")
+                        return landing(403, denied.finnish, question=question)
+                    found = access.find(store, raw)
+                    if found is None:  # pragma: no cover - reserve just locked it
+                        return landing(403, "Tämä linkki ei kelpaa.", question=question)
+                    response, cost_usd = run(found, question, municipality)
+                    if response.status_code == 200:
+                        access.record_spend(store, reservation, cost_usd)
+                    else:
+                        # Every non-200 here either made no model call at all
+                        # (AskError, DatabaseError) or failed at the gateway
+                        # (AnswerError). Charging a visitor for the harness
+                        # declining, or for our own outage, is charging them for
+                        # our behaviour. See REVIEW-DEBT for the one hole this
+                        # leaves: a call the provider billed but we never measured.
+                        access.refund(store, reservation)
+                    return response
+            except access.AccessError as exc:
+                log(f"store unreachable: {exc}")
+                return landing(503, UNAVAILABLE_BODY, question=question)
+
+        return await run_in_threadpool(gated)
 
     return Starlette(
         routes=[
             Route("/", home, methods=["GET"]),
+            Route(GATE_PATH, gate, methods=["GET"]),
             Route(ASK_PATH, ask_route, methods=["POST"]),
         ]
     )

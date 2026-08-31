@@ -15,14 +15,17 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Mapping, Sequence
+from datetime import timedelta
 from pathlib import Path
+from typing import Any, cast
 
+import httpx
 import psycopg
 import pytest
 from starlette.testclient import TestClient
 
+from fi_rag_eval import access, db, serve
 from fi_rag_eval import ask as ask_module
-from fi_rag_eval import db, serve
 from fi_rag_eval.analyse import Morphology
 from fi_rag_eval.answer import Answer, AnswerError, ProxyError, TokenBudget, Usage
 from fi_rag_eval.ask import AskError
@@ -101,27 +104,87 @@ def canned(text: str, *, refused: bool, citations: tuple[str, ...] = ()) -> obje
     return answerer
 
 
+class TokenClient:
+    """A `TestClient` that routes `/` and `/ask` through one live token.
+
+    The demo is gated (ADR-0013): there is no ungated `/ask` any more. Rather than
+    thread a token through every assertion about rendering, escaping and refusals,
+    this rewrites exactly two paths and leaves everything else alone.
+
+    **It hides nothing that is under test.** The gate has its own tests below
+    (`TestNothingSpendsWithoutALiveToken`, `TestTheCapsBiteOnTheSurface`) and they
+    use the raw paths with no wrapper, precisely so the gate is never proven by a
+    helper that assumes it.
+    """
+
+    def __init__(self, client: TestClient, token: str) -> None:
+        self._client = client
+        self.token = token
+
+    def _route(self, path: str) -> str:
+        if path == "/":
+            return f"/d/{self.token}"
+        if path == "/ask":
+            return f"/d/{self.token}/ask"
+        return path
+
+    def get(self, path: str, **kwargs: Any) -> httpx.Response:
+        return cast(httpx.Response, self._client.get(self._route(path), **kwargs))
+
+    def post(self, path: str, **kwargs: Any) -> httpx.Response:
+        return cast(httpx.Response, self._client.post(self._route(path), **kwargs))
+
+
+def a_link(store: psycopg.Connection[tuple[object, ...]], queries: int = 500) -> str:
+    """A token generous enough that no test about something else hits a cap."""
+    return access.issue(store, queries=queries, lifetime=timedelta(days=1)).token
+
+
+def store_opener(url: str) -> serve.StoreConnect:
+    """A fresh connection per call, because `serve` closes what it is given."""
+    return lambda: access.connect(url)
+
+
+def used(store: psycopg.Connection[tuple[object, ...]], token: str) -> int:
+    """How many queries a token has spent, read after the app committed.
+
+    The rollback is not cosmetic: this connection is not autocommit, so without
+    ending its transaction the next SELECT reads the snapshot from before the
+    request.
+    """
+    store.rollback()
+    found = access.find(store, token)
+    assert found is not None
+    return found.queries_used
+
+
 @pytest.fixture
-def pure_client(manifest: Manifest) -> TestClient:
-    """An app with NO database and NO analyser, so it cannot answer anything.
+def pure_client(
+    manifest: Manifest, store: psycopg.Connection[tuple[object, ...]], store_url: str
+) -> TokenClient:
+    """An app with a real gate but NO corpus and NO analyser.
 
     Everything reachable through it is a path that must not touch either -- which
     is most of the point.
     """
-    return TestClient(
-        create_app(
-            manifest=manifest,
-            morphology=None,
-            connect=never_connects,
-            answerer=never_answers,
-        )
+    app = create_app(
+        manifest=manifest,
+        morphology=None,
+        store_connect=store_opener(store_url),
+        connect=never_connects,
+        answerer=never_answers,
     )
+    return TokenClient(TestClient(app), a_link(store))
 
 
 @pytest.fixture
 def live_client(
-    corpus: psycopg.Connection[tuple[object, ...]], manifest: Manifest, morphology: Morphology
-) -> TestClient:
+    corpus: psycopg.Connection[tuple[object, ...]],
+    manifest: Manifest,
+    morphology: Morphology,
+    store: psycopg.Connection[tuple[object, ...]],
+    store_url: str,
+) -> TokenClient:
     """The real thing, minus the money.
 
     Depends on `corpus` for the ingest but lets the app open its OWN connections:
@@ -129,7 +192,13 @@ def live_client(
     the session-scoped one would close the corpus fixture out from under the rest
     of the suite after the first request.
     """
-    return TestClient(create_app(manifest=manifest, morphology=morphology, answerer=never_answers))
+    app = create_app(
+        manifest=manifest,
+        morphology=morphology,
+        store_connect=store_opener(store_url),
+        answerer=never_answers,
+    )
+    return TokenClient(TestClient(app), a_link(store))
 
 
 # ---------------------------------------------------------------------------
@@ -138,20 +207,20 @@ def live_client(
 
 
 class TestThePage:
-    def test_it_renders_and_touches_no_database(self, pure_client: TestClient) -> None:
+    def test_it_renders_and_touches_no_database(self, pure_client: TokenClient) -> None:
         response = pure_client.get("/")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_the_kunta_list_is_the_manifests_and_omits_sastamala(
-        self, pure_client: TestClient, manifest: Manifest
+        self, pure_client: TokenClient, manifest: Manifest
     ) -> None:
         body = pure_client.get("/").text
         for name in ask_module.municipalities(manifest):
             assert f'<option value="{name}"' in body
         assert "Sastamala" not in body, "partial coverage: ADR-0002 as amended"
 
-    def test_it_opens_on_NOTHING_chosen(self, pure_client: TestClient) -> None:
+    def test_it_opens_on_NOTHING_chosen(self, pure_client: TokenClient) -> None:
         """The load-bearing option.
 
         A dropdown defaulting to its first entry would make the harness pick a
@@ -162,7 +231,7 @@ class TestThePage:
         body = pure_client.get("/").text
         assert '<option value="" selected>' in body
 
-    def test_it_names_the_cell_it_retrieves_in(self, pure_client: TestClient) -> None:
+    def test_it_names_the_cell_it_retrieves_in(self, pure_client: TokenClient) -> None:
         """A demo that hides its configuration is a demo of an unnamed pipeline."""
         assert PUBLISHED.name in pure_client.get("/").text
         assert PUBLISHED.name == "lemma-reasm/0"
@@ -174,12 +243,12 @@ class TestThePage:
 
 
 class TestTheTransport:
-    def test_the_question_cannot_travel_in_a_url(self, pure_client: TestClient) -> None:
+    def test_the_question_cannot_travel_in_a_url(self, pure_client: TokenClient) -> None:
         """AD7. A GET would put a resident's words in three logs nobody controls."""
         assert pure_client.get("/ask").status_code == 405
 
     def test_an_over_long_question_is_refused_before_anything_is_opened(
-        self, pure_client: TestClient
+        self, pure_client: TokenClient
     ) -> None:
         """AD10. The prompt carries the question verbatim, so length is spend.
 
@@ -194,7 +263,7 @@ class TestTheTransport:
         assert "liian pitkä" in response.text
 
     def test_an_over_large_body_is_refused_while_still_streaming(
-        self, pure_client: TestClient
+        self, pure_client: TokenClient
     ) -> None:
         """A body cap, not a question cap. The two are different limits.
 
@@ -232,7 +301,7 @@ class TestTheTransport:
         assert serve.form_fields(b"kysymys=hei&kunta=") == {"kysymys": "hei", "kunta": ""}
 
     def test_a_question_at_the_limit_is_not_refused_for_length(
-        self, pure_client: TestClient
+        self, pure_client: TokenClient
     ) -> None:
         """The boundary, from the other side: at the cap it proceeds and hits the
         stub connection. Without this, the cap could be off by any amount."""
@@ -343,13 +412,13 @@ class TestEveryRefusalIsFree:
         ids=["empty", "unknown-kunta", "partial-coverage", "no-lexemes", "no-hits"],
     )
     def test_it_refuses_without_spending(
-        self, live_client: TestClient, question: str, kunta: str, expected: str
+        self, live_client: TokenClient, question: str, kunta: str, expected: str
     ) -> None:
         response = live_client.post("/ask", data={"kysymys": question, "kunta": kunta})
         assert response.status_code == 400
         assert expected in response.text
 
-    def test_no_kunta_chosen_never_reaches_the_answerer(self, live_client: TestClient) -> None:
+    def test_no_kunta_chosen_never_reaches_the_answerer(self, live_client: TokenClient) -> None:
         """AD4, and `CLAUDE.md`'s layer 3: it must not silently pick one."""
         response = live_client.post(
             "/ask", data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": ""}
@@ -358,7 +427,7 @@ class TestEveryRefusalIsFree:
         assert "Kuntaa ei ole valittu" in response.text
 
     def test_a_multipart_request_refuses_as_an_empty_question(
-        self, live_client: TestClient
+        self, live_client: TokenClient
     ) -> None:
         """The HTTP half of the parser decision, and it needs the live client.
 
@@ -379,14 +448,14 @@ class TestEveryRefusalIsFree:
         assert "Kysymys puuttuu" in response.text
 
     def test_a_refusal_page_still_offers_the_form_and_keeps_the_question(
-        self, live_client: TestClient
+        self, live_client: TokenClient
     ) -> None:
         """A dead end is not an honest empty state."""
         response = live_client.post("/ask", data={"kysymys": "? ... §", "kunta": "Turku"})
         assert "? ... §" in response.text
         assert '<option value="Turku" selected>' in response.text
 
-    def test_markup_in_a_refused_question_is_escaped(self, live_client: TestClient) -> None:
+    def test_markup_in_a_refused_question_is_escaped(self, live_client: TokenClient) -> None:
         """AD8 through HTTP, not only through `page`."""
         response = live_client.post(
             "/ask",
@@ -408,17 +477,23 @@ class TestItAnswers:
         corpus: psycopg.Connection[tuple[object, ...]],
         manifest: Manifest,
         morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
     ) -> None:
-        client = TestClient(
-            create_app(
-                manifest=manifest,
-                morphology=morphology,
-                answerer=canned(  # type: ignore[arg-type]
-                    "Neljän viikon välein [#26].",
-                    refused=False,
-                    citations=("lounais-suomi@2024-08-01#26",),
-                ),
-            )
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=morphology,
+                    store_connect=store_opener(store_url),
+                    answerer=canned(  # type: ignore[arg-type]
+                        "Neljän viikon välein [#26].",
+                        refused=False,
+                        citations=("lounais-suomi@2024-08-01#26",),
+                    ),
+                )
+            ),
+            a_link(store),
         )
         response = client.post(
             "/ask",
@@ -441,16 +516,22 @@ class TestItAnswers:
         corpus: psycopg.Connection[tuple[object, ...]],
         manifest: Manifest,
         morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
     ) -> None:
         """The demo's whole argument: a reader can check the refusal was honest."""
-        client = TestClient(
-            create_app(
-                manifest=manifest,
-                morphology=morphology,
-                answerer=canned(  # type: ignore[arg-type]
-                    "En voi vastata otteiden perusteella.", refused=True
-                ),
-            )
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=morphology,
+                    store_connect=store_opener(store_url),
+                    answerer=canned(  # type: ignore[arg-type]
+                        "En voi vastata otteiden perusteella.", refused=True
+                    ),
+                )
+            ),
+            a_link(store),
         )
         response = client.post(
             "/ask",
@@ -468,14 +549,20 @@ class TestTheJurisdictionForkSurvivesTheHttpLayer:
         corpus: psycopg.Connection[tuple[object, ...]],
         manifest: Manifest,
         morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
     ) -> None:
         """AD5. The #1 product failure mode, re-checked where a guard regresses."""
-        client = TestClient(
-            create_app(
-                manifest=manifest,
-                morphology=morphology,
-                answerer=canned("x", refused=False),  # type: ignore[arg-type]
-            )
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=morphology,
+                    store_connect=store_opener(store_url),
+                    answerer=canned("x", refused=False),  # type: ignore[arg-type]
+                )
+            ),
+            a_link(store),
         )
         question = "Kuinka usein jäteastia on tyhjennettävä?"
         pages = {}
@@ -535,7 +622,7 @@ class TestTheCopyIsInTheAskersLanguage:
     )
     def test_a_refusal_reads_in_finnish_and_leaks_no_maintainer_english(
         self,
-        live_client: TestClient,
+        live_client: TokenClient,
         question: str,
         kunta: str,
         finnish: str,
@@ -546,7 +633,7 @@ class TestTheCopyIsInTheAskersLanguage:
         assert finnish in response.text
         assert english_that_must_not_appear not in response.text
 
-    def test_the_authority_name_is_never_hand_inflected(self, live_client: TestClient) -> None:
+    def test_the_authority_name_is_never_hand_inflected(self, live_client: TokenClient) -> None:
         """The first live run rendered "jätehuoltolautakuntan".
 
         The genitive of `lautakunta` is `lautakunnan` -- consonant gradation, the
@@ -561,7 +648,7 @@ class TestTheCopyIsInTheAskersLanguage:
         assert "jätehuoltolautakuntan" not in response.text
         assert "Lounais-Suomen jätehuoltolautakunta" in response.text
 
-    def test_the_finnish_refusal_carries_no_english_prose(self, live_client: TestClient) -> None:
+    def test_the_finnish_refusal_carries_no_english_prose(self, live_client: TokenClient) -> None:
         """Sastamala's coverage detail was English inside a Finnish sentence.
 
         The manifest now carries the authority's own Finnish, so the resident reads
@@ -577,7 +664,7 @@ class TestTheCopyIsInTheAskersLanguage:
             assert english not in body, f"English prose {english!r} reached the page"
 
     def test_sastamalas_partial_coverage_survives_the_translation(
-        self, live_client: TestClient
+        self, live_client: TokenClient
     ) -> None:
         """ADR-0002 as amended is the nuance most easily lost in a second text.
 
@@ -602,19 +689,28 @@ class TestInternalMessagesNeverReachThePage:
     page is reachable by someone who must not read it.
     """
 
-    def test_a_database_failure_discloses_no_url_and_no_password(self, manifest: Manifest) -> None:
+    def test_a_database_failure_discloses_no_url_and_no_password(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
         secret = "postgresql://fi_rag_eval:s3cr3t-p4ss@db.internal:5434/fi_rag_eval"
 
         def broken() -> psycopg.Connection[tuple[object, ...]]:
             raise db.DatabaseError(f"cannot reach Postgres at {secret}: refused")
 
-        client = TestClient(
-            create_app(
-                manifest=manifest,
-                morphology=None,
-                connect=broken,
-                answerer=never_answers,
-            )
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=None,
+                    store_connect=store_opener(store_url),
+                    connect=broken,
+                    answerer=never_answers,
+                )
+            ),
+            a_link(store),
         )
         response = client.post("/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"})
         assert response.status_code == 503
@@ -627,6 +723,8 @@ class TestInternalMessagesNeverReachThePage:
         corpus: psycopg.Connection[tuple[object, ...]],
         manifest: Manifest,
         morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
     ) -> None:
         """Needs the live corpus: a gateway error can only happen once retrieval
         has succeeded, so a stubbed connection would never reach the answerer and
@@ -644,7 +742,17 @@ class TestInternalMessagesNeverReachThePage:
         ) -> Answer:
             raise ProxyError("LiteLLM at http://localhost:4010 said: key sk-abc123 denied")
 
-        client = TestClient(create_app(manifest=manifest, morphology=morphology, answerer=explodes))
+        client = TokenClient(
+            TestClient(
+                create_app(
+                    manifest=manifest,
+                    morphology=morphology,
+                    store_connect=store_opener(store_url),
+                    answerer=explodes,
+                )
+            ),
+            a_link(store),
+        )
         response = client.post(
             "/ask",
             data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": "Turku"},
@@ -657,6 +765,311 @@ class TestInternalMessagesNeverReachThePage:
     def test_the_types_whose_messages_are_withheld_are_named_not_remembered(self) -> None:
         assert (db.DatabaseError, AnswerError) == serve.INTERNAL_MESSAGES_NEVER_RENDERED
         assert issubclass(ProxyError, AnswerError)
+
+
+class TestNothingSpendsWithoutALiveToken:
+    """AD12. Raw paths, no `TokenClient` -- the gate is never proven by a helper
+    that already assumes it.
+
+    Every client here injects an answerer that RAISES and a database connection
+    that RAISES, so reaching either is the failure.
+    """
+
+    @pytest.fixture
+    def raw(
+        self, manifest: Manifest, store: psycopg.Connection[tuple[object, ...]], store_url: str
+    ) -> TestClient:
+        return TestClient(
+            create_app(
+                manifest=manifest,
+                morphology=None,
+                store_connect=store_opener(store_url),
+                connect=never_connects,
+                answerer=never_answers,
+            )
+        )
+
+    def test_there_is_NO_ungated_ask_route_at_all(self, raw: TestClient) -> None:
+        """Tracer 2 had one. A route that does not exist cannot be reached by a
+        forgotten bookmark, and removing it beats guarding it."""
+        assert raw.post("/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}).status_code == 404
+        assert raw.get("/ask").status_code == 404
+
+    def test_the_landing_page_offers_no_usable_form(self, raw: TestClient) -> None:
+        response = raw.get("/")
+        assert response.status_code == 200
+        assert "<form" in response.text, "the shell is still one file"
+        assert " hidden>" in response.text, "but the form is not usable without a link"
+        assert "henkilökohtaisella linkillä" in response.text
+        for banned in ("coming soon", "tulossa", "ei tuettu"):
+            assert banned not in response.text.lower()
+
+    def test_an_unknown_token_never_reaches_the_answerer(self, raw: TestClient) -> None:
+        response = raw.post("/d/ZZZZ-ZZZZ/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"})
+        assert response.status_code == 403
+        assert "ei kelpaa" in response.text
+
+    def test_an_unknown_token_renders_no_form_either(self, raw: TestClient) -> None:
+        response = raw.get("/d/ZZZZ-ZZZZ")
+        assert response.status_code == 403
+        assert " hidden>" in response.text
+
+    def test_a_token_shaped_like_an_injection_is_just_a_miss(self, raw: TestClient) -> None:
+        """The token reaches SQL as a parameter, never as text."""
+        response = raw.post(
+            "/d/x'%20OR%201=1--/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}
+        )
+        assert response.status_code == 403
+
+    def test_a_token_is_never_echoed_into_the_page_unescaped(self, raw: TestClient) -> None:
+        assert "<script>" not in raw.get("/d/%3Cscript%3Ex%3C/script%3E").text
+
+
+class TestTheCapsBiteOnTheSurface:
+    """AD13-AD16 and AD18, through HTTP. The store tests prove the SQL; these
+    prove the route actually consults it."""
+
+    def app(
+        self,
+        manifest: Manifest,
+        store_url: str,
+        *,
+        clock: access.Clock = access.utc_now,
+        queries_per_day: int = access.QUERIES_PER_DAY,
+        dollars_per_month: float = access.DOLLARS_PER_MONTH,
+    ) -> TestClient:
+        return TestClient(
+            create_app(
+                manifest=manifest,
+                morphology=None,
+                store_connect=store_opener(store_url),
+                connect=never_connects,
+                answerer=never_answers,
+                clock=clock,
+                queries_per_day=queries_per_day,
+                dollars_per_month=dollars_per_month,
+            )
+        )
+
+    def test_an_EXPIRED_link_never_answers(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        one = access.issue(store, queries=5, lifetime=timedelta(hours=1))
+        after = one.expires_at + timedelta(seconds=1)
+        client = self.app(manifest, store_url, clock=lambda: after)
+        response = client.post(
+            f"/d/{one.token}/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}
+        )
+        assert response.status_code == 403
+        assert "voimassaolo on päättynyt" in response.text
+        assert used(store, one.token) == 0
+
+    def test_an_OVER_CAP_link_never_answers(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        one = access.issue(store, queries=1)
+        client = self.app(manifest, store_url)
+        body = {"kysymys": "   ", "kunta": "Turku"}  # a free refusal, so it refunds
+        # Spend the one query on something that is NOT refunded: a question the
+        # gate accepts and the harness then fails to serve would refund, so this
+        # drives the counter through the store instead, which is the same column.
+        access.reserve(store, one.token)
+        store.commit()
+        response = client.post(f"/d/{one.token}/ask", data=body)
+        assert response.status_code == 403
+        assert "kysymystä on käytetty" in response.text
+
+    def test_a_REVOKED_link_never_answers(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        one = access.issue(store, queries=5)
+        access.revoke(store, one.token)
+        client = self.app(manifest, store_url)
+        response = client.post(
+            f"/d/{one.token}/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}
+        )
+        assert response.status_code == 403
+        assert "peruutettu" in response.text
+        assert used(store, one.token) == 0
+
+    def test_the_GLOBAL_DAILY_ceiling_stops_a_fresh_link(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        spent = access.issue(store, queries=5)
+        fresh = access.issue(store, queries=5)
+        access.reserve(store, spent.token, queries_per_day=1)
+        store.commit()
+        client = self.app(manifest, store_url, queries_per_day=1)
+        response = client.post(
+            f"/d/{fresh.token}/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}
+        )
+        assert response.status_code == 403
+        assert "päivittäinen kysymysmäärä on täynnä" in response.text
+        assert used(store, fresh.token) == 0
+
+    def test_the_MONTHLY_DOLLAR_ceiling_stops_a_fresh_link(
+        self,
+        manifest: Manifest,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        """The enforcer that guards the money, reached through HTTP."""
+        spent = access.issue(store, queries=5)
+        fresh = access.issue(store, queries=5)
+        got = access.reserve(store, spent.token, dollars_per_month=0.01)
+        access.record_spend(store, got, 0.0161)
+        store.commit()
+        client = self.app(manifest, store_url, dollars_per_month=0.01)
+        response = client.post(
+            f"/d/{fresh.token}/ask", data={"kysymys": "Kysymys?", "kunta": "Turku"}
+        )
+        assert response.status_code == 403
+        assert "budjetti on käytetty" in response.text
+        assert used(store, fresh.token) == 0
+
+
+class TestAQueryIsChargedOnceAndRefundedWhenNothingWasSpent:
+    """AD18. The reserve-then-refund contract, observed from outside."""
+
+    def test_a_free_refusal_costs_the_visitor_NOTHING(
+        self, live_client: TokenClient, store: psycopg.Connection[tuple[object, ...]]
+    ) -> None:
+        before = used(store, live_client.token)
+        response = live_client.post("/ask", data={"kysymys": "   ", "kunta": "Turku"})
+        assert response.status_code == 400
+        assert used(store, live_client.token) == before, (
+            "the visitor was charged for the harness declining"
+        )
+        assert "ei kuluttanut kysymystä" in response.text
+
+    def test_an_ANSWERED_query_costs_exactly_one(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        token = a_link(store, queries=4)
+        client = TestClient(
+            create_app(
+                manifest=manifest,
+                morphology=morphology,
+                store_connect=store_opener(store_url),
+                answerer=canned("vastaus", refused=False),  # type: ignore[arg-type]
+            )
+        )
+        for expected in (1, 2, 3):
+            response = client.post(
+                f"/d/{token}/ask",
+                data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": "Turku"},
+            )
+            assert response.status_code == 200
+            assert used(store, token) == expected
+        # And the page tells the visitor what is left, before they ask again.
+        assert "1</strong> kysymystä jäljellä" in response.text
+
+    def test_a_MODEL_REFUSAL_still_costs_one_because_it_was_generated(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        """The distinction that matters: a refusal the MODEL produced was paid
+        for, and a refusal the harness produced before any call was not."""
+        token = a_link(store, queries=3)
+        client = TestClient(
+            create_app(
+                manifest=manifest,
+                morphology=morphology,
+                store_connect=store_opener(store_url),
+                answerer=canned("En voi vastata.", refused=True),  # type: ignore[arg-type]
+            )
+        )
+        response = client.post(
+            f"/d/{token}/ask",
+            data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": "Turku"},
+        )
+        assert response.status_code == 200
+        assert used(store, token) == 1
+
+    def test_the_DISPLAYED_count_matches_the_stored_one_on_both_paths(
+        self,
+        corpus: psycopg.Connection[tuple[object, ...]],
+        manifest: Manifest,
+        morphology: Morphology,
+        store: psycopg.Connection[tuple[object, ...]],
+        store_url: str,
+    ) -> None:
+        """The reservation was once subtracted TWICE.
+
+        `find` runs after `reserve`, so the row already excludes this query;
+        subtracting again made the page say 2 left of 4 after a single answer.
+        The refund path is the one that adds. Pinned on both, because a count a
+        visitor reads and cannot verify is worse than none.
+        """
+        token = a_link(store, queries=4)
+        client = TestClient(
+            create_app(
+                manifest=manifest,
+                morphology=morphology,
+                store_connect=store_opener(store_url),
+                answerer=canned("vastaus", refused=False),  # type: ignore[arg-type]
+            )
+        )
+        answered = client.post(
+            f"/d/{token}/ask",
+            data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": "Turku"},
+        )
+        assert used(store, token) == 1
+        assert "<strong>3</strong> kysymystä jäljellä 4:stä" in answered.text
+
+        refused = client.post(f"/d/{token}/ask", data={"kysymys": "   ", "kunta": "Turku"})
+        assert used(store, token) == 1, "a free refusal charged a query"
+        assert "<strong>3</strong> kysymystä jäljellä 4:stä" in refused.text
+
+    def test_the_page_shows_what_the_link_is_still_worth_BEFORE_asking(
+        self, pure_client: TokenClient
+    ) -> None:
+        body = pure_client.get("/").text
+        assert "kysymystä jäljellä" in body
+        assert "voimassa vielä noin" in body
+
+
+class TestTheJurisdictionFilterStillRefusesOnTheGatedSurface:
+    """AD17. The #1 product failure mode, re-checked once more where a new layer
+    could have swallowed it."""
+
+    def test_an_out_of_jurisdiction_question_refuses_with_a_valid_token(
+        self, live_client: TokenClient
+    ) -> None:
+        response = live_client.post(
+            "/ask", data={"kysymys": "Pitääkö mökillä olla jäteastia?", "kunta": "Helsinki"}
+        )
+        assert response.status_code == 400
+        assert "ei ole tässä aineistossa" in response.text
+
+    def test_a_valid_token_does_not_let_a_kunta_be_skipped(self, live_client: TokenClient) -> None:
+        """A token grants queries, never a jurisdiction."""
+        response = live_client.post(
+            "/ask", data={"kysymys": "Kuinka usein jäteastia on tyhjennettävä?", "kunta": ""}
+        )
+        assert response.status_code == 400
+        assert "Kuntaa ei ole valittu" in response.text
 
 
 def _addresses(body: str) -> frozenset[str]:

@@ -15,7 +15,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from fi_rag_eval import db
+from fi_rag_eval import access, db
 from fi_rag_eval.analyse import AnalyserError, Morphology
 from fi_rag_eval.evaluate import GridRun, evaluate_grid
 from fi_rag_eval.golden import GoldenSet, load_golden_set
@@ -89,3 +89,48 @@ def grid(
     re-implementation of it.
     """
     return evaluate_grid(corpus, manifest=manifest, golden=golden, k=5, morphology=morphology)
+
+
+DEMO_TEST_URL = "postgresql://litellm:litellm@localhost:5435/demo_test"
+"""A SEPARATE database from the demo's own `demo`.
+
+The cap tests issue tokens, exhaust them and drive the global counters to their
+ceilings. Doing that in the real store would revoke links the Owner had handed
+out and burn the day's and the month's budget on a test run -- so the tests get
+their own database, created the same way the real one is, and truncated between
+tests rather than dropped (dropping it would re-exercise `ensure_database` on
+every test for no gain).
+"""
+
+
+@pytest.fixture
+def store_url() -> str:
+    """The test store's URL, as a fixture rather than an import.
+
+    `from tests.conftest import ...` breaks mypy's module resolution (there is no
+    `tests/__init__.py`, deliberately), so anything a test needs from here arrives
+    as a fixture.
+    """
+    return DEMO_TEST_URL
+
+
+@pytest.fixture
+def store() -> Iterator[psycopg.Connection[tuple[object, ...]]]:
+    """The demo's state store, empty, in its own database.
+
+    Skips loudly when the container is down. `make services-up` publishes the
+    port this needs (127.0.0.1:5435, ADR-0013); `make db-up` alone does NOT --
+    that starts only the corpus database, so a green run with just it proves
+    nothing about the access gate.
+    """
+    try:
+        conn = access.open_store(DEMO_TEST_URL)
+    except access.AccessError as exc:
+        pytest.skip(f"no demo state store, so the access-gate tests did not run: {exc}")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE demo_token, demo_day, demo_month")
+        conn.commit()
+        yield conn
+    finally:
+        conn.close()

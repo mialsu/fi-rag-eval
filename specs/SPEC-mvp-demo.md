@@ -54,7 +54,7 @@ that carries a capability token. No build step, no `node_modules`, no client fra
 2. **The endpoint and the page.** Localhost only, no gate. After this it is watchable.
    *(blocked by 1)*
 3. **The OTP gate and the caps.** 10 queries per token, 24h lifetime, 200 queries/day globally.
-   Token in the link (`/d/AB12-CD34`). Every rule seen red on purpose. *(blocked by 2)*
+   Token in the link (`/d/AB23-CD45`). Every rule seen red on purpose. *(blocked by 2)*
 4. **One container image.** `make docker-build` currently exits 1 on purpose. *(blocked by 3)*
 
 Each is demoable alone: 2 is a working local demo; 3 is a link that can be handed to someone; 4 is
@@ -135,14 +135,16 @@ purpose**. A cap never watched failing is decoration (`PRINCIPLES.md` #2).
 | AD17 | The municipality hard filter still refuses **on the gated surface** | `test:` out-of-jurisdiction question through HTTP with a valid token |
 | AD18 | A cap is charged **once per answered query**, and a refused query that spent nothing is **not** charged | `test:` counter asserted across a refusal and an answer |
 | AD19 | Token state survives a container restart | `live:` `docker compose restart`, same link still works with its counter intact |
+| AD20 | The **monthly dollar ceiling** stops every token, on **measured** spend | `test:` store and HTTP, **seen red** |
+| AD21 | The `demo` database and its tables are created idempotently, on a volume that is **already initialised** | `test:` twice in a row; the schema contains no `DROP` |
 
 ### Tracer 4 — the image
 
 | # | Criterion | Proven by |
 |---|---|---|
-| AD20 | `make docker-build` produces an image and **exits 0** | `live:` build output |
-| AD21 | `docker compose up` serves the gated demo with **no host Python, no host voikko** | `live:` a real query answered from inside the container |
-| AD22 | The image's `fi-rag-eval eval` reproduces the published table | `live:` the table, from the container |
+| AD22 | `make docker-build` produces an image and **exits 0** | `live:` build output |
+| AD23 | `docker compose up` serves the gated demo with **no host Python, no host voikko** | `live:` a real query answered from inside the container |
+| AD24 | The image's `fi-rag-eval eval` reproduces the published table | `live:` the table, from the container |
 
 ## Open questions (for the Owner)
 
@@ -243,3 +245,76 @@ English for the CLI and the suite, `finnish` for the page.
    refusal — asserted, because `parse_qsl` does not reject such a body, it produces a junk key.
 4. **31 Aug 2026 — a corpus data file was edited during a surface tracer.** See `REVIEW-DEBT.md`.
    No published number can move, and it is recorded rather than left silent.
+
+---
+
+## Tracer slice 3 — measured result (31 Aug 2026)
+
+`fi-rag-eval serve` on `127.0.0.1:8080`, gated. **One** real call was spent, deliberately.
+516 tests green. **Ten** enforcers broken on purpose and watched red, with an intact-tree control.
+
+| AC | Verdict | Evidence |
+|---|---|---|
+| AD12 | **MET, seen red** | There is **no** `/ask` route: `POST /ask` → **404** live, `GET /ask` → 404. Unknown token → **403** on both `GET /d/…` and `POST /d/…/ask`, with the answerer and the corpus connection both stubbed to raise. Red when an ungated route is put back. |
+| AD13 | **MET, seen red** | Injected clock. One second before expiry it reserves; **at** expiry it denies — the boundary pinned from both sides. `queries_used` unchanged by the denial. |
+| AD14 | **MET, seen red** | 3-query token: three reservations return 2/1/0 remaining, the fourth denies, and `queries_used` stays 3. |
+| AD15 | **MET, seen red** | `live:` `token --revoke SWZL-PW4P` → both routes **403**, *"Tämä linkki on peruutettu"*. Revocation is idempotent and keeps the first timestamp. |
+| AD16 | **MET, seen red** | A **fresh, unused** token is denied because the *day* is full — and the ceiling resets on the next day, so it is not a lifetime cap wearing a daily name. |
+| AD17 | **MET** | Out-of-jurisdiction question with a **valid** token → 400, *"ei ole tässä aineistossa"*. A token grants queries, never a jurisdiction: `kunta=""` with a valid token still refuses. |
+| AD18 | **MET, seen red, twice** | `live:` a free refusal left the ledger at **10/10** and the page said *"Tämä kysymys ei kuluttanut kysymystä"*; the answered query took it to **9/10** with **$0.0089** recorded. A model-produced refusal **is** charged (it was generated); a harness refusal is not. Red both when the refund is removed and when `GREATEST(…, 0)` is dropped, which lets a double refund **mint** queries. |
+| AD19 | **MET** | `live:` `docker compose restart litellm-postgres` → the ledger reads `9  $0.0089` before and after, and the link still renders its form. |
+| AD20 | **MET, seen red** | Enforced on **measured** spend against the token, the day and the month. A ceiling of $0.02 admitted two $0.0177 answers and denied the third — **the overshoot is a property, not a bug**, and it is the same guarantee `answer.TokenBudget` words as "one call of overshoot, then nothing". Resets on the next month. |
+| AD21 | **MET** | `ensure_database` twice in a row is a no-op; `SCHEMA` contains no `DROP` and three `IF NOT EXISTS`. Red when a `DROP` is added. |
+
+**Tracer verdict: MET.** Every criterion claimed, met, ten of them watched failing.
+
+### Live evidence
+
+```
+$ fi-rag-eval token --issue --note "tracer 3 live exercise"
+http://127.0.0.1:8080/d/SWZL-PW4P
+10 questions, expires 2026-09-01T08:36:03+00:00 (in 24h). Anyone holding this link can
+ask -- it is a capability, not a login (ADR-0013).
+
+GET  /                      200   no form (hidden), "vain henkilökohtaisella linkillä"
+POST /ask                   404   the ungated route does not exist
+GET  /d/ZZZZ-ZZZZ           403   no form
+POST /d/ZZZZ-ZZZZ/ask       403   nothing reserved, nothing spent
+POST /d/SWZL-PW4P/ask       400   free refusal -> 10/10, "ei kuluttanut kysymystä"
+POST /d/SWZL-PW4P/ask       200   9s, $0.0089, 7083 tokens (1724 reasoning)  ->  9/10
+     Tampere -> Alueellinen jätehuoltolautakunta (pirkanmaa), haku lemma-reasm/0
+     4 viikkoa / 8 viikkoa biojätehuollon mukaan, cited pirkanmaa@2021-07-01#23
+docker compose restart      9  $0.0089  survives
+token --revoke              403 on both routes
+```
+
+The paid call is **Tampere**, so the jurisdiction fork is now visible *through the gate*: the same
+question tracer 2 answered for Turku as 4/8/16 weeks is answered here as 4/8 weeks, from different
+clauses, in the other authority's vocabulary (`keräysväline`, not `jäteastia`).
+
+### What this tracer found that the tests did not, at first
+
+1. **`AB12-CD34` is not a producible token.** It was the shape sketched while shaping, and it
+   contains `1`, which the alphabet excludes so a link survives being read aloud. The *shape* was the
+   decision; a test now pins that the illustration itself is invalid, so nobody widens the alphabet
+   to make an example work.
+2. **The displayed remaining count was off by one** — the reservation was subtracted twice, so the
+   page said *2 left of 4* after a single answer. Found by a test that asserted the stored and the
+   displayed number agree. Pinned on both the answered and the refunded path: a count a visitor reads
+   and cannot verify is worse than none.
+3. **`request.form()` is not the only Starlette assumption worth checking** — carried from tracer 2,
+   but the same class of finding: `MutableHeaders` has no `pop`, which killed a first attempt to
+   return the measured cost on an internal response header. It returns as a value now, which is what
+   it should have been.
+
+### Spec deltas from this tracer
+
+5. **31 Aug 2026 — two criteria added mid-tracer.** AD20 (the monthly dollar ceiling) came from the
+   Owner's decision *during* shaping, after the cap arithmetic was raised; AD21 (idempotent database
+   creation) came from discovering the volume is already initialised. Recorded as additions.
+6. **31 Aug 2026 — ADR-0009's "No published port" is partially reversed.** `litellm-postgres` now
+   publishes `127.0.0.1:5435:5432`. Stated in ADR-0013 and in `compose.yaml`, with the alternative
+   (a fourth container) named as rejected by the Owner.
+7. **31 Aug 2026 — the ungated `/ask` route from tracer 2 is DELETED, not guarded.** Tracer 2's HTTP
+   assertions now run through a `TokenClient` wrapper that rewrites two paths; the gate's own tests
+   use raw paths with no wrapper, so the gate is never proven by a helper that assumes it.

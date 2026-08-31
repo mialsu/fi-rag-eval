@@ -14,7 +14,8 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 **Slices 1–4 are built, slice 5 is four tracers in, and the MVP demo is two tracers in: the
 measurement spine, an honest golden set, a lemmatising analyser measured as a grid, a second
 authority, an answering boundary with a scored refusal population, a judge that passes an 8/8
-known-bad control and publishes nothing, and now a WATCHABLE demo page — with no access gate.** Two authorities are ingested into Postgres and
+known-bad control and publishes nothing, and now a SHAREABLE demo page behind four caps, ten of
+whose enforcers have been watched failing.** Two authorities are ingested into Postgres and
 retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
 chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
 — 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
@@ -176,7 +177,7 @@ regresses. Nothing else exists.
   correct but not independently attributed for the same reason** — audit them **before** ingesting a
   second edition (ADR-0006 anticipates one), not after. `REVIEW-DEBT.md`.
 
-- **THERE IS A WATCHABLE DEMO PAGE NOW, AND IT HAS NO ACCESS GATE (31 Aug 2026, MVP tracer 2).**
+- **THERE IS A GATED, SHAREABLE DEMO PAGE (31 Aug 2026, MVP tracers 2–3).**
   `fi-rag-eval serve` / `make serve` → Starlette + uvicorn on `127.0.0.1:8080`: `GET /` renders one
   server-rendered HTML file (no build step, no `node_modules`), `POST /ask` answers. It **calls
   `ask.ask`** and re-implements no retrieval — enforced twice, by the injected asker's default being
@@ -185,8 +186,57 @@ regresses. Nothing else exists.
   all five, so the list cannot go stale). **Exercised live: HTTP 200 in 14s, $0.0161, 8420 tokens,
   all five conditional branches of Turku's tyhjennysväli stated and cited to `#26`.** Nine gates
   seen red on purpose with an intact-tree control.
-  **`REVIEW-DEBT.md` first: there is no token, no rate limit and no daily ceiling. Do not bind it
-  off-loopback, expose it, or deploy it until tracer 3.**
+- **ACCESS IS A CAPABILITY TOKEN IN THE LINK, AND IT IS A SPEND CONTROL, NOT AUTH (ADR-0013).**
+  `fi-rag-eval token --issue` prints `http://…/d/SWZL-PW4P`. It identifies no person, stores no
+  identity, has no password and no session, and grants exactly one privilege: N answers. That is why
+  it does not contradict `DESIGN.md:52` — the thing that non-goal forbids is a system that knows *who*
+  you are, and this one deliberately cannot. **A forwarded link is a valid link**, and tokens are
+  stored **unhashed** so `--list` can reprint one. Both confessed.
+- **FOUR ENFORCERS, AND ONLY THE FOURTH IS DENOMINATED IN MONEY.** 10 queries per token · 24 h from
+  issue · 200 queries/day · **$10.00/month on measured spend**. The query caps are the Owner's
+  *fairness* controls; the dollar ceiling exists because they do not fit the budget on their own — at
+  $0.0084–$0.0177 per answer, 200/day is $1.70–$4.20/day and ADR-0008's $25/month is gone in 6–15
+  days. **$10 leaves ~$15 for the harness's own runs**, so a saturated demo can never starve
+  `answer --all`. **Ten enforcers were broken on purpose and watched red**, with an intact-tree
+  control. The monthly ceiling stops the query **after** the one that crossed it — "one answer of
+  overshoot, then nothing", the same guarantee `answer.TokenBudget` words for tokens.
+- **A QUERY IS RESERVED BEFORE THE ANSWER AND REFUNDED IF NOTHING WAS SPENT.** Not
+  check-then-charge (two requests could both pass at 9 of 10) and not a row lock held across a 14–50 s
+  model call. It fails in the safe direction: a crash between the answer and the refund over-counts
+  by one and can never under-count. **A harness refusal costs the visitor nothing; a refusal the
+  *model* produced costs one, because it was generated.** Measured live: free refusal left 10/10,
+  the answered query took it to 9/10 with $0.0089 recorded against the token, the day and the month.
+- **THERE IS NO UNGATED `/ask` ANY MORE — the route was DELETED, not guarded.** `POST /ask` is a
+  **404**. Bare `GET /` renders the shell with the form `hidden` and a Finnish line saying a link is
+  needed. An ungated path left beside a gate is how one gets exposed by accident.
+- **THE DEMO'S STATE LIVES IN A `demo` DATABASE INSIDE `litellm-postgres`, AND THAT CONTAINER NOW
+  PUBLISHES `127.0.0.1:5435` (ADR-0013).** The corpus database is on **tmpfs**, so a token in it dies
+  on the next restart and a link handed to someone silently stops working. The demo's state and the
+  gateway's spend ledger have the *same* persistence requirement, so they share the container and its
+  existing volume in **separate** databases. **This partially reverses ADR-0009's "No published
+  port"** — our own app is now a client, and the bind is loopback-explicit, unlike the corpus
+  database's `5434:5432`. `compose.yaml` says the container's name no longer describes its contents;
+  renaming it was rejected because it holds the ledger the $25 ceiling is enforced from.
+- **The `demo` database is created by the APPLICATION, idempotently.** `litellm-spend` is already
+  initialised and a Postgres image runs `docker-entrypoint-initdb.d` **only on first init**, so an
+  init script would be dead code that reads like setup. Postgres has no `CREATE DATABASE IF NOT
+  EXISTS` and cannot run it in a transaction. **This schema is never dropped** — the exact opposite of
+  `db.SCHEMA`, because a corpus that survives an ingest has drifted from the manifest while a token
+  store that does not survive is a link that broke. Proven live: `docker compose restart` left the
+  ledger at `9  $0.0089`.
+- **`AB12-CD34` IS NOT A PRODUCIBLE TOKEN**, and a test says so. It was the shape sketched during
+  shaping and it contains `1`, which the 32-symbol alphabet excludes along with `0`, `I` and `O` so a
+  link survives being read aloud. The *shape* was the decision; nobody should widen the alphabet to
+  make an illustration valid.
+- **The displayed remaining count was off by one and a test caught it.** `find` runs after `reserve`,
+  so the row already excludes the query; subtracting again said *2 left of 4* after one answer. Pinned
+  on both the answered and the refunded path — a count a visitor reads and cannot verify is worse than
+  none.
+- **There is NO RATE limit, only a count.** Ten queries can arrive in ten seconds; the answering lock
+  serialises them but nothing spaces them. At ~10 s per answer a script with a valid link can burn the
+  day's whole 200 in ~35 minutes. Bounded in money by the daily and monthly ceilings, unbounded in
+  time within them. Confessed.
+
 - **The question travels in a POST body, never a URL, and nothing logs it.** A GET would put a
   resident's words in uvicorn's access log, the browser history and every proxy between. `GET /ask`
   is a **405**. The server logs what *failed*, never what was asked — which means
@@ -227,11 +277,6 @@ regresses. Nothing else exists.
 - **The answering path is serialised by one lock, and that is a spend control.** `libvoikko`'s
   thread-safety is unspecified and one `Morphology` is shared, which is why the lock appeared;
   **bounded in-flight spend** is why it stays. `GET /` never takes it.
-- **THE CAP ARITHMETIC FOR TRACER 3 DOES NOT CLOSE, AND IT IS THE OWNER'S MONEY.** Measured cost per
-  answered question is **$0.0084–$0.0177** on this path. At the decided **200 queries/day** that is
-  **$1.70–$4.20/day**, so the **$25/month** ceiling (ADR-0008) is exhausted in **6–15 days of a
-  saturated daily cap** and the gateway's virtual key starts returning 429 mid-demo. Raised before
-  the caps were built; the numbers are the Owner's to revisit.
 - **uvicorn itself is exercised only by hand.** Every test uses Starlette's in-process `TestClient`,
   and `make gate` makes no request over a socket — so **a green gate is compatible with a `serve`
   command that fails on startup**. Same standing gap as "no automated test makes a live model call",
@@ -332,8 +377,9 @@ regresses. Nothing else exists.
   a hand-made claim in `absence_source`; the lexeme only keeps it from rotting. Re-derive the whole
   population from the clause lists at the N≈85 tranche.
 - **Not built:** embeddings, pgvector, reranking, **the 168 hand labels and therefore judge–human
-  agreement**, the answer-metric floor gate, a third authority, **the demo's OTP gate and every one of
-  its caps (MVP tracer 3)**, CI, Docker, Cloud Run.
+  agreement**, the answer-metric floor gate, a third authority, **a rate limit (as opposed to a
+  count), reconciliation of our recorded spend against the gateway's, the Dockerfile (MVP tracer 4)**,
+  CI, Cloud Run.
   `make docker-build` still exits non-zero on purpose — do not "fix" it.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
@@ -373,7 +419,10 @@ Run them all with `make gate`. Every one below has been run, and has been proven
   Requires Docker, `poppler-utils`, `libvoikko1` and `voikko-fi`. Anything that answers additionally
   needs `make services-up` and a filled `.env`. **`make serve` is not in any gate either**, and no
   test starts the ASGI server — the demo's tests all use Starlette's in-process `TestClient`, so a
-  green gate says nothing about whether `fi-rag-eval serve` binds. **Neither `fi-rag-eval answer --all` nor `fi-rag-eval judge` is
+  green gate says nothing about whether `fi-rag-eval serve` binds. The **access-gate** tests
+  additionally need `make services-up` (not `db-up`): they run against a `demo_test` database on
+  `127.0.0.1:5435`, and they **skip** when that container is down — so a green `make gate` with only
+  the corpus database up proves nothing about any cap. **Neither `fi-rag-eval answer --all` nor `fi-rag-eval judge` is
   part of any gate**: the answer phase takes ~50 minutes and ~$0.76, the judge ~7 minutes and
   ~$0.07, and both are run deliberately by a human. No test in `make gate` calls the judge either.
 
