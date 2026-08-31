@@ -12,6 +12,7 @@ goes red when it stops holding.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import psycopg
@@ -40,6 +41,8 @@ from fi_rag_eval.golden import (
     RefusalQuestion,
     load_golden_set,
 )
+from fi_rag_eval.judging import JudgingError, load_run, score_refusals_offline
+from fi_rag_eval.labelling import DEFAULT_SAMPLE
 from fi_rag_eval.manifest import Manifest, ManifestError
 from fi_rag_eval.metrics import (
     AnswerOutcome,
@@ -51,7 +54,7 @@ from fi_rag_eval.metrics import (
     wilson,
 )
 from fi_rag_eval.metrics import RefusalKind as MetricsRefusalKind
-from fi_rag_eval.report import format_refusal_detail, format_refusals
+from fi_rag_eval.report import format_offline_refusals, format_refusal_detail, format_refusals
 
 REFUSALS = Path(__file__).resolve().parent.parent / "corpus" / "golden" / "refusals.yaml"
 
@@ -874,3 +877,143 @@ class TestTheRefusalReport:
         assert "REFUSED" in out and "ANSWERED (miss)" in out
         assert "Näissä määräyksissä" in out
         assert "[out-of-jurisdiction]" in out
+
+
+class TestScoringRefusalsOffline:
+    """Recomputing the population from a file, which is what makes a re-label cheap.
+
+    Until 31 Aug 2026 the only path to these numbers ran through a live model:
+    ~50 minutes, ~$0.76, and -- the answerer being non-deterministic -- a different
+    set of answers every time. Changing one label meant re-publishing every number
+    in the table.
+    """
+
+    def test_the_committed_sample_scores_without_a_database_or_a_gateway(
+        self, golden: GoldenSet
+    ) -> None:
+        scored = score_refusals_offline(load_run(DEFAULT_SAMPLE), golden=golden)
+        assert scored.metrics.recall.n == 13
+        assert scored.metrics.recall.point == pytest.approx(12 / 13)
+        # Precision's denominator is every refusal EMITTED, and the tyre question
+        # was answered rather than refused -- so removing it cannot move this.
+        assert scored.metrics.precision.n == 19
+        assert scored.metrics.precision.point == pytest.approx(12 / 19)
+
+    def test_the_removed_question_is_excluded_BY_NAME_and_not_silently(
+        self, golden: GoldenSet
+    ) -> None:
+        """An exclusion nobody can see is indistinguishable from a mistake."""
+        scored = score_refusals_offline(load_run(DEFAULT_SAMPLE), golden=golden)
+        assert scored.not_in_golden == ("ooc-autonrenkaiden-vastaanotto",)
+        assert "ooc-autonrenkaiden-vastaanotto" in format_offline_refusals(scored)
+        assert "EXCLUDED" in format_offline_refusals(scored)
+
+    def test_the_restricted_reading_is_printed_BESIDE_the_published_one_never_instead(
+        self, golden: GoldenSet
+    ) -> None:
+        """The Owner's decision, 31 Aug 2026. Both or neither."""
+        scored = score_refusals_offline(load_run(DEFAULT_SAMPLE), golden=golden)
+        restricted = scored.metrics.restricted_precision
+        assert restricted is not None
+        assert restricted.point > scored.metrics.precision.point
+        rendered = format_offline_refusals(scored)
+        assert "precision " in rendered
+        assert "precision*" in rendered
+        # Every excused question is a wrongly-refused one, and named.
+        assert set(scored.metrics.excused) <= set(scored.metrics.wrongly_refused)
+        for question_id in scored.metrics.excused:
+            assert question_id in rendered
+
+    def test_a_run_missing_a_golden_refusal_question_is_REFUSED(
+        self, golden: GoldenSet, tmp_path: Path
+    ) -> None:
+        """Never a table over a silently reduced N -- the project's own hard limit."""
+        payload = json.loads(DEFAULT_SAMPLE.read_text(encoding="utf-8"))
+        dropped = golden.refusals[0].id
+        payload["answers"] = [a for a in payload["answers"] if a["question_id"] != dropped]
+        path = tmp_path / "short.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(JudgingError, match="has no answer for refusal questions"):
+            score_refusals_offline(load_run(path), golden=golden)
+
+    def test_the_refusal_KIND_is_read_from_the_golden_set_not_the_run_file(
+        self, golden: GoldenSet, tmp_path: Path
+    ) -> None:
+        """A stale file must not be able to assert a label.
+
+        The kind decides the per-kind split, which is where prediction 3 lives. If
+        a run file could carry it, an old file would silently re-classify a
+        question the golden set has since moved between kinds.
+        """
+        payload = json.loads(DEFAULT_SAMPLE.read_text(encoding="utf-8"))
+        for answer in payload["answers"]:
+            if answer.get("population") == "refusal":
+                answer["kind"] = "out-of-corpus"
+        path = tmp_path / "relabelled.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        scored = score_refusals_offline(load_run(path), golden=golden)
+        kinds = dict(scored.metrics.by_kind)
+        assert MetricsRefusalKind.OUT_OF_JURISDICTION in kinds
+        assert kinds[MetricsRefusalKind.OUT_OF_JURISDICTION].n == 6
+
+    def test_the_frozen_samples_provenance_is_read_from_its_own_field(self) -> None:
+        """`answered_at_commit`, not `commit`.
+
+        Reading only `commit` made every provenance line on the committed sample
+        say "(none recorded)" and every label file write an empty
+        `sample_answered_at_commit` -- the field ADR-0011 moved the provenance INTO
+        because a filename cannot be checked. It reported *dirty* correctly by
+        accident, an empty commit being dirty too.
+        """
+        run = load_run(DEFAULT_SAMPLE)
+        assert run.commit == "4b75dfd-dirty"
+        assert run.dirty_provenance
+
+
+class TestRestrictedPrecisionArithmetic:
+    """The second reading, in isolation from any file."""
+
+    @staticmethod
+    def _refusal(question_id: str, *, refused: bool) -> RefusalOutcome:
+        return RefusalOutcome(
+            question_id=question_id,
+            kind=MetricsRefusalKind.OUT_OF_CORPUS,
+            refused=refused,
+            citations=(),
+            retrieved=(),
+        )
+
+    def test_it_is_NOT_COMPUTED_when_any_completeness_is_unknown(self) -> None:
+        """A partly-unknown denominator is not a smaller denominator."""
+        metrics = refusal_metrics(
+            refusals=[self._refusal("r1", refused=True)],
+            answerable=[
+                AnswerOutcome(question_id="a1", refused=True, retrieval_complete=False),
+                AnswerOutcome(question_id="a2", refused=True),
+            ],
+        )
+        assert metrics.restricted_precision is None
+        assert metrics.excused == ()
+
+    def test_it_equals_precision_when_nothing_is_excused(self) -> None:
+        metrics = refusal_metrics(
+            refusals=[self._refusal("r1", refused=True)],
+            answerable=[AnswerOutcome(question_id="a1", refused=True, retrieval_complete=True)],
+        )
+        assert metrics.restricted_precision is not None
+        assert metrics.restricted_precision.point == metrics.precision.point
+        assert metrics.excused == ()
+
+    def test_only_REFUSED_questions_with_incomplete_retrieval_are_excused(self) -> None:
+        """An answered question with incomplete retrieval was never in the denominator."""
+        metrics = refusal_metrics(
+            refusals=[self._refusal("r1", refused=True)],
+            answerable=[
+                AnswerOutcome(question_id="a1", refused=True, retrieval_complete=False),
+                AnswerOutcome(question_id="a2", refused=False, retrieval_complete=False),
+            ],
+        )
+        assert metrics.excused == ("a1",)
+        assert metrics.precision.n == 2
+        assert metrics.restricted_precision is not None
+        assert metrics.restricted_precision.n == 1

@@ -38,7 +38,13 @@ from fi_rag_eval.extract import ExtractionError
 from fi_rag_eval.golden import GoldenSetError, load_golden_set
 from fi_rag_eval.ingest import IngestError, ingest
 from fi_rag_eval.judge import judge_ceiling_for
-from fi_rag_eval.judging import DEFAULT_CONTROL, JudgingError, load_control, load_run
+from fi_rag_eval.judging import (
+    DEFAULT_CONTROL,
+    JudgingError,
+    load_control,
+    load_run,
+    score_refusals_offline,
+)
 from fi_rag_eval.labelling import (
     DEFAULT_LABELS,
     DEFAULT_SAMPLE,
@@ -61,6 +67,7 @@ from fi_rag_eval.report import (
     format_ingest,
     format_judged,
     format_judged_detail,
+    format_offline_refusals,
     format_probe_table,
     format_refusal_detail,
     format_refusals,
@@ -280,6 +287,21 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_LABELS,
         help=f"where your labels are written, after every single unit (default: {DEFAULT_LABELS})",
+    )
+
+    refusals_parser = subparsers.add_parser(
+        "refusals",
+        help="recompute the refusal population's recall and precision from a frozen "
+        "answer file. No model, no network, no spend.",
+    )
+    refusals_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    refusals_parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
+    refusals_parser.add_argument(
+        "run",
+        type=Path,
+        nargs="?",
+        default=DEFAULT_SAMPLE,
+        help=f"an answer run file (default: {DEFAULT_SAMPLE}, the committed frozen sample)",
     )
 
     agreement_parser = subparsers.add_parser(
@@ -819,6 +841,21 @@ def _label(args: argparse.Namespace) -> int:
     return 0
 
 
+def _refusals(args: argparse.Namespace) -> int:
+    """Refusal metrics from a file on disk, and nothing else.
+
+    Deliberately needs no database and no gateway: the whole point is that a label
+    change can be re-measured without re-answering 63 questions through a live
+    model at ~$0.76 and ~50 minutes -- which, the answerer being non-deterministic,
+    would move every other number in the table at the same time.
+    """
+    manifest = load_manifest(args.manifest)
+    golden = load_golden_set(args.golden, manifest)
+    scored = score_refusals_offline(load_run(args.run), golden=golden)
+    print(format_offline_refusals(scored))
+    return 0
+
+
 def _agreement(args: argparse.Namespace) -> int:
     """Judge-human agreement, or judge self-consistency with `--against`."""
     manifest = load_manifest(args.manifest)
@@ -898,6 +935,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "judge": _judge,
         "label": _label,
         "agreement": _agreement,
+        "refusals": _refusals,
     }
     try:
         return handlers[args.command](args)

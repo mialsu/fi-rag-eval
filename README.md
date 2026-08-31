@@ -350,7 +350,8 @@ mismatch can be diagnosed rather than merely detected.
 
 Other targets: `make gate` (lint, format, types, tests, build — the commit gate), `make label`
 (hand-label the frozen sample, 168 units, blind and resumable), `make agreement VERDICTS=<file>`,
-`make ingest`,
+`make refusals` (recompute refusal recall and precision from the committed frozen sample — no
+model, no network, no spend), `make ingest`,
 `make db-up` / `make db-down`, `make eval-baseline` to re-record the baseline deliberately (run it
 from a clean tree, so the recorded commit identifies the code that produced the numbers).
 

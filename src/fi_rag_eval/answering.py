@@ -219,6 +219,15 @@ def run(
         )
 
     kinds = {r.refusal.id: r.refusal.kind for r in retrieved_refusals}
+    # Completeness against the context the ANSWERER saw, not against what the
+    # retriever would return today. The restricted precision reading is a claim
+    # about this run; recomputing retrieval underneath it would make it a claim
+    # about two different runs at once.
+    complete = {
+        run.question.id: {str(a) for a in run.question.required_chunks}
+        <= {hit.address for hit in run.hits}
+        for run in scored.runs
+    }
     metrics = refusal_metrics(
         refusals=[
             RefusalOutcome(
@@ -231,7 +240,11 @@ def run(
             for one in refused
         ],
         answerable=[
-            AnswerOutcome(question_id=one.question_id, refused=one.answer.refused)
+            AnswerOutcome(
+                question_id=one.question_id,
+                refused=one.answer.refused,
+                retrieval_complete=complete[one.question_id],
+            )
             for one in answerable
         ],
     )

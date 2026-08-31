@@ -16,7 +16,7 @@ against excerpts the answerer never saw, and the resulting groundedness would lo
 like an answerer problem. Same discipline as the golden set's `absent_lexeme`: the
 claim cannot rot silently.
 
-**The judged population is the 50 answerable questions and nothing else.** The 14
+**The judged population is the 50 answerable questions and nothing else.** The 13
 refusal questions carry no `required_branches`, so groundedness has no denominator
 over them and branch coverage no numerator; their behaviour is already measured by
 refusal precision and recall, with no judge and no floor. Enforced by only ever
@@ -42,7 +42,15 @@ from fi_rag_eval.evaluate import DEFAULT_K, PUBLISHED, Cell, QuestionRun, evalua
 from fi_rag_eval.golden import GoldenSet, Question
 from fi_rag_eval.judge import Judgement, judge_answer
 from fi_rag_eval.manifest import Manifest
-from fi_rag_eval.metrics import JudgedMetrics, judged_metrics
+from fi_rag_eval.metrics import (
+    AnswerOutcome,
+    JudgedMetrics,
+    RefusalMetrics,
+    RefusalOutcome,
+    judged_metrics,
+    refusal_metrics,
+)
+from fi_rag_eval.metrics import RefusalKind as MetricsRefusalKind
 
 DEFAULT_CONTROL = Path("corpus/control/known-bad.yaml")
 SUPPORTED_CONTROL_VERSION = 1
@@ -183,7 +191,14 @@ def load_run(path: Path) -> RecordedRun:
         k=int(payload.get("k", 0)),
         model=str(payload.get("model", ANSWERER)),
         reasoning=bool(payload.get("reasoning", True)),
-        commit=str(payload.get("commit", "")),
+        # `answered_at_commit` is the frozen sample's spelling and `commit` is a
+        # live run's. Reading only the latter left every provenance line on the
+        # committed sample reading "(none recorded)" and every label file writing
+        # an empty `sample_answered_at_commit` -- the exact field ADR-0011
+        # decision 5 moved the provenance INTO, on the grounds that a filename
+        # cannot be checked. It reported dirty provenance correctly by accident,
+        # because an empty commit is also dirty.
+        commit=str(payload.get("commit") or payload.get("answered_at_commit") or ""),
         tokens=int(payload.get("tokens", 0)),
         cost_usd=float(payload.get("cost_usd", 0.0)),
         answers=tuple(answers),
@@ -672,4 +687,112 @@ def run_control(
         tokens=budget.tokens,
         cost_usd=budget.cost_usd,
         json_validation_retries=budget.json_validation_retries,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Scoring the refusal population OFFLINE (31 Aug 2026)
+#
+# Until today the only path to refusal recall and precision ran through
+# `answering.run`, which answers 63 questions through a live model: ~50 minutes,
+# ~$0.76, and a different set of answers every time, because `temperature=0`
+# becomes `1e-8` at Groq (ADR-0008). Re-measuring the population after a label
+# changed therefore meant re-publishing every other number in it.
+#
+# The frozen sample already holds `refused` for every answer. Recomputing the
+# arithmetic over it costs nothing and calls nothing, which makes the refusal
+# numbers reproducible from a COMMITTED artifact for the first time.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineRefusalRun:
+    """Refusal metrics recomputed from a frozen run, with what it had to leave out."""
+
+    metrics: RefusalMetrics
+    source: Path
+    source_commit: str
+    model: str
+    cell: str
+    reasoning: bool
+    scored: tuple[str, ...]
+    not_in_golden: tuple[str, ...]
+    """Refusal answers in the file for questions the golden set no longer asks.
+
+    Never silently dropped. A frozen sample and a living golden set diverge the
+    moment an entry moves -- `ooc-autonrenkaiden-vastaanotto` was removed on
+    31 Aug 2026 and its answer is still in the sample, paid for and real. Reporting
+    the exclusion is the difference between a measurement over 13 and a
+    measurement over 14 that quietly calls itself 13.
+    """
+
+    @property
+    def dirty_provenance(self) -> bool:
+        return self.source_commit.endswith("-dirty") or not self.source_commit
+
+
+def score_refusals_offline(run: RecordedRun, *, golden: GoldenSet) -> OfflineRefusalRun:
+    """Recompute the refusal population's arithmetic from a recorded run.
+
+    Refuses rather than reports when the run is missing a question the golden set
+    asks: this harness must never publish a table over a silently reduced N, and a
+    refusal population short one question is exactly that.
+
+    Retrieval completeness is read from each answer's own recorded context, so the
+    restricted precision reading describes the run being scored rather than what
+    the retriever would return today.
+    """
+    asked = {r.id: r for r in golden.refusals}
+    answered = {a.question_id: a for a in run.refusals}
+    unanswered = sorted(set(asked) - set(answered))
+    if unanswered:
+        raise JudgingError(
+            f"{run.source} has no answer for refusal questions {unanswered}. Refusal "
+            "recall over the remainder would be a measurement of a smaller population "
+            "wearing this one's name."
+        )
+    not_in_golden = tuple(sorted(set(answered) - set(asked)))
+
+    required = {q.id: {str(a) for a in q.required_chunks} for q in golden.questions}
+    answerable = []
+    for one in run.answerable:
+        if one.question_id not in required:
+            raise JudgingError(
+                f"{run.source}: {one.question_id} is answered as answerable but is not in "
+                "the golden set. Precision's denominator would count a refusal of a "
+                "question nobody is scoring."
+            )
+        answerable.append(
+            AnswerOutcome(
+                question_id=one.question_id,
+                refused=one.refused,
+                retrieval_complete=required[one.question_id] <= set(one.retrieved),
+            )
+        )
+
+    metrics = refusal_metrics(
+        refusals=[
+            RefusalOutcome(
+                question_id=one.question_id,
+                # From the GOLDEN SET, never from the file: the kind is the label,
+                # and a stale run file must not be able to assert one.
+                kind=MetricsRefusalKind(asked[one.question_id].kind.value),
+                refused=one.refused,
+                citations=one.citations,
+                retrieved=one.retrieved,
+            )
+            for one in run.refusals
+            if one.question_id in asked
+        ],
+        answerable=answerable,
+    )
+    return OfflineRefusalRun(
+        metrics=metrics,
+        source=run.source,
+        source_commit=run.commit,
+        model=run.model,
+        cell=run.cell,
+        reasoning=run.reasoning,
+        scored=tuple(sorted(asked)),
+        not_in_golden=not_in_golden,
     )

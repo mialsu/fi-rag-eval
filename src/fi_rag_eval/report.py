@@ -26,8 +26,8 @@ from fi_rag_eval.db import TEXT_SEARCH_CONFIG
 from fi_rag_eval.evaluate import PUBLISHED, EvaluationRun, GridRun
 from fi_rag_eval.golden import Phrasing
 from fi_rag_eval.ingest import IngestReport
-from fi_rag_eval.judging import ControlRun, JudgeRun
-from fi_rag_eval.metrics import Agreement, Metrics, discordance
+from fi_rag_eval.judging import ControlRun, JudgeRun, OfflineRefusalRun
+from fi_rag_eval.metrics import Agreement, Metrics, RefusalMetrics, discordance
 
 RANKER_NOTE = (
     "Postgres ts_rank over a tsvector, normalisation as shown per cell. NOT BM25: "
@@ -536,6 +536,42 @@ def format_probe_table(
     return "\n".join(lines)
 
 
+def _restricted_precision_lines(metrics: RefusalMetrics) -> list[str]:
+    """The second reading of precision, printed only beside the first (Owner, 31 Aug 2026).
+
+    Never on its own and never instead: the system-level figure is what a resident
+    experiences and stays the published one. This answers a different question --
+    *when the retriever gave the answerer what it needed, how good was its
+    judgement?* -- and the gap between the two is a fact about RETRIEVAL, not about
+    the answerer, which is exactly why both belong on the page.
+    """
+    if metrics.restricted_precision is None:
+        return [
+            "  restricted precision NOT COMPUTED — retrieval completeness is unknown for at",
+            "  least one answerable question, and a partly-unknown denominator is not a",
+            "  smaller one.",
+        ]
+    lines = [
+        f"  precision* {metrics.restricted_precision.render():<28} "
+        "same numerator, minus refusals of questions",
+        "             whose retrieval was INCOMPLETE   (diagnostic, never the published one)",
+    ]
+    if metrics.excused:
+        lines.append(
+            f"  excused ({len(metrics.excused)}): {', '.join(metrics.excused)} — refused, and the"
+        )
+        lines.append(
+            "  context genuinely lacked the answer. Precision as defined charges the answerer"
+        )
+        lines.append("  for a RETRIEVAL failure; precision* does not. Read them together.")
+    else:
+        lines.append(
+            "  Nothing excused: every wrongly-refused question had complete retrieval, so the"
+        )
+        lines.append("  two readings coincide and the answerer owns all of them.")
+    return lines
+
+
 def format_refusals(run: AnswerRun) -> str:
     """The refusal population's arithmetic, with its interval on every figure.
 
@@ -551,6 +587,7 @@ def format_refusals(run: AnswerRun) -> str:
         f"  recall     {metrics.recall.render():<28} correct refusals / refusal population",
         f"  precision  {metrics.precision.render():<28} correct refusals / all refusals emitted",
     ]
+    lines.extend(_restricted_precision_lines(metrics))
     for kind, interval in metrics.by_kind:
         lines.append(f"  {kind.value:<10} {interval.render()}")
     lines.append(
@@ -1022,4 +1059,57 @@ def format_agreement(
     else:
         lines.append("  This is the CEILING on judge-human agreement, not a substitute for it: two")
         lines.append("  judge runs that disagree with each other cannot both match a human.")
+    return "\n".join(lines)
+
+
+def format_offline_refusals(run: OfflineRefusalRun) -> str:
+    """The refusal arithmetic recomputed from a frozen file, with its exclusions.
+
+    Prints the same figures `format_refusals` does and three things it cannot: the
+    file they came from, the commit that file was answered at, and every answer the
+    file holds that the golden set no longer asks. The last is the one that earns
+    this function -- a frozen sample and a living golden set diverge the moment a
+    label moves, and an exclusion nobody can see is indistinguishable from a
+    mistake.
+    """
+    metrics = run.metrics
+    lines = [
+        f"refusal behaviour — RECOMPUTED OFFLINE from {run.source}",
+        f"  {run.cell}, {run.model}, reasoning {'on' if run.reasoning else 'off'}   "
+        "(DIAGNOSTIC, never a headline)",
+        "  No model was called and no money was spent: every figure below is arithmetic",
+        "  over answers that were already paid for.",
+        "",
+        f"  recall     {metrics.recall.render():<28} correct refusals / refusal population",
+        f"  precision  {metrics.precision.render():<28} correct refusals / all refusals emitted",
+    ]
+    lines.extend(_restricted_precision_lines(metrics))
+    for kind, interval in metrics.by_kind:
+        lines.append(f"  {kind.value:<10} {interval.render()}")
+    if metrics.missed:
+        lines.append(f"  ANSWERED anyway ({len(metrics.missed)}): {', '.join(metrics.missed)}")
+    if metrics.wrongly_refused:
+        lines.append(
+            f"  WRONGLY refused ({len(metrics.wrongly_refused)}): "
+            f"{', '.join(metrics.wrongly_refused)}"
+        )
+    lines.append("")
+    lines.append(f"  scored over {len(run.scored)} refusal questions")
+    if run.not_in_golden:
+        lines.append(
+            f"  EXCLUDED ({len(run.not_in_golden)}): {', '.join(run.not_in_golden)} — answered in"
+        )
+        lines.append(
+            "  this file, no longer in the golden set. The answer is real and was paid for;"
+        )
+        lines.append("  it is left out because the question is not asked any more, NOT because it")
+        lines.append("  scored badly. Removing an entry moves this number and that is the point.")
+    if run.dirty_provenance:
+        lines.append(
+            f"  !!         answered at commit {run.source_commit or '(none recorded)'} — a tree,"
+        )
+        lines.append(
+            "  not a commit. These answers are not reproducible from a clean clone; the file"
+        )
+        lines.append("  that holds them is committed instead (ADR-0011).")
     return "\n".join(lines)

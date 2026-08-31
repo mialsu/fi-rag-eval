@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
-        ingest label agreement db-up db-down services-up services-down docker-build clean
+        ingest label agreement refusals db-up db-down services-up services-down docker-build clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) \
@@ -58,6 +58,9 @@ eval-baseline: ingest ## Record this run as the baseline the gate compares again
 label: ingest ## Hand-label the frozen sample's claims (168 units, blind, resumable)
 	@echo "168 units, ~1.5-2h. Stop any time with q -- every label is written as you make it."
 	uv run fi-rag-eval label
+
+refusals: ## Recompute refusal recall/precision from the frozen sample. No model, no spend.
+	uv run fi-rag-eval refusals
 
 agreement: ## Judge-human agreement over the hand labels. VERDICTS=<judge --out file>
 	@test -n "$(VERDICTS)" || { \

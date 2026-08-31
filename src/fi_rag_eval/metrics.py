@@ -309,6 +309,22 @@ class AnswerOutcome:
     question_id: str
     refused: bool
 
+    retrieval_complete: bool | None = None
+    """Did the answerer's own context hold every required chunk? `None` = unknown.
+
+    Carried here so refusal precision can be read a second way. Measured in tracer
+    slice 3: the answerer refused **5 of the 9** answerable questions whose
+    retrieval was incomplete and **2 of the 41** whose retrieval was complete
+    (Fisher exact p=0.0011). Precision as defined therefore charges the answerer
+    for retrieval's failures -- most of its "wrong" refusals are it being honest
+    about a context that genuinely lacked the answer.
+
+    `None` rather than a default of `True`: an unknown completeness that defaulted
+    to complete would quietly *shrink* nothing and publish the restricted reading
+    as though it had been computed. `refusal_metrics` refuses to compute the
+    restricted reading unless every answerable outcome carries this.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class Interval:
@@ -377,6 +393,29 @@ class RefusalMetrics:
 
     by_kind: tuple[tuple[RefusalKind, Interval], ...]
     """Prediction 3 lives here: out-of-corpus >= 7/8 against out-of-jurisdiction <= 4/6."""
+
+    restricted_precision: Interval | None
+    """Precision over the refusals the answerer emitted *with what it needed*.
+
+    A **diagnostic that never replaces `precision`**, and both are printed
+    together or neither is. The Owner's decision, 31 Aug 2026: the system-level
+    number is what a resident experiences and stays the published one; this one
+    answers a different question -- *when the retriever did its job, how good was
+    the answerer's judgement?* -- and answering only one of those two hides
+    something either way.
+
+    `None` when completeness is unknown for any answerable outcome. A restricted
+    reading computed over a partly-unknown denominator is not a restricted
+    reading.
+    """
+
+    excused: tuple[str, ...]
+    """Wrongly-refused questions left out of `restricted_precision`'s denominator.
+
+    Named rather than counted, for the same reason `wrongly_refused` is: this is
+    the exact set that separates the two readings, and a reader who cannot see it
+    cannot audit the difference between them.
+    """
 
     wrongly_refused: tuple[str, ...]
     """Answerable questions the system declined. Named, not just counted."""
@@ -459,6 +498,22 @@ def refusal_metrics(
     wrongly_refused = tuple(o.question_id for o in answerable if o.refused)
     emitted = len(correct) + len(wrongly_refused)
 
+    # The restricted reading. Computed only when EVERY answerable outcome knows
+    # its own retrieval completeness -- a denominator that is partly unknown is
+    # not a smaller denominator, it is an unknown one.
+    known = all(o.retrieval_complete is not None for o in answerable)
+    excused = tuple(
+        o.question_id for o in answerable if o.refused and o.retrieval_complete is False
+    )
+    restricted: Interval | None = None
+    if known:
+        restricted_denominator = emitted - len(excused)
+        restricted = (
+            wilson(len(correct), restricted_denominator)
+            if restricted_denominator
+            else Interval(0.0, 0.0, 1.0, 0)
+        )
+
     by_kind: list[tuple[RefusalKind, Interval]] = []
     for kind in RefusalKind:
         population = [o for o in refusals if o.kind is kind]
@@ -471,6 +526,8 @@ def refusal_metrics(
         # is undefined, and reporting it as 0.0 would read as "every refusal it
         # emitted was wrong" when it emitted none.
         precision=wilson(len(correct), emitted) if emitted else Interval(0.0, 0.0, 1.0, 0),
+        restricted_precision=restricted,
+        excused=excused if known else (),
         by_kind=tuple(by_kind),
         wrongly_refused=wrongly_refused,
         missed=tuple(o.question_id for o in refusals if not o.refused),
