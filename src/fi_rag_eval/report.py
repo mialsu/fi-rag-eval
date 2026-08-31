@@ -730,8 +730,14 @@ def format_judged(run: JudgeRun, *, agreement: float | None = None) -> str:
     **This function is where "never publish a judged metric whose judge is
     unvalidated" actually happens.** `JudgeRun` carries no agreement field, so the
     caller has to supply one or state that there is none; and with none, or one
-    below the floor, groundedness is withheld from the published block and appears
-    only under a DIAGNOSTIC heading that says why it may not be quoted.
+    below the floor, the judged figures are withheld from the published block and
+    appear only under a DIAGNOSTIC heading that says why they may not be quoted.
+
+    **The headline is branch coverage, not groundedness, since 31 Aug 2026** --
+    D11 inverted on the Owner's decision, on the measured finding that
+    groundedness has no variance on this answerer. The pairing rule is unchanged
+    and is the part that was always load-bearing: neither figure is ever printed
+    without the other.
 
     The alternative -- a metrics object that hides its own value -- was rejected
     because it is harder to test than an object that carries the number and a
@@ -770,32 +776,37 @@ def format_judged(run: JudgeRun, *, agreement: float | None = None) -> str:
         assert agreement is not None  # narrowed by `publishable`
         lines.append("  PUBLISHED")
         lines.append(
+            f"    branch coverage   {metrics.branch_coverage:.3f}   stated "
+            f"{metrics.branches_stated} / required {metrics.branches_required} branches"
+            "   <- THE HEADLINE"
+        )
+        lines.append(
             f"    groundedness      {_ratio(metrics.groundedness)}   supported "
             f"{metrics.branches_supported} / stated {metrics.branches_stated} branches"
         )
         lines.append(
-            f"    branch coverage   {metrics.branch_coverage:.3f}   stated "
-            f"{metrics.branches_stated} / required {metrics.branches_required} branches"
-        )
-        lines.append(
             f"    judge agreement   {agreement:.3f}   at or above the {AGREEMENT_FLOOR:.2f} floor"
         )
+        lines.append("    D11 INVERTED, 31 Aug 2026: branch coverage leads and groundedness is the")
+        lines.append("    companion. Groundedness measured 1.000 with complete retrieval AND 1.000")
         lines.append(
-            "    Never quote groundedness without both companions. It is gameable by saying"
+            "    without it -- no variance on this answerer, which drops a branch rather than"
         )
         lines.append(
-            "    less and branch coverage is gameable by saying everything; only the pair is"
+            "    stating one it cannot cite. A headline that reads the same whether retrieval"
         )
-        lines.append("    a metric.")
+        lines.append("    worked or not tells a reader nothing, and gets quoted anyway.")
+        lines.append(
+            "    Neither ever appears alone: groundedness is gameable by saying less, branch"
+        )
+        lines.append("    coverage by saying everything. Only the pair is a metric.")
     else:
-        lines.append("  PUBLISHED   nothing. Groundedness is WITHHELD.")
+        lines.append("  PUBLISHED   nothing. Branch coverage AND groundedness are WITHHELD.")
         if agreement is None:
             lines.append(
                 "    Judge-human agreement is NOT MEASURED — it is tracer slice 5's work and"
             )
-            lines.append(
-                "    does not exist yet. D11: groundedness may never appear without it, so"
-            )
+            lines.append("    does not exist yet. D11: no judged figure may appear without it, so")
             lines.append(
                 "    there is no publishable answer-layer number in this run. An unvalidated"
             )
@@ -806,19 +817,19 @@ def format_judged(run: JudgeRun, *, agreement: float | None = None) -> str:
                 f"    {AGREEMENT_FLOOR:.2f} floor. At that level the judge carries ~15% label"
             )
             lines.append(
-                "    noise, so a 0.05 difference in groundedness is not distinguishable from"
+                "    noise, so a 0.05 difference in either figure is not distinguishable from"
             )
             lines.append("    the judge disagreeing with itself.")
 
     lines.append("")
     lines.append("  DIAGNOSTIC — computed, not published. Do not quote these on their own.")
     lines.append(
-        f"    groundedness      {_ratio(metrics.groundedness)}   supported "
-        f"{metrics.branches_supported} / stated {metrics.branches_stated} branches"
-    )
-    lines.append(
         f"    branch coverage   {metrics.branch_coverage:.3f}   stated "
         f"{metrics.branches_stated} / required {metrics.branches_required} branches"
+    )
+    lines.append(
+        f"    groundedness      {_ratio(metrics.groundedness)}   supported "
+        f"{metrics.branches_supported} / stated {metrics.branches_stated} branches"
     )
     lines.append(
         f"    over-claim rate   {metrics.over_claim_rate:.3f}   "

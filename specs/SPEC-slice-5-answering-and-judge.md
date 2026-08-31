@@ -375,7 +375,18 @@ Postgres already has — tests skip **loudly**, and a green `make gate` with the
 less than it looks. Secrets (`GROQ_API_KEY`, the proxy master key) stay out of git behind an
 `.env.example`.
 
-### D11 — groundedness is published, never unaccompanied, and void below the floor → **ADR-0010**
+### D11 — a judged pair is published, never unaccompanied, and void below the floor → **ADR-0010**, **AMENDED by ADR-0012**
+
+> **AMENDED 31 Aug 2026 (ADR-0012), on the Owner's decision.** The headline is now **branch
+> coverage**, with groundedness beside it — D11's pair, inverted. Measured in tracer 4:
+> groundedness is **1.000 with complete retrieval and 1.000 without it**, because this answerer
+> drops a branch rather than stating one it cannot cite. A headline identical in both retrieval
+> strata tells a reader nothing and gets quoted anyway. **Everything else in D11 stands**: the
+> pairing rule, the 0.85 floor, and the withholding below it — and the withheld block now names
+> *both* figures, since both are judge-dependent. The argument D11 used to reject branch coverage
+> (that it is judge-dependent) does not separate the two: same judge, same call, same two fields.
+> The text below is left as written, because a spec that quietly matches the code is the drift this
+> project logs rather than the record it keeps.
 
 The project already has a rule for this shape: the README publishes recall@5 **with** leakage, and
 `CLAUDE.md` says *"Never quote the first without the second."* The answer layer inherits it.
@@ -611,6 +622,13 @@ Four of the five carried here at shaping time have been answered. What remains i
 
 **Two, both raised by tracer slice 3's measured result, neither blocking tracer 4.**
 
+- ~~**Should refusal precision be reported over a restricted denominator?**~~ **ANSWERED 31 Aug
+  2026: report BOTH, built the same day.** `precision*` is printed beside `precision`, never
+  instead, with every excused question named. Measured offline over the frozen sample:
+  **precision 0.632 [0.41, 0.81] n=19 and precision\* 0.857 [0.60, 0.96] n=14**, excusing 5.
+  It is `None` and labelled NOT COMPUTED when completeness is unknown for any answerable question,
+  because a partly-unknown denominator is not a smaller one. Original text follows.
+
 - **Should refusal precision be reported over a restricted denominator?** Measured: the answerer
   refuses 5 of 9 questions whose retrieval was incomplete and 2 of 41 whose retrieval was complete
   (Fisher p=0.0011). As defined, refusal precision charges the answerer for retrieval failures, and
@@ -619,6 +637,30 @@ Four of the five carried here at shaping time have been answered. What remains i
   what it needed"* — rather than replacing one with the other, because the system-level number is
   what a resident experiences. Not built: it is a metric the spec never shaped, and inventing one
   mid-tracer is scope-filling.
+- ~~**Should `ooc-autonrenkaiden-vastaanotto` and `ooj-lisajate-lounais-suomi` be re-labelled?**~~
+  **ANSWERED 31 Aug 2026, and the question turned out to be the wrong one.** Checked against the
+  corpus rather than argued: both authorities' `2 §` definition of tuottajavastuunalainen jäte
+  **enumerates `renkaat`**, and `12 §` says where such waste goes. The entry's own `absence_source`
+  claimed the word appears in neither text *"missään muodossa"*, which is **false**. Not
+  contestable — wrong. The entry is **REMOVED** (14 → 13), with a tombstone forbidding its return
+  as a refusal; `ooj-lisajate-lounais-suomi` is **KEPT**, as recommended.
+
+  Two things the sweep that followed found. **The drift detector could not have caught it**:
+  `ILIKE '%rengas%'` cannot see `renkaat`, Finnish consonant gradation against a check written on
+  the nominative singular. A lemma-aware second check now runs beside it, seen red on this exact
+  case, and the whole detector moved into `make eval` — it had been reachable only through a
+  ~$0.76, ~50-minute networked command. And **`ooc-romuajoneuvon-toimituspaikka` has the same
+  defect from the same sentence** (`romuautot` is in that enumeration): the Owner **kept** the
+  label, since the question's second half is genuinely uncovered, and its false
+  `label_source: "Ei lähdepykälää"` was corrected in place. `romuauto` vs `romuajoneuvo` is a
+  different compound, so neither check can see it — the `sakokaivo` case, recorded not papered over.
+
+  Re-measured offline, over the same frozen answers: **refusal recall 0.923 [0.67, 0.99] n=13**,
+  up from 0.857 n=14, and **precision unchanged at 0.632** — precision's denominator is every
+  refusal *emitted*, and this question was answered rather than refused, so it was never in it.
+  The published 0.857 stands as what the tracer-3 configuration produced over the set as it was.
+  Original text follows.
+
 - **Should `ooc-autonrenkaiden-vastaanotto` and `ooj-lisajate-lounais-suomi` be re-labelled?** Both
   are contestable, both are the two misses, and re-labelling either would raise refusal recall from
   0.857 toward 1.0. *Recommendation:* **re-label `ooc-autonrenkaiden-vastaanotto` and keep
@@ -1305,20 +1347,24 @@ predicted.**
    substantive answer *is* the failure refusal recall already measures. **Corrected: over-claim is
    over the 50 answerable questions.**
 
-### Open questions this tracer adds (both the Owner's)
+### Open questions this tracer added — BOTH ANSWERED 31 Aug 2026
 
-- **Should the published answer-layer headline move from groundedness to branch coverage?**
-  Measured: groundedness 1.000 / 0.983, identical across both retrieval strata, no variance.
-  Branch coverage 0.472, and 0.574-against-0.042 across the strata. D11 considered branch coverage
-  as the headline and rejected it for being judge-dependent — but groundedness is judge-dependent in
-  exactly the same way, so that argument does not separate them. *Recommendation:* **publish branch
-  coverage as the headline with groundedness beside it**, inverting D11's pair while keeping the
-  rule that neither appears alone. A headline of 1.000 that is identical whether retrieval worked or
-  not tells a reader nothing, and will be quoted anyway.
-- **Does the slice 6 decision rule fire on substituted evidence?** Prediction 5 is void as written
-  and its substance holds decisively on branch coverage. *Recommendation:* **yes, treat the rule as
-  fired for the reranker**, and require slice 6's spec to pre-register its fix size against branch
-  coverage rather than groundedness — plus the 6-discordant-question bar, which is unchanged.
+- ~~**Should the published answer-layer headline move from groundedness to branch coverage?**~~
+  **YES. Decided by the Owner, 31 Aug 2026 → ADR-0012.** Branch coverage leads the published block
+  and groundedness is printed beside it; D11's pairing rule, its 0.85 floor and its withholding all
+  survive unchanged, and the withheld block now names both figures. Pinned by three tests, one of
+  which asserts the *order*, because the first number under `PUBLISHED` is the one that gets copied
+  into a README. Measured basis: groundedness 1.000 / 0.983 with **no variance across retrieval
+  strata**; branch coverage 0.472, and 0.574-against-0.042 across them.
+- ~~**Does the slice 6 decision rule fire on substituted evidence?**~~ **YES, and it is recorded as a
+  substitution rather than as prediction 5 being scored.** Decided by the Owner, 31 Aug 2026 →
+  ADR-0012 decision 5. The reranker's rule **fires**; slice 6's spec must pre-register its fix size
+  against **branch coverage**, and the 6-discordant-question bar is unchanged.
+
+  The pattern this is the third instance of is now specific enough to name: **this project keeps
+  registering a statistic before knowing whether it has variance on the population it will be
+  measured over** — the ±0.18 absolute interval, the ±0.13 standard error, and now groundedness.
+  Slice 6 registers its statistic *and* the evidence that it varies.
 
 ---
 

@@ -530,6 +530,37 @@ class TestD11IsEnforcedWhereTheTableIsRendered:
         assert "branch coverage" in table
         assert "judge agreement" in table
 
+    def test_BRANCH_COVERAGE_leads_the_published_block_not_groundedness(self) -> None:
+        """D11 inverted, 31 Aug 2026, on the Owner's decision.
+
+        Groundedness measured 1.000 with complete retrieval and 1.000 without it --
+        no variance on this answerer, which drops a branch rather than stating one
+        it cannot cite. A headline identical in both strata tells a reader nothing
+        and gets quoted anyway. Pinned as an ORDER because the first number under
+        PUBLISHED is the one that gets copied into a README.
+        """
+        table = format_judged(self._run(), agreement=AGREEMENT_FLOOR)
+        published = table.split("  PUBLISHED", 1)[1]
+        assert published.index("branch coverage") < published.index("groundedness")
+        assert "THE HEADLINE" in published.split("DIAGNOSTIC", 1)[0]
+
+    def test_neither_judged_figure_is_ever_printed_without_the_other(self) -> None:
+        """The half of D11 the inversion did NOT change, and the load-bearing half.
+
+        Groundedness is gameable by saying less and branch coverage by saying
+        everything; only the pair is a metric. True in the published block and in
+        the withheld one, so no rendering path can emit a lone figure.
+        """
+        for agreement in (None, 0.5, AGREEMENT_FLOOR, 0.99):
+            table = format_judged(self._run(), agreement=agreement)
+            assert table.count("branch coverage") == table.count("groundedness")
+            assert "branch coverage" in table
+
+    def test_the_withheld_block_withholds_BOTH_figures_by_name(self) -> None:
+        """Both are judge-dependent, so an unvalidated judge withholds both."""
+        table = format_judged(self._run(), agreement=None)
+        assert "Branch coverage AND groundedness are WITHHELD" in table
+
     def test_a_partial_run_cannot_publish_however_good_agreement_is(self) -> None:
         """The two gates are independent, and a reduced N overrides a healthy judge."""
         table = format_judged(self._run(partial=True), agreement=0.99)
