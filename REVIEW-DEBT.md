@@ -14,6 +14,74 @@ ledger is worse than none, because sessions trust it.
 - **Disposition:** open
 -->
 
+## 2026-08-31 (MVP tracer 4) — `make docker-build` needs `--network=host` on this machine
+
+- **What:** the build fetches the corpus PDFs, and a container on Docker's bridge here **cannot open a
+  TCP connection** to `lsjatehuoltolautakunta.fi`: measured `connect 0.000s`, timeout at **90 s**,
+  against **0.25 s** from the host. DNS resolves from the container (to a different IP than the host
+  gets) and the MTU is 1500 on both sides. So `make docker-build` passes `--network=host`.
+- **Where:** `Makefile:docker-build`; ADR-0014 fact 4.
+- **What green tests do NOT prove here:** that `docker build` works anywhere else, with or without the
+  flag. Reproducibility is not at risk — every download is checked against the manifest's `sha256`, so
+  a build that succeeds has the same two documents whichever route it took — but **portability of the
+  build command is untested**. CI would be the first place this is discovered.
+- **Disposition:** open. The flag is in the Makefile with the measurement beside it so nobody removes
+  it as noise or copies it as a habit. Fixing the bridge is a daemon change needing root and would not
+  travel with the repository.
+
+## 2026-08-31 (MVP tracer 4) — a stale image is a stale corpus that still looks fine
+
+- **What:** the PDFs are baked at build time and verified against the manifest **in the same image**.
+  So the manifest and the documents can never disagree *inside* one build — and an image built before
+  a manifest change carries the old manifest **and** the old PDFs, agreeing with each other perfectly.
+- **Where:** `Dockerfile` (the `corpus` stage); ADR-0014's Consequences.
+- **What green tests do NOT prove here:** that a running container's corpus is the current one. The
+  analyser fingerprint and `eval/baseline.json` catch a *dictionary* change; nothing catches an image
+  that is three manifest revisions old. `git` is the only record of that.
+- **Disposition:** open, accepted for a demo. The closer is CI building on every manifest change, or
+  stamping the image with the commit and printing it on the page — the latter is cheap and would make
+  `DESIGN.md:154`'s "the served version matches the commit you merged" checkable.
+
+## 2026-08-31 (MVP tracer 4) — I diagnosed the network failure WRONG first, and it was one step from a needless design change
+
+- **What:** the build's TLS timeout was first read as *"container DNS returns IPv6-only and the bridge
+  has no IPv6 egress"*, on the strength of a `getent hosts` result. That result was for a **stale
+  hostname in my own probe** (`www.lsjh.fi`), not the manifest's host. Both real hosts resolve A
+  records from a container fine. The actual cause is that the bridge cannot reach the destination at
+  all.
+- **Where:** session-local; recorded in `SPEC-mvp-demo`'s tracer-4 findings.
+- **What green tests do NOT prove here:** nothing — this is a process confession, not a code one. It
+  is written down because the wrong diagnosis pointed at abandoning the Owner's build-time-fetch
+  decision, and the correct one **confirmed** it. Reaching for a design change before the measurement
+  agreed would have been the expensive mistake.
+- **Disposition:** open as a lesson: probe the thing the code actually uses, not a hostname typed from
+  memory. Same family as the seen-red harness that could not go red (tracer 2).
+
+## 2026-08-31 (MVP tracer 4) — the image is 426 MB and none of it is measured
+
+- **What:** `fi-rag-eval:local` is 426 MB. `voikko-fi`, `poppler-utils` and the Python runtime are the
+  bulk, plus 4.7 MB of baked PDFs.
+- **Where:** `Dockerfile`.
+- **What green tests do NOT prove here:** that any of it is necessary. Nothing measures the image's
+  size, its start-up time, or its memory. `poppler-utils` is needed only by `ingest` and could leave
+  the runtime stage; the venv carries dev-free but not runtime-minimal dependencies.
+- **Disposition:** open, and deliberately not optimised. ADR-0005 makes the analyser
+  non-negotiable, and an unmeasured optimisation of the one artifact that must reproduce the published
+  numbers is the wrong trade for a demo.
+
+## 2026-08-31 (MVP tracer 4) — nothing is deployed, and the deploy blocker is unchanged
+
+- **What:** an image exists and runs locally. Nothing is on Cloud Run, no URL is public, and
+  `DESIGN.md:151`'s *"a public URL or a 90-second recording"* is still unmet.
+- **Where:** `DESIGN.md:107-111` (M3); `SPEC-mvp-demo`'s non-goals.
+- **Why:** two things block it and neither is technical. The **logging tension** (`DESIGN.md:35` wants
+  per-query logging, `DESIGN.md:74` forbids personal data, a resident's question can be personal data)
+  is the Owner's unmade call and `CLAUDE.md` says resolve it *"before any query log leaves this
+  machine"*. And nothing leaves this machine without an explicit `/ship`.
+- **Disposition:** open — **blocks deploy, not building.** Raised again here because tracer 4 is the
+  point at which deploying became merely a keystroke away, which is exactly when an unresolved
+  blocker gets forgotten.
+
 ## 2026-08-31 (MVP tracer 3) — the token is a BEARER capability, stored in the clear
 
 - **What:** anyone holding the link is the bearer. There is no way to tell one reviewer from another,
@@ -1005,7 +1073,12 @@ ledger is worse than none, because sessions trust it.
 - **Where:** `Makefile:44-46`
 - **What green tests do NOT prove here:** The build gate proves a clean `uv sync --locked` and an
   import — it says nothing about whether this runs in a container or on Cloud Run.
-- **Disposition:** open — closes at M3 (20 Sep 2026).
+- **Disposition:** **CLOSED 31 Aug 2026 (MVP tracer 4).** `Dockerfile` exists, `make docker-build`
+  exits 0, and `docker compose up` serves the gated demo with no host Python, voikko or poppler. The
+  image's own `fi-rag-eval eval` reproduces the published table (`lemma-reasm/0` 0.820 at leakage
+  0.550, gate green, exit 0) with an analyser fingerprint identical to `eval/baseline.json`'s.
+  **The Cloud Run half is NOT closed** — nothing is deployed and the logging tension still blocks it.
+  Superseded by the narrower entries below.
 
 ## 2026-08-26 — the only test asserts an import
 

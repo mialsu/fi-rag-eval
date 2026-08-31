@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev gate lint fmt fmt-check typecheck test build eval eval-baseline \
-        ingest label agreement refusals serve token db-up db-down services-up services-down \
+        ingest label agreement refusals serve token demo-up demo-token demo-down db-up db-down services-up services-down \
         docker-build clean
 
 help: ## Show the available targets
@@ -42,7 +42,10 @@ db-down: ## Stop everything (the corpus volume is tmpfs, so the corpus is discar
 	docker compose down
 
 services-up: ## Start Postgres AND the LiteLLM gateway (needed by anything that answers)
-	docker compose up -d --wait
+	# Named explicitly rather than `up --wait`: since tracer 4, plain `up` also
+	# builds the image and runs the containerised demo, and the answer/judge
+	# workflow wants neither.
+	docker compose up -d --wait postgres litellm
 
 services-down: ## Stop them. The gateway's spend ledger is a named volume and survives.
 	docker compose down
@@ -80,9 +83,27 @@ serve: ingest ## Serve the gated demo on http://127.0.0.1:8080. SPENDS per answe
 token: ## Issue a demo access link. ARGS='--list' / '--revoke AB23-CD45'. No spend.
 	uv run fi-rag-eval token $(or $(ARGS),--issue)
 
-docker-build: ## Container image (a /ship-time gate, not a per-commit one)
-	@echo "docker-build: NOT IMPLEMENTED -- no Dockerfile until the service exists (M3)." >&2
-	@exit 1
+docker-build: ## Build the one image (a /ship-time gate, not a per-commit one)
+	# --network=host because the build FETCHES the corpus PDFs and verifies them
+	# against the manifest's sha256 (ADR-0014). Measured on this machine: a
+	# container on Docker's bridge cannot open a TCP connection to
+	# lsjatehuoltolautakunta.fi at all (connect 0.000s, timeout at 90s) while the
+	# host connects in 0.25s. DNS and MTU are fine; the bridge's egress is not.
+	# Reproducibility is unaffected -- every download is checked against the hash.
+	docker build --network=host -t fi-rag-eval:local .
+	docker run --rm fi-rag-eval:local ingest --fetch-only --raw-dir /app/data/raw
+
+demo-up: docker-build ## Run the WHOLE demo in containers: no host Python, no host voikko
+	docker compose up -d --wait postgres litellm
+	docker compose up -d --wait demo
+	@echo "demo: http://127.0.0.1:8080  -- issue a link with: make demo-token"
+
+demo-token: ## Issue a demo link from INSIDE the container
+	docker compose run --rm --no-deps -e FI_RAG_EVAL_DEMO_DATABASE_URL=postgresql://litellm:litellm@litellm-postgres:5432/demo \
+	  demo token --issue --base-url http://127.0.0.1:8080
+
+demo-down: ## Stop the containerised demo (the corpus is tmpfs and is discarded)
+	docker compose down
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache dist *.egg-info

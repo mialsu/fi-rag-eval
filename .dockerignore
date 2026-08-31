@@ -1,0 +1,40 @@
+# Everything the image must NOT carry. Kept in step with .gitignore, plus the
+# things that are in git but have no business in a runtime image.
+
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+node_modules/
+dist/
+
+# Secrets. `.env` would otherwise be copied in by a broad COPY and baked into a
+# layer, where deleting it later does not remove it.
+.env
+.env.*
+!.env.example
+*.pem
+service-account*.json
+
+# The corpus PDFs are fetched and verified DURING the build (ADR-0014), from the
+# manifest, rather than copied from the host -- so a clean clone builds the same
+# image as this checkout. Copying them in would make the build depend on
+# gitignored files that a clean clone does not have.
+data/raw/
+data/cache/
+
+# Measured artifacts. `eval/runs/` is gitignored; the frozen sample under
+# `eval/frozen/` IS committed and IS wanted, so this is deliberately narrow.
+eval/runs/
+.playwright/
+test-results/
+
+.vscode/
+.idea/
+.DS_Store

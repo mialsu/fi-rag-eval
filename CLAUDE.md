@@ -14,8 +14,8 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 **Slices 1–4 are built, slice 5 is four tracers in, and the MVP demo is two tracers in: the
 measurement spine, an honest golden set, a lemmatising analyser measured as a grid, a second
 authority, an answering boundary with a scored refusal population, a judge that passes an 8/8
-known-bad control and publishes nothing, and now a SHAREABLE demo page behind four caps, ten of
-whose enforcers have been watched failing.** Two authorities are ingested into Postgres and
+known-bad control and publishes nothing, and now a SHAREABLE demo page behind four caps — in ONE
+CONTAINER whose own `eval` reproduces the published table.** Two authorities are ingested into Postgres and
 retrieved lexically — Lounais-Suomi (50 clauses → 82 chunks) and Pirkanmaa (48 clauses → 89
 chunks), 171 chunks total. `make eval` scores **50** hand-labelled questions in **12 cells**
 — 4 analysers × 3 `ts_rank` normalisations — prints a table, a per-authority breakdown, a
@@ -186,6 +186,40 @@ regresses. Nothing else exists.
   all five, so the list cannot go stale). **Exercised live: HTTP 200 in 14s, $0.0161, 8420 tokens,
   all five conditional branches of Turku's tyhjennysväli stated and cited to `#26`.** Nine gates
   seen red on purpose with an intact-tree control.
+- **THE WHOLE DEMO RUNS IN CONTAINERS: `make demo-up`, then `make demo-token` (31 Aug 2026, MVP
+  tracer 4).** One image, `fi-rag-eval:local`, 426 MB, Debian 13 trixie, non-root uid 10001.
+  `docker compose up` starts the corpus database, the gateway, a **one-shot `ingest`** that exits 0,
+  and the gated page on `127.0.0.1:8080`. **No host Python, no host voikko, no host poppler** —
+  `libvoikko1` 4.3.2, `voikko-fi` 2.5 and `poppler-utils` 25.03 are in the image. Debian not Alpine is
+  settled by ADR-0005, not preference. **`make docker-build` exits 0**; the stub that exited 1 on
+  purpose since 26 Aug is CLOSED.
+- **THE IMAGE'S OWN `eval` REPRODUCES THE PUBLISHED TABLE, AND THE FINGERPRINT PROVES IT IS THE SAME
+  ANALYSER.** From inside the container: `lemma-reasm/0` **recall@5 0.820 at leakage 0.550**, control
+  `snowball/0` **0.680 at 0.332**, *"gate: green against eval/baseline.json"*, **exit 0** — the
+  published numbers to three decimals. The analyser fingerprint is **`9117b2f347e4c331` on the host,
+  in the image, and in `eval/baseline.json`**, so the image's dictionary is provably the one every
+  number was computed with rather than a similar one. The container's ingest loads **171 chunks**
+  (82 + 89), matching the host exactly.
+- **THE CORPUS IS FETCHED AT BUILD TIME AND BAKED IN (ADR-0014).** The PDFs are gitignored, so a clean
+  clone has none and copying them from the host would build here and fail in a clone. `ingest` fetches
+  *and* writes to Postgres and there is no Postgres at build time, so `fetch_sources` /
+  `fi-rag-eval ingest --fetch-only` exist. Each document is checked against the manifest's `sha256`
+  and a mismatch **fails the build**. `docker compose up` therefore needs **no network for the
+  corpus**. Price: a manifest change needs a rebuild, and **a stale image is a stale corpus that still
+  looks fine** — the manifest and the PDFs travel in the same image, so they agree with each other
+  even when both are old. The fingerprint catches a dictionary change, **not** an out-of-date PDF.
+- **`make docker-build` PASSES `--network=host`, and that is measured, not cargo-culted.** A container
+  on Docker's bridge here **cannot open a TCP connection** to `lsjatehuoltolautakunta.fi`:
+  `connect 0.000s`, timeout at **90 s**, against **0.25 s** from the host. DNS resolves and the MTU is
+  1500 both sides. It independently confirmed the build-time-fetch decision — a run-time fetch would
+  never start on this machine. **My first diagnosis of this was WRONG** (I read an IPv6-only DNS answer
+  that came from a stale hostname in my own probe) and it pointed at abandoning a decision the correct
+  diagnosis then confirmed. Do not remove the flag as noise, and do not copy it as a habit.
+- **`make services-up` now names its services.** Plain `docker compose up` builds the image and runs
+  the containerised demo, so the answer/judge workflow asks for `postgres litellm` explicitly.
+- **The `127.0.0.1:5435` port is no longer needed by the app.** Inside the compose network the demo
+  reaches its state database by service name; the port stays for a host-run `serve` and for `psql`.
+
 - **ACCESS IS A CAPABILITY TOKEN IN THE LINK, AND IT IS A SPEND CONTROL, NOT AUTH (ADR-0013).**
   `fi-rag-eval token --issue` prints `http://…/d/SWZL-PW4P`. It identifies no person, stores no
   identity, has no password and no session, and grants exactly one privilege: N answers. That is why
@@ -378,9 +412,8 @@ regresses. Nothing else exists.
   population from the clause lists at the N≈85 tranche.
 - **Not built:** embeddings, pgvector, reranking, **the 168 hand labels and therefore judge–human
   agreement**, the answer-metric floor gate, a third authority, **a rate limit (as opposed to a
-  count), reconciliation of our recorded spend against the gateway's, the Dockerfile (MVP tracer 4)**,
-  CI, Cloud Run.
-  `make docker-build` still exits non-zero on purpose — do not "fix" it.
+  count), reconciliation of our recorded spend against the gateway's**, CI, **any deploy at all**.
+  `make docker-build` now EXITS 0 — the old instruction not to "fix" it is obsolete.
 - **No held-out slice yet.** Deferred deliberately to N≈85: holding out 10 of 50 leaves a tuning set
   that cannot reach d=6 and a held-out set that never can.
 - Read `REVIEW-DEBT.md` before assuming any capability exists, and `/verify-claim` anything a

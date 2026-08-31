@@ -119,6 +119,64 @@ services:
       timeout: 5s
       retries: 40
 
+  # ---------------------------------------------------------------------------
+  # The demo, containerised (SPEC-mvp-demo tracer 4). `docker compose up` brings
+  # up the whole thing: corpus database, gateway, an ingest that runs once, and
+  # the gated page. No host Python, no host voikko, no host poppler.
+  # ---------------------------------------------------------------------------
+
+  ingest:
+    # A ONE-SHOT service, not an entrypoint step in `demo`. The corpus database is
+    # on tmpfs, so a load is needed on every start -- but it is a different job
+    # from serving, it must be able to fail loudly on its own, and `demo` waits on
+    # its exit code rather than racing it.
+    #
+    # It fetches nothing: the PDFs are baked into the image and verified at build
+    # time (ADR-0014), so this only chunks, indexes and writes the lemma columns.
+    build:
+      context: .
+    image: fi-rag-eval:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FI_RAG_EVAL_DATABASE_URL: postgresql://fi_rag_eval:fi_rag_eval@postgres:5432/fi_rag_eval
+    command: ["ingest", "--raw-dir", "/app/data/raw"]
+    restart: "no"
+
+  demo:
+    # Reuses the image `ingest` builds -- one image, as the tracer's whole point.
+    image: fi-rag-eval:local
+    depends_on:
+      ingest:
+        condition: service_completed_successfully
+      litellm:
+        condition: service_healthy
+    environment:
+      FI_RAG_EVAL_DATABASE_URL: postgresql://fi_rag_eval:fi_rag_eval@postgres:5432/fi_rag_eval
+      # Inside this network the demo's state database is reached by service name,
+      # so the 127.0.0.1:5435 port published above is NOT needed by the app any
+      # more -- it stays for a host-run `fi-rag-eval serve` and for `psql`.
+      FI_RAG_EVAL_DEMO_DATABASE_URL: postgresql://litellm:litellm@litellm-postgres:5432/demo
+      LITELLM_PROXY_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env -- see .env.example}
+    # Published on LOOPBACK. The container binds 0.0.0.0 because a container's own
+    # loopback is reachable by nothing; this line is what decides who can reach
+    # it, and the token gate (ADR-0013) is what decides who may spend.
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # The landing page needs no token, no corpus row and no gateway, so a 200
+      # here means the process is serving -- and nothing more, deliberately.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/').read()"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   litellm-spend:
     # The spend ledger the budget enforcer reads. Survives `make db-down` on

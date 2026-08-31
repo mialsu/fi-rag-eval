@@ -318,3 +318,83 @@ clauses, in the other authority's vocabulary (`keräysväline`, not `jäteastia`
 7. **31 Aug 2026 — the ungated `/ask` route from tracer 2 is DELETED, not guarded.** Tracer 2's HTTP
    assertions now run through a `TokenClient` wrapper that rewrites two paths; the gate's own tests
    use raw paths with no wrapper, so the gate is never proven by a helper that assumes it.
+
+---
+
+## Tracer slice 4 — measured result (31 Aug 2026)
+
+One image (`fi-rag-eval:local`, **426 MB**), Debian 13 trixie, non-root (uid 10001), the corpus baked
+in and verified at build time (ADR-0014). **One** real call was spent, deliberately.
+
+| AC | Verdict | Evidence |
+|---|---|---|
+| AD22 | **MET** | `make docker-build` → **exit 0**, replacing the stub that exited 1 on purpose since 26 Aug. It also re-verifies the baked corpus against the manifest from inside the image. |
+| AD23 | **MET** | `docker compose up` → `ingest` runs once and exits 0 (**171 chunks**, 82 + 89, fingerprint `9117b2f347e4c331`), `demo` reports healthy. `make demo-token` issued `XQHP-57HG` **from inside the container**; one real question answered in **14 s** for **$0.0161**, all five conditional branches stated and cited to `#26`. **No host Python, no host voikko, no host poppler** — the venv, `libvoikko1` 4.3.2, `voikko-fi` 2.5 and `poppler-utils` 25.03 are all in the image. |
+| AD24 | **MET** | `fi-rag-eval eval` **from the container**: `lemma-reasm/0` **recall@5 = 0.820** at **leakage 0.550** `<- published`, control `snowball/0` **0.680** at **0.332**, analyser fingerprint `9117b2f347e4c331`, *"gate: green against eval/baseline.json"*, **exit 0**. Those are the published numbers to three decimals. |
+
+**Tracer verdict: MET.** The strongest form AD24 could take: the fingerprint is **identical** across
+the host, the image and `eval/baseline.json`, so the image's analyser is provably the one every
+published number was computed with — not a similar one.
+
+### Live evidence
+
+```
+$ make docker-build
+  ... exit 0
+  present  /app/data/raw/lounais-suomi.pdf
+  present  /app/data/raw/pirkanmaa.pdf
+  ingest --fetch-only: every manifest source is on disk and verified
+
+$ make demo-up
+  ingest-1  | lounais-suomi@2024-08-01: 82 chunks (50 clauses, 32 definition chunks)
+  ingest-1  | pirkanmaa@2021-07-01: 89 chunks (48 clauses, 41 definition chunks)
+  ingest-1  | analyser: voikko library 4.3.2, fingerprint 9117b2f347e4c331 over 28 probe words
+  ingest-1  | ingest: 171 chunks loaded
+  demo-1    | fi-rag-eval serve: http://0.0.0.0:8080  cell lemma-reasm/0, k=5, model qwen/qwen3.6-27b
+  demo-1    | fi-rag-eval serve: gated. 10 queries per link, 24h, 200/day, $10.00/month measured
+  demo      running  127.0.0.1:8080->8080/tcp
+
+$ make demo-token
+  http://127.0.0.1:8080/d/XQHP-57HG        (issued from inside the container)
+
+  GET  /                 200   no form
+  GET  /d/XQHP-57HG      200   "10 kysymystä jäljellä 10:stä ... voimassa vielä noin 23 h"
+  POST /d/XQHP-57HG/ask  200   14s, $0.0161, 8420 tokens (4307 reasoning)  ->  9/10
+       4 / 4 / 8 / 16 viikkoa + vapaa-ajanasunto, cited lounais-suomi@2024-08-01#26
+
+$ docker compose run --rm demo eval
+  lemma-reasm/0     0.820   0.811   0.569   0.550   0   10   <- published
+  snowball/0        0.680   0.679   0.501   0.332   6   11
+  gate: green against eval/baseline.json          exit 0
+```
+
+### What this tracer found
+
+1. **A container on this machine cannot reach one of the corpus sources at all.** `curl` from a
+   container: `connect 0.000s`, timed out at **90 s**; from the host: **0.25 s**. DNS resolves (to a
+   *different* IP than the host gets) and the MTU is 1500 both sides, so it is the bridge's egress.
+   Diagnosed rather than worked around blindly: `make docker-build` passes `--network=host`, with the
+   measurement written beside it. It independently confirmed the Owner's build-time-fetch decision,
+   which had been taken before the measurement existed — a run-time fetch would simply never start
+   here.
+2. **My first diagnosis of that was wrong and the probe was at fault.** I read an IPv6-only DNS answer
+   as the cause; it came from a **stale hostname in my own probe**, not from the manifest. Both real
+   hosts resolve A records from a container. Recorded because the wrong diagnosis was one step from
+   a design change nobody needed.
+3. **`ingest` could not do half its job**, so `fetch_sources` and `--fetch-only` exist. Tested
+   without a network (verify-what-is-on-disk) and with the checksum guard **seen red**.
+4. **The image was missing `eval/baseline.json`** on the first build, so it could not run its own
+   regression gate — caught by trying AD24 rather than by assuming it. The whole of `eval/` is copied
+   now, minus the gitignored `runs/`.
+
+### Spec deltas from this tracer
+
+8. **31 Aug 2026 — the corpus is fetched at BUILD time, baked, and verified** → **ADR-0014**, with
+   the rejected alternatives including the run-time fetch the Owner considered and declined.
+9. **31 Aug 2026 — `make services-up` now names its services.** Since plain `docker compose up` also
+   builds the image and runs the containerised demo, the answer/judge workflow asks for
+   `postgres litellm` explicitly rather than `up --wait`.
+10. **31 Aug 2026 — the `127.0.0.1:5435` port from tracer 3 is no longer needed by the app.** Inside
+    the compose network the demo reaches its state database by service name. The port stays for a
+    host-run `fi-rag-eval serve` and for `psql`, and ADR-0013's partial reversal of ADR-0009 stands
+    for that reason alone now.

@@ -137,6 +137,23 @@ def fetch(source: Source, raw_dir: Path) -> tuple[Path, bool]:
     return target, True
 
 
+def fetch_sources(manifest: Manifest, raw_dir: Path) -> tuple[tuple[Path, bool], ...]:
+    """Put every manifest source on disk, verified, and touch no database.
+
+    Exists for the container build (`SPEC-mvp-demo` tracer 4): the PDFs are
+    gitignored, so an image that wants them baked in has to fetch them at build
+    time -- and at build time there is no Postgres to ingest into. `ingest` does
+    both jobs and cannot be used for half of one.
+
+    The verification is `fetch`'s, unchanged: a checksum mismatch is a hard error,
+    because silently accepting a different document changes what every golden
+    label means.
+    """
+    return tuple(
+        fetch(source, raw_dir) for authority in manifest.authorities for source in authority.sources
+    )
+
+
 def read_effective_date(clauses: Sequence[Clause]) -> date:
     """Read the in-force date out of the document, per ADR-0004's closing note.
 

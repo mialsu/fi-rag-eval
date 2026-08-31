@@ -38,7 +38,7 @@ from fi_rag_eval.evaluate import (
 )
 from fi_rag_eval.extract import ExtractionError
 from fi_rag_eval.golden import GoldenSetError, load_golden_set
-from fi_rag_eval.ingest import IngestError, ingest
+from fi_rag_eval.ingest import IngestError, fetch_sources, ingest
 from fi_rag_eval.judge import judge_ceiling_for
 from fi_rag_eval.judging import (
     DEFAULT_CONTROL,
@@ -115,6 +115,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     ingest_parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     ingest_parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
+    ingest_parser.add_argument(
+        "--fetch-only",
+        action="store_true",
+        help="download and verify the manifest's sources, then stop. Touches no "
+        "database -- this is what the container build runs, because the PDFs are "
+        "gitignored and there is no Postgres at build time.",
+    )
 
     eval_parser = subparsers.add_parser(
         "eval", help="score the golden set and print the metric table"
@@ -416,6 +423,15 @@ def _parser() -> argparse.ArgumentParser:
 
 def _ingest(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
+    if args.fetch_only:
+        # No database is touched. This is what the container build runs: the PDFs
+        # are gitignored, so they are fetched and verified at BUILD time and baked
+        # in, which is why `docker compose up` needs no network for the corpus and
+        # does not depend on a municipal web server staying up (ADR-0014).
+        for path, downloaded in fetch_sources(manifest, args.raw_dir):
+            print(f"{'fetched ' if downloaded else 'present '} {path}")
+        print("ingest --fetch-only: every manifest source is on disk and verified")
+        return 0
     with db.connect() as conn:
         report = ingest(conn, manifest, args.raw_dir)
     print(format_ingest(report))

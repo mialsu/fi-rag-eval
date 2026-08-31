@@ -15,7 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from fi_rag_eval.ingest import IngestError, assert_edition, read_front_matter_dates
+from fi_rag_eval.ingest import (
+    IngestError,
+    assert_edition,
+    fetch_sources,
+    read_front_matter_dates,
+)
 from fi_rag_eval.manifest import ManifestError, load_manifest
 
 REPO = Path(__file__).resolve().parent.parent
@@ -155,3 +160,45 @@ def test_the_fetcher_identifies_itself() -> None:
 
     assert "fi-rag-eval" in USER_AGENT
     assert "Mozilla" not in USER_AGENT, "identify the tool; do not impersonate a browser"
+
+
+class TestFetchingWithoutADatabase:
+    """`fetch_sources` exists so the container BUILD can bake the corpus in.
+
+    `SPEC-mvp-demo` tracer 4, ADR-0014. The PDFs are gitignored, so an image that
+    wants them baked has to fetch them at build time -- and at build time there is
+    no Postgres to ingest into. `ingest` does both jobs and cannot do half of one.
+    """
+
+    def test_it_verifies_what_is_already_on_disk_and_downloads_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        """No network: a file whose hash matches is accepted as-is.
+
+        This is the case that runs on every rebuild with a warm layer cache, and
+        it is the one that must not reach out.
+        """
+        manifest = load_manifest(REPO / "corpus" / "manifest.yaml")
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        expected = [s for a in manifest.authorities for s in a.sources]
+        for source in expected:
+            on_host = REPO / "data" / "raw" / source.filename
+            if not on_host.is_file():
+                pytest.skip(f"{on_host} is gitignored and absent, so nothing to verify")
+            (raw / source.filename).write_bytes(on_host.read_bytes())
+
+        got = fetch_sources(manifest, raw)
+        assert len(got) == len(expected)
+        assert all(not downloaded for _, downloaded in got), "it went to the network"
+        assert [path.name for path, _ in got] == [s.filename for s in expected]
+
+    def test_a_document_that_is_not_the_pinned_one_is_a_HARD_ERROR(self, tmp_path: Path) -> None:
+        """Not a re-download. Every golden label points into the pinned text."""
+        manifest = load_manifest(REPO / "corpus" / "manifest.yaml")
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        first = next(s for a in manifest.authorities for s in a.sources)
+        (raw / first.filename).write_bytes(b"not the regulations")
+        with pytest.raises(IngestError, match="does not match the manifest"):
+            fetch_sources(manifest, raw)
