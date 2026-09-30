@@ -11,7 +11,7 @@ project-specific eval-integrity layer. The choice and its rejected alternatives 
 
 ## Where this stands (31 Aug 2026)
 
-**Slices 1–4 are built, slice 5 is four tracers in, and the MVP demo is two tracers in: the
+**Slices 1–4 are built, slice 5 is four tracers in, and the MVP demo's four tracers are in: the
 measurement spine, an honest golden set, a lemmatising analyser measured as a grid, a second
 authority, an answering boundary with a scored refusal population, a judge that passes an 8/8
 known-bad control and publishes nothing, and now a SHAREABLE demo page behind four caps — in ONE
@@ -223,9 +223,10 @@ regresses. Nothing else exists.
 - **ACCESS IS A CAPABILITY TOKEN IN THE LINK, AND IT IS A SPEND CONTROL, NOT AUTH (ADR-0013).**
   `fi-rag-eval token --issue` prints `http://…/d/SWZL-PW4P`. It identifies no person, stores no
   identity, has no password and no session, and grants exactly one privilege: N answers. That is why
-  it does not contradict `DESIGN.md:52` — the thing that non-goal forbids is a system that knows *who*
-  you are, and this one deliberately cannot. **A forwarded link is a valid link**, and tokens are
-  stored **unhashed** so `--list` can reprint one. Both confessed.
+  it does not contradict the `DESIGN.md` §3 non-goal "Multi-tenant auth, user accounts" — what that
+  non-goal forbids is a system that knows *who* you are, and this one deliberately cannot. **A
+  forwarded link is a valid link**, and tokens are stored **unhashed** so `--list` can reprint one.
+  Both confessed.
 - **FOUR ENFORCERS, AND ONLY THE FOURTH IS DENOMINATED IN MONEY.** 10 queries per token · 24 h from
   issue · 200 queries/day · **$10.00/month on measured spend**. The query caps are the Owner's
   *fairness* controls; the dollar ceiling exists because they do not fit the budget on their own — at
@@ -274,8 +275,8 @@ regresses. Nothing else exists.
 - **The question travels in a POST body, never a URL, and nothing logs it.** A GET would put a
   resident's words in uvicorn's access log, the browser history and every proxy between. `GET /ask`
   is a **405**. The server logs what *failed*, never what was asked — which means
-  `DESIGN.md:35`'s per-query ops record does **not exist** on this surface, deliberately, because the
-  `DESIGN.md:35` / `DESIGN.md:74` privacy tension is still the Owner's unmade call. Logging nothing
+  `DESIGN.md` §3's per-query ops record does **not exist** on this surface, deliberately, because the
+  `DESIGN.md` §3 / §5 privacy tension is still the Owner's unmade call. Logging nothing
   is the only choice that cannot be wrong. **It blocks deploy, not building.**
 - **The *kunta* dropdown opens on NOTHING selected, and that is the load-bearing part of the form.**
   A `<select>` defaulting to its first entry would make the harness pick a jurisdiction — the one
@@ -491,7 +492,7 @@ possible output, because everything else is trusted against it.
   derived from what the retriever returned, `recall@k` is measuring the retriever against itself.
 - **The judge fails a known-bad control.** Feed it answers with deliberately wrong citations and
   fabricated claims. If they pass as grounded, the judge is broken — fix the judge, not the answer.
-- **Report judge–human agreement as a number** on the fixed sample, every run (`DESIGN.md:97-100`).
+- **Report judge–human agreement as a number** on the fixed sample, every run (`DESIGN.md` §6, *Judging*).
   "Spot-checked" is not a measurement.
 - **Prove the regression gate goes red.** Break something on purpose — drop a chunk, downgrade the
   reranker, swap the model — and confirm CI actually fails. A gate never seen red is decoration.
@@ -508,18 +509,22 @@ possible output, because everything else is trusted against it.
 - Trust the arithmetic over the model: `recall@k` and MRR involve no judge, so when the two layers
   disagree, retrieval metrics win the argument.
 
-### 3. The municipality hard filter (the #1 product failure mode)
-`DESIGN.md:15,67` make cross-municipality answers structurally impossible rather than discouraged.
+### 3. The authority hard filter (the #1 product failure mode)
+`DESIGN.md` §1 and §4 make cross-jurisdiction answers structurally impossible rather than
+discouraged. The filter keys on the authority; the municipality is input resolved to one (ADR-0002).
 Verify that structurally:
-- Ask a question answerable only from municipality A's rules, with municipality B's filter set →
-  it must **refuse**, not answer from B's rules.
+- Ask a question answerable only from authority A's rules, with a municipality that resolves to
+  authority B → it must **refuse**, not answer from B's rules. Two municipalities under one
+  authority read the same text, so a pair like that tests nothing.
 - Ask with no municipality set → it must not silently pick one.
 
 ### 4. At `/ship` only (grafted from the `web` profile)
 - Hit the deployed Cloud Run URL and confirm the **served version matches the commit you merged**.
-- Run one real query and one refusal case against the deployed URL, not localhost.
-- Not adopted from `web`: browser-persona walks, restricted-user login, empty/error-state
-  screenshots — there is no UI or auth in scope.
+- Run one real query and one refusal case against the deployed URL, not localhost — in a browser,
+  through a valid `/d/<token>` link, as a resident would — and load bare `/` to see the
+  link-needed state.
+- Not adopted from `web`: restricted-user login — there is no login; access is a capability token
+  in the link, which identifies no one (ADR-0013).
 
 ## What green tests can't prove here (watch for these)
 - A metric that is green because the harness is circular (labels derived from retriever output).
@@ -537,7 +542,7 @@ Verify that structurally:
   with the golden set getting easier.
 - The authority filter applied *after* rerank, or skipped when the field is absent.
 - Finnish compound words and inflection sinking lexical recall — it will look like a model problem
-  and it isn't (`DESIGN.md:118`).
+  and it isn't (`DESIGN.md` §8).
 - Latency and cost per query measured on a warm cache.
 - A ranker whose defaults are wrong for the corpus: `ts_rank`'s default normalisation (0) does
   not divide by document length, so short chunks lose systematically. Measured: definition
@@ -563,8 +568,8 @@ Verify that structurally:
   memory. Ambiguity goes to CUSTOMER-QUESTIONS / the spec's open-questions, never a silent guess.
 - Slice end-to-end; gate every commit; confess at every landing; fold review fixes into commits.
 - Reuse before building. Write load-bearing decisions down as ADRs at the moment of decision.
-- Build the golden set **before** tuning anything. `DESIGN.md:117` makes this the top risk; the
-  milestone order in `DESIGN.md:107-111` does not enforce it, so the discipline lives here.
+- Build the golden set **before** tuning anything. `DESIGN.md` §8 makes this the top risk; the
+  milestone order in §7 does not enforce it, so the discipline lives here.
 
 ## Domain guard-rails  (authored by the Owner, 26 Aug 2026)
 
@@ -577,7 +582,7 @@ Verify that structurally:
 - **Explicit non-goal:** **Corpus breadth.** No municipalities beyond the handful chosen for
   format variety until the existing ones' metrics are trustworthy. Adding a municipality feels
   like progress, costs a day, raises the document count, improves the instrument by nothing, and
-  dilutes a hand-labelled golden set you then have to redo. (`DESIGN.md:40-44` additionally binds:
+  dilutes a hand-labelled golden set you then have to redo. (`DESIGN.md` §3's out-of-scope list additionally binds:
   no chat product, no auth/accounts/memory, no fine-tuning, no real-time ingestion.)
 
 - **Must never do:** **Never publish a metric it did not compute.** No hand-written values in the
@@ -604,12 +609,12 @@ Verify that structurally:
      This harness must never publish a table over a silently reduced N, so the answering slice needs
      retry-with-backoff and a **hard failure** when a question cannot be scored — never a skip.
      Two smaller consequences: Groq serves open models rather than Claude, which is *fine* and even
-     helpful for `CONTEXT.md:59`'s rule that the judge must be a different model **family** than the
+     helpful for `CONTEXT.md`'s **Judge** rule that the judge must be a different model **family** than the
      one under test; and the data-usage terms want reading once, though the corpus is public
      documents and the queries are golden-set questions, so the no-personal-data limit is not at
      risk today.
   2. **No personal data, ever.** The corpus is public documents reached through the manifest only.
      Never log raw end-user queries or anything identifying. Note the unresolved tension:
-     `DESIGN.md:74` says no personal data, while `DESIGN.md:35` specifies structured per-query
+     `DESIGN.md` §5 says no personal data, while §3 specifies structured per-query
      logging — and a resident's real question can itself be personal data. Logging is where this
      bites; resolve it before any query log leaves this machine.
